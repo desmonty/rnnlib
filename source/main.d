@@ -89,32 +89,33 @@ void main()
         auto f = new FourierMatrix!(ushort, Complex!real)(cast(ushort) 65536u);
     }
 
-    auto len = 10_000_000;
+    auto len = 100_000_000;
 
-    auto v = new Vector!(size_t, real)(len, 0.01);
-    auto w = new Vector!(size_t, real)(len, 0.01);
+    auto vec = new Vector!(size_t, float)(len, 0.01);
+    auto wec = new Vector!(size_t, float)(len, 0.01);
 
-    writeln(v.dot(w));
-    writeln("\a");
-
-    auto m = new PermutationMatrix!(size_t, float)(3, 0.1);
-    auto ve = new Vector!(size_t, float)(3);
-    ve[0] = 0;
-    ve[1] = 1;
-    ve[2] = 40;
-
-    writeln(ve.v);
-    ve = m*ve;
-    writeln(ve.v);
-    writeln(m.perm);
-
-    MatrixAbstract!(size_t, float) mp = m;
-    ve = mp * ve;
-    writeln(ve.v);
+    writeln(vec.dot(wec));
 
 
-    writeln(typeof(m).stringof);
-    writeln(typeof(mp).stringof);
+    auto m1 = new Matrix!(uint, Complex!double)(4, 4, 0.1);
+    auto m2 = new DiagonalMatrix!(uint, Complex!double)(4, 0.1);
+    auto m3 = new ReflectionMatrix!(uint, Complex!double)(4, 0.1);
+    auto m4 = new FourierMatrix!(uint, Complex!double)(4);
+    auto bm = new BlockMatrix!(uint, Complex!double)(16, 4, [m1,m2,m3,m4], false);
+
+    auto v = new Vector!(uint, Complex!double)(16);
+    v[0]=complex(0,0);   v[1]=complex(1,0);
+    v[2]=complex(2, 0);   v[3]=complex(3, 0);
+    v[4]=complex(4, 0);   v[5]=complex(5, 0);
+    v[6]=complex(6, 0);   v[7]=complex(7, 0);
+    v[8]=complex(8, 0);   v[9]=complex(9, 0);
+    v[10]=complex(10, 0); v[11]=complex(11, 0);
+    v[12]=complex(12, 0); v[13]=complex(13, 0);
+    v[14]=complex(14, 0); v[15]=complex(15, 0);
+
+    writeln(v.v);
+    v = bm * v;
+    writeln(v.v);
 
     auto endttime = Clock.currTime();
     auto duration = endttime - stattime;

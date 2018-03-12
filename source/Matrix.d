@@ -21,7 +21,7 @@ class MatrixAbstract(S, T) : Parameter {
     else alias Tc = T;
 
     const
-    auto opBinary(string op)(in Vector!(S,T) v)
+    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
         auto res = this * v.v;
@@ -30,7 +30,7 @@ class MatrixAbstract(S, T) : Parameter {
 
 
     const
-    auto opBinary(string op)(in T[] v)
+    T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
         // TODO: Refactor. This is ugly but one can't simply use mixin here.
@@ -43,7 +43,7 @@ class MatrixAbstract(S, T) : Parameter {
                 static if (T.stringof.startsWith("Complex")) {
                     return cast(UnitaryMatrix!(S,T)) this * v;
                 }
-                else static assert(0, "Unitary matrices must be of complex type.");
+                else assert(0, "Unitary matrices must be of complex type.");
             case "DiagonalMatrix":
                 return cast(DiagonalMatrix!(S,T)) this * v;
             case "ReflectionMatrix":
@@ -51,7 +51,10 @@ class MatrixAbstract(S, T) : Parameter {
             case "PermutationMatrix":
                 return cast(PermutationMatrix!(S,T)) this * v;
             case "FourierMatrix":
-                return cast(FourierMatrix!(S,T)) this * v;
+                static if (T.stringof.startsWith("Complex")) {
+                    return cast(FourierMatrix!(S,T)) this * v;
+                }
+                else assert(0, "Fourier matrices must be of complex type.");
             case "Matrix":
                 return cast(Matrix!(S,T)) this * v;
             default:
@@ -272,9 +275,11 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
             // is rectangular with more columns than rows.
             index = b + blocks_out;
             while(index < blocks_in) {
-                s += blocks[index] *
-                     vec[(index*size_blocks) .. ((index+1)*size_blocks)];
+                s[] += (blocks[index] *
+                       vec[(index*size_blocks) .. ((index+1)*size_blocks)])[];
             }
+            import std.stdio: writeln;
+            writeln(b, " ", size_blocks);
 
             res[(b*size_blocks) .. ((b+1)*size_blocks)] = s;
         }
@@ -629,7 +634,6 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     void compute_invSqNormVec2()
     {
         invSqNormVec2 = -2*pow(vec.norm!"L2",-2);
-
     }
 
     /// Return a duplicate.
@@ -659,10 +663,11 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        auto vres = v.dup;
-        auto s = vec.conjdot(v, vec);
-        auto tmp = vec.dup;
-        tmp *= invSqNormVec2*s;
+        T[] vres = v.dup;
+        T s = vec.conjdot(v, vec);
+        T[] tmp = vec.v.dup;
+        s *= invSqNormVec2;
+        tmp[] *= s[];
         vres[] += tmp.v[];
         return vres;
     }
