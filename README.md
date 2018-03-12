@@ -6,7 +6,7 @@ RNN architecture using simple layers and any non linear function.
 
 I choose to train the neural networks using [Evolutionnary Algorithms](https://en.wikipedia.org/wiki/Evolutionary_algorithm).
 The reason why we do not use any optimization based on gradient descent is to avoid many issues it gives us when optimizing
-a rnn like vanishing/exploding gradients (e.g. see _[On the difficulty of training recurrent neural networks]_(http://www.jmlr.org/proceedings/papers/v28/pascanu13.pdf)).
+a rnn like vanishing/exploding gradients (e.g. see _[On the difficulty of training recurrent neural networks](http://www.jmlr.org/proceedings/papers/v28/pascanu13.pdf)_).
 
 One of the auxiliary goal of this project is to cut any dependencies between the evolutionary algorithms
 and the recurrent neural netwroks to enable anyone to use it independently.
