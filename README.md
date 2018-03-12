@@ -12,25 +12,25 @@ One of the auxiliary goal of this project is to cut any dependencies between the
 and the recurrent neural netwroks to enable anyone to use it independently.
 
 # TODO
-1. RNN
-  2. _Matrices_
-    3. Diagonal
-    3. Reflection
-    3. Permutation
-    3. Fourier
-    3. Unitary
-    3. Block
-    3. Unittest
-    3. Optimization
-  2. _Vectors_
-    3. Unittest
-    3. Optimization
-  2. _Layers_
-    3. Linear
-    3. Functional
-    3. Recurrent
-1. EVO
-  2. Evolution Strategy
-  2. Genetic Algorithm
-  2. Particle Swarm optimization
-  2. Ant colony optimization
+* RNN
+  * _Matrices_
+    * ~~Diagonal~~
+    * ~~Reflection~~
+    * ~~Permutation~~
+    * ~~Fourier~~
+    * Unitary
+    * Block
+    * Unittest
+    * Optimization
+  * _Vectors_
+    * Unittest
+    * Optimization
+  * _Layers_
+    * Linear
+    * Functional
+    * Recurrent
+* EVO
+  * Evolution Strategy
+  * Genetic Algorithm
+  * Particle Swarm optimization
+  * Ant colony optimization
