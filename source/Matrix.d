@@ -12,6 +12,7 @@ import std.string;
 import source.Parameters;
 
 
+
 class MatrixAbstract(S, T) : Parameter {
     private S rows, cols;
     protected string typeId;
@@ -24,16 +25,7 @@ class MatrixAbstract(S, T) : Parameter {
     Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
-        auto res = this * v.v;
-        return new Vector!(S,T)(res);
-    }
-
-    const
-    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
-    if (op=="*")
-    {
-        auto res = new Vector!(S,T)(this * v.v);
-        return res;
+        return new Vector!(S,T)(this * v.v);
     }
 
     const
@@ -82,7 +74,7 @@ class MatrixAbstract(S, T) : Parameter {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        // TODO: Refactor. This is ugly but one can't simply use mixin here.
+        // TODO: Refactor.
         auto tmptypeId = split(typeId, "!")[0];
         switch (tmptypeId)
         {
@@ -105,14 +97,48 @@ class MatrixAbstract(S, T) : Parameter {
                 }
                 else assert(0, "Fourier matrices must be of complex type.");
             case "Matrix":
-                return v / cast(Matrix!(S,T)) this;
+                assert(0, "Division by a general matrix is not yet implemented.");
             default:
                 assert(0, tmptypeId~" is not in the 'switch'
                                       clause of MatrixAbstract");
         }
     }
 }
+unittest
+{
+    import std.stdio: write;
+    write("Unittest Matrix Abstract ... ");
 
+    auto len = 1024;
+    auto m1 = new PermutationMatrix!(ulong, Complex!real)(len/4, 1.0);
+    auto m2 = new DiagonalMatrix!(ulong, Complex!real)(len/4, 1.0);
+    auto m3 = new ReflectionMatrix!(ulong, Complex!real)(len/4, 1.0);
+    auto m4 = new FourierMatrix!(ulong, Complex!real)(len/4);
+    auto bm = new BlockMatrix!(ulong, Complex!real)(len, len/4, [m1,m2,m3,m4], false);
+    
+    auto list_mat = [m1, m2, m3, m4, bm];
+    auto m1_hiden = list_mat[0];
+    auto m2_hiden = list_mat[1];
+    auto m3_hiden = list_mat[2];
+    auto m4_hiden = list_mat[3];
+    auto bm_hiden = list_mat[4];
+
+    auto v = new Vector!(ulong, Complex!real)(len);
+    auto w = new Vector!(ulong, Complex!real)(len/4);
+    foreach(i; 0 .. len)
+        v[i] = complex(cast(real)(i*2 - len/2), cast(real)(len/3 - i/3.0));
+
+
+    auto v2 = bm_hiden * v;
+    auto v3 = v2 / bm_hiden;
+
+    v3 -= v;
+    assert(v3.norm!"L2" < 1.0);
+    v2 -= v;
+    assert(v2.norm!"L2" > 1.0);
+
+    write("Done.\n");
+}
 
 class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
     MatrixAbstract!(S,T)[] blocks;
@@ -268,34 +294,34 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
         res = res / this.P;
         return res;
     }
+}
+unittest
+{
+    import std.stdio: write;
+    write("Unittest Block Matrix ... ");
 
-    unittest {
-        import std.stdio: write;
-        write("Unittest Block Matrix ... ");
+    auto len = 1024;
+    auto m1 = new PermutationMatrix!(ulong, Complex!float)(len/4, 1.0);
+    auto m2 = new DiagonalMatrix!(ulong, Complex!float)(len/4, 1.0);
+    auto m3 = new ReflectionMatrix!(ulong, Complex!float)(len/4, 1.0);
+    auto m4 = new FourierMatrix!(ulong, Complex!float)(len/4);
+    auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4, [m1,m2,m3,m4], false);
 
-        auto len = 65536;
-        auto m1 = new PermutationMatrix!(ulong, Complex!float)(len/4, 1.0);
-        auto m2 = new DiagonalMatrix!(ulong, Complex!float)(len/4, 1.0);
-        auto m3 = new ReflectionMatrix!(ulong, Complex!float)(len/4, 1.0);
-        auto m4 = new FourierMatrix!(ulong, Complex!float)(len/4);
-        auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4, [m1,m2,m3,m4], false);
+    auto v = new Vector!(ulong, Complex!float)(len);
+    foreach(i; 0 .. len)
+        v[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
 
-        auto v = new Vector!(ulong, Complex!float)(len);
-        foreach(i; 0 .. len)
-            v[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
-
-        auto mem= v.dup;
+    auto mem= v.dup;
 
 
-        auto v2 = bm * v;
-        auto v3 = v2 / bm;
-        v3 -= v;
-        assert(v3.norm!"L2" < 1.0);
-        v2 -= v;
-        assert(v2.norm!"L2" > 1.0);
+    auto v2 = bm * v;
+    auto v3 = v2 / bm;
+    v3 -= v;
+    assert(v3.norm!"L2" < 1.0);
+    v2 -= v;
+    assert(v2.norm!"L2" > 1.0);
 
-        write("Done.\n");
-    }
+    write("Done.\n");
 }
 
 class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
@@ -404,7 +430,9 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
         T[] res = v.dup;
         return res;
     }
-
+}
+unittest
+{
 }
 
 class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
@@ -447,35 +475,38 @@ class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
     {
         return objFFT.inverseFft!(Tc)(v);
     }
-
-    unittest
+}
+unittest
+{
+    import std.stdio : write;
+    import std.datetime;
+    write("Unittest Fourrier Matrix ... ");
     {
-        import std.stdio : write;
-        write("Unittest Fourrier Matrix ... ");
-        {
-            alias Fourier = FourierMatrix!(uint, Complex!double);
-            auto f = new Fourier(1024);
-            auto v = new Complex!double[2048];
-            auto vc = v[15 .. 1039];
+        alias Fourier = FourierMatrix!(uint, Complex!double);
+        auto f = new Fourier(1024);
+        auto v = new Complex!double[2048];
+        auto vc = v[15 .. 1039];
 
-            assert(vc.length == 1024);
+        assert(vc.length == 1024);
 
-            foreach(i;0 .. 1024)
-                vc[i] = complex(uniform(-1.0, 1.0, rnd),
-                                uniform(-1.0, 1.0, rnd));
+        auto rnd_tmp = Random(cast(uint) ((Clock.currTime()
+                         - SysTime(unixTimeToStdTime(0))).total!"msecs"));
 
-            auto r1 = f * (vc / f);
-            auto r2 = (f * vc) / f;
+        foreach(i;0 .. 1024)
+            vc[i] = complex(uniform(-1.0, 1.0, rnd_tmp),
+                            uniform(-1.0, 1.0, rnd_tmp));
 
-            foreach(i;0 .. 1024){
-                assert(std.complex.abs(r1[i] - vc[i]) <= 0.0001);
-                assert(std.complex.abs(r2[i] - vc[i]) <= 0.0001);
-                assert(std.complex.abs(r1[i] - r1[i]) <= 0.0001);
-            }
+        auto r1 = f * (vc / f);
+        auto r2 = (f * vc) / f;
+
+        foreach(i;0 .. 1024){
+            assert(std.complex.abs(r1[i] - vc[i]) <= 0.0001);
+            assert(std.complex.abs(r2[i] - vc[i]) <= 0.0001);
+            assert(std.complex.abs(r1[i] - r1[i]) <= 0.0001);
         }
-
-        write("Done.\n");
     }
+
+    write("Done.\n");
 }
 
 class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
@@ -639,64 +670,63 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     @property const
     T sum()
     {return mat.sum;}
-
-    unittest
+}
+unittest
+{
+    import std.stdio : write;
+    write("Unittest DiagonalMatrix ... ");
     {
-        import std.stdio : write;
-        write("Unittest DiagonalMatrix ... ");
-        {
-            alias Diag = DiagonalMatrix!(uint, double);
-            auto m1 = new Diag(4);
-            auto m2 = new Diag([0, 1, 2, 3]);
-            m1[0]=-0;m1[1]=-1;m1[2]=-2;m1[3]=-3;
+        alias Diag = DiagonalMatrix!(uint, double);
+        auto m1 = new Diag(4);
+        auto m2 = new Diag([0, 1, 2, 3]);
+        m1[0]=-0;m1[1]=-1;m1[2]=-2;m1[3]=-3;
 
-            auto m3 = m1.dup;
-            auto m4 = new Diag(m2);
+        auto m3 = m1.dup;
+        auto m4 = new Diag(m2);
 
-            assert(m1[2] == -2);
-            assert(m4.sum == m2.sum);
-            assert(m3.sum == m1.sum);
+        assert(m1[2] == -2);
+        assert(m4.sum == m2.sum);
+        assert(m3.sum == m1.sum);
 
-            m3 += m2;
-            assert(m3.sum == 0);
+        m3 += m2;
+        assert(m3.sum == 0);
 
-            m3 -= m4;
-            assert(m3[3] == m1[3]);
+        m3 -= m4;
+        assert(m3[3] == m1[3]);
 
-            auto v = [10.0, 3.0, 5.0, 1.0, 8.0, 4.0, 6.0];
-            auto w = m2 * v[0 .. 4];
-            assert(w[0] == 0);
-            assert(w[1] == 3);
-        }
-        {
-            alias Diag = DiagonalMatrix!(uint, Complex!double);
-            auto m1 = new Diag(4, 3.0);
-            auto m2 = new Diag([complex(0), complex(1),
-                                complex(2), complex(3)]);
-            m1[0]=complex(-0);m1[1]=complex(-1);
-            m1[2]=complex(-2);m1[3]=complex(-3);
-
-            auto m3 = m1.dup;
-            auto m4 = new Diag(m2);
-
-            assert(m1[2] == complex(-2));
-            assert(m4.sum == m2.sum);
-            assert(m3.sum == m1.sum);
-
-            m3 += m2;
-            assert(m3.sum.abs < 0.0001);
-
-            m3 -= m4;
-            assert(m3[3] == m1[3]);
-            assert(m3[1, 1] == m1[1]);
-            assert(m1.length == 4);
-
-            m1[1, 2] = complex(10000.0);
-            assert(m3[1, 1] == m1[1]);
-        }
-
-        write("Done.\n");
+        auto v = [10.0, 3.0, 5.0, 1.0, 8.0, 4.0, 6.0];
+        auto w = m2 * v[0 .. 4];
+        assert(w[0] == 0);
+        assert(w[1] == 3);
     }
+    {
+        alias Diag = DiagonalMatrix!(uint, Complex!double);
+        auto m1 = new Diag(4, 3.0);
+        auto m2 = new Diag([complex(0), complex(1),
+                            complex(2), complex(3)]);
+        m1[0]=complex(-0);m1[1]=complex(-1);
+        m1[2]=complex(-2);m1[3]=complex(-3);
+
+        auto m3 = m1.dup;
+        auto m4 = new Diag(m2);
+
+        assert(m1[2] == complex(-2));
+        assert(m4.sum == m2.sum);
+        assert(m3.sum == m1.sum);
+
+        m3 += m2;
+        assert(m3.sum.abs < 0.0001);
+
+        m3 -= m4;
+        assert(m3[3] == m1[3]);
+        assert(m3[1, 1] == m1[1]);
+        assert(m1.length == 4);
+
+        m1[1, 2] = complex(10000.0);
+        assert(m3[1, 1] == m1[1]);
+    }
+
+    write("Done.\n");
 }
 
 class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
@@ -798,7 +828,8 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         T s = vec.conjdot(v, vec);
         T[] tmp = vec.v.dup;
         s *= invSqNormVec2;
-        tmp[] *= s;
+        foreach(i; 0 .. cols)
+            tmp[i] = tmp[i] * s;
         vres[] += tmp[];
         return vres;
     }
@@ -820,7 +851,8 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         T s = vec.conjdot(v, vec);
         T[] tmp = vec.v.dup;
         s *= invSqNormVec2;
-        tmp[] *= s;
+        foreach(i; 0 .. cols)
+            tmp[i] = tmp[i] * s;
         vres[] += tmp[];
         return vres;
     }
@@ -845,55 +877,55 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         }
         return res;
     }
-
-    unittest
-    {
-        import std.stdio : writeln, write;
-        import source.Parameters;
-        write("Unittest Reflection ... ");
-        {
-            // Verification of the multiplication algorithm.
-            alias Reflection = ReflectionMatrix!(uint, Complex!real);
-            ReflectionMatrix!(uint, Complex!real) r1 = new Reflection(100, 1.0);
-            ReflectionMatrix!(uint, Complex!real) r1bis = r1.dup;
-            Matrix!(uint, Complex!real) m1 = r1.toMatrix();
-
-            r1bis.vec -= r1.vec;
-            assert(r1bis.vec.norm!"L2" <= 0.0001);
-
-            auto v = new Vector!(uint, Complex!real)(100, 1.0);
-            auto u = new Vector!(uint, Complex!real)(v);
-
-            v.opOpAssign!"*"(r1);
-            u.opOpAssign!"*"(m1);
-            v -= u;
-            assert(v.norm!"L2" < 0.0001);
-        }
-        {
-
-            auto vref = new Vector!(uint, real)(100, 1.0);
-
-            auto r1 = new ReflectionMatrix!(uint, real)(vref);
-            auto r1bis = new ReflectionMatrix!(uint, real)(vref.v);
-            Matrix!(uint, real) m1 = r1.toMatrix();
-
-            r1bis.vec -= r1.vec;
-            assert(r1bis.vec.norm!"L2" <= 0.0001);
-
-            auto v = new Vector!(uint, real)(100, 1.0);
-            auto u = new Vector!(uint, real)(v);
-
-            v.opOpAssign!"*"(r1);
-            u.opOpAssign!"*"(m1);
-            v -= u;
-            assert(v.norm!"L2" < 0.0001);
-
-            assert(r1.length == 100);
-            
-        }
-        writeln("Done.");
-    }
 }
+unittest
+{
+    import std.stdio : writeln, write;
+    import source.Parameters;
+    write("Unittest Reflection ... ");
+    {
+        // Verification of the multiplication algorithm.
+        alias Reflection = ReflectionMatrix!(uint, Complex!real);
+        ReflectionMatrix!(uint, Complex!real) r1 = new Reflection(100, 1.0);
+        ReflectionMatrix!(uint, Complex!real) r1bis = r1.dup;
+        Matrix!(uint, Complex!real) m1 = r1.toMatrix();
+
+        r1bis.vec -= r1.vec;
+        assert(r1bis.vec.norm!"L2" <= 0.0001);
+
+        auto v = new Vector!(uint, Complex!real)(100, 1.0);
+        auto u = new Vector!(uint, Complex!real)(v);
+
+        v.opOpAssign!"*"(r1);
+        u.opOpAssign!"*"(m1);
+        v -= u;
+        assert(v.norm!"L2" < 0.0001);
+    }
+    {
+
+        auto vref = new Vector!(uint, real)(100, 1.0);
+
+        auto r1 = new ReflectionMatrix!(uint, real)(vref);
+        auto r1bis = new ReflectionMatrix!(uint, real)(vref.v);
+        Matrix!(uint, real) m1 = r1.toMatrix();
+
+        r1bis.vec -= r1.vec;
+        assert(r1bis.vec.norm!"L2" <= 0.0001);
+
+        auto v = new Vector!(uint, real)(100, 1.0);
+        auto u = new Vector!(uint, real)(v);
+
+        v.opOpAssign!"*"(r1);
+        u.opOpAssign!"*"(m1);
+        v -= u;
+        assert(v.norm!"L2" < 0.0001);
+
+        assert(r1.length == 100);
+        
+    }
+    writeln("Done.");
+}
+
 
 class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
     S[] perm;
@@ -989,25 +1021,24 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
             vres[perm[i]] = v[i];
         return vres;
     }
+}
+unittest
+{
+    import std.stdio : write;
+    write("Unittest Permutation ... ");
+    
+    alias Perm = PermutationMatrix!(uint, float);
+    
+    auto p = new Perm(1_000, 3);
+    auto o = p.dup;
 
-    unittest
-    {
-        import std.stdio : write;
-        write("Unittest Permutation ... ");
-        
-        alias Perm = PermutationMatrix!(uint, float);
-        
-        auto p = new Perm(10_000, 3);
-        auto o = p.dup;
+    assert(p.perm[4] < p.perm.length);
+    p.perm[] -= o.perm[];
+    assert(p.perm.sum == 0);
 
-        assert(p.perm[4] < p.perm.length);
-        p.perm[] -= o.perm[];
-        assert(p.perm.sum == 0);
-
-        assert(p.length == 10_000);
-        
-        write("Done.\n");
-    }
+    assert(p.length == 1_000);
+    
+    write("Done.\n");
 }
 
 class Matrix(S,T) : MatrixAbstract!(S,T) {
@@ -1021,9 +1052,15 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         this.rows = rows;
         this.cols = cols;
     }
-        this(in S rows)
+    
+    this(in S rows)
     {
         this(rows, rows);
+    }
+
+    this(in S rows, in Tc randomBound)
+    {
+        this(rows, rows, randomBound);
     }
 
     /// Simple constructor with random initialization
@@ -1128,49 +1165,35 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         }
         return res;
     }
-    
-    const
-    auto opBinaryRight(string op)(in Vector!(S,T) v)
-    if (op=="/")
-    {
-        return new Vector!(S,T)(v.v / this);
-    }
-
-    const
-    T[] opBinaryRight(string op)(in T[] v)
-    if (op=="/")
-    {
-        // To implement
-        assert(0, "Multiplication by the inverse of a general Matrix
-                   is not yet implemented.");
-        T[] res = v.dup;
-        return res;
-    }
-
-    unittest
-    {
-        auto m1 = new Matrix!(uint, Complex!float)(10, 30, 5.0f);
-        auto m2 = m1.dup;
-        auto m3 = new Matrix!(uint, Complex!float)(30, 5, 10.0f);
-        auto m4 = new Matrix!(size_t, real)(100, 100, 1.0);
-
-        m2 -= m1;
-        assert(m2.mat.sum.abs < 0.1);
-
-        m2 += m1;
-        auto m5 = m1 * m3;
-
-        assert(m5.length == m1.length);
-
-        bool isFailed = false;
-        try
-        {
-            auto m6 = m3 * m1;
-        }
-        catch (Exception e)
-        {
-            isFailed = true;
-        }
-        assert(isFailed);
-    }
 }
+unittest
+{
+    auto m1 = new Matrix!(uint, Complex!float)(10, 30, 5.0f);
+    auto m2 = m1.dup;
+    auto m3 = new Matrix!(uint, Complex!float)(30, 5, 10.0f);
+    auto m4 = new Matrix!(size_t, real)(100, 1.0);
+    auto m5 = new Matrix!(size_t, real)(100);
+    m5.mat = m4.mat.dup;
+
+    m2 -= m1;
+    assert(m2.mat.sum.abs < 0.1);
+
+    m5 -= m4;
+    assert(m5.mat.sum.abs < 0.1);
+
+    m2 += m1;
+    auto m6 = m1 * m3;
+    assert(m6.length == m1.length);
+
+    bool isFailed = false;
+    try
+    {
+        auto m7 = m3 * m1;
+    }
+    catch (Exception e)
+    {
+        isFailed = true;
+    }
+    assert(isFailed);
+}
+

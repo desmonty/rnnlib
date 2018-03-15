@@ -238,7 +238,7 @@ class Vector(S, T) : Parameter {
         }
     }
 
-    // This fonction allow us to compute the conugate dot
+    // This fonction allow us to compute the conjugate dot
     // with a simple array. 
     const
     T conjdot(in T[] u, in Vector vtmp)
@@ -266,214 +266,216 @@ class Vector(S, T) : Parameter {
             this.v[] *= u[];
         }
     }
-
-    unittest
-    {
-    import std.stdio : write;
-    write("Unittest Vector ... ");
-
-    foreach(____;0 .. 10){
-        alias Vectoruf = Vector!(uint, float);
-        {
-            Vectoruf v = new Vectoruf([1.0f, 2.0f, 1000.0f]);
-            v[2] = 3.75f;
-
-            Vectoruf u = new Vectoruf(v);
-            u[0] = 1.25f;
-
-            assert(v.length == 3, "1");
-            assert(u.length == 3, "2");
-            assert(v.sum == 6.75f, "3");
-            assert(u.sum == 7.0f, "4");
-            assert(u.dot(v) == v.dot(u), "5");
-            assert(u.dot(v) == 19.3125f, "6");
-
-            auto w = u.dup;
-            
-            w -= u;
-            assert(w.sum == 0.0f, "7");
-            assert(w[2] == 0.0f, "8");
-
-            w += v;
-            assert(w.sum == v.sum, "9");
-            assert(w[1] == v[1], "10");
-
-            v /= w;
-            assert(v.sum == 3.0f, "11");
-            assert(v[0] == 1.0f, "12");
-
-            v *= u;
-            assert(v.sum == u.sum, "13");
-            assert(v[1] == u[1], "14");
-
-            u -= v;
-            assert(u.sum == 0.0f, "15");
-            assert(u[2] == 0.0f, "16");
-
-            // u=0
-            // v=u
-            // w=v
-
-            assert(v.sum == v.norm!"L1");
-            assert(std.math.abs(std.math.sqrt(w.dot(w)) - w.norm!"L2") < 0.0001);
-            assert(v.norm!"Linf" == 3.75f);
-            u[0] = 9;
-            assert(u.norm!"L0" == 1);
-        }
-
-        import std.complex : abs;
-        {
-            // The following test work every time if and only if
-            // the period of the random number generator is odd.
-            // It is the case with the one used here: Mersenne twister.
-            auto vc = new Vector!(uint, Complex!real)(3, 10.5f);
-            auto uc = new Vector!(uint, Complex!real)(3, 10.5f);
-            auto vc1 = new Vector!(uint, Complex!real)(vc);
-            auto uc1 = new Vector!(uint, Complex!real)(uc);
-
-            vc -= uc;
-            assert(vc.norm!"Linf" != complex(0));
-            vc += uc;
-            vc.conjmult(uc);
-            Complex!real sc = complex(0.0,0.0);
-            foreach(i; 0 .. vc1.length)
-                sc += vc1[i]*uc1[i].conj;
-            sc -= vc.sum;
-            assert(sc.abs < 0.00001);
-        }
-        {
-            auto vc = new Vector!(uint, real)(3, 10.5f);
-            auto uc = new Vector!(uint, real)(3, 10.5f);
-            auto vc1 = new Vector!(uint, real)(vc);
-            auto uc1 = new Vector!(uint, real)(uc);
-
-            vc -= uc;
-            assert(vc.norm!"Linf" != complex(0));
-            vc += uc;
-            vc.conjmult(uc);
-            real sc = 0.0;
-            foreach(i; 0 .. vc1.length)
-                sc += vc1[i]*uc1[i];
-            sc -= vc.sum;
-            assert(std.math.abs(sc) < 0.00001);
-
-            assert(std.math.abs(vc1.conjdot(uc1) - uc1.dot(vc1)) < 0.0001);
-            assert(std.math.abs(vc1.conjdot(uc1) - uc1.conjdot(uc1.v, vc1)) < 0.0001);
-        }
-
-        /// Test with matrix.
-
-        // Diagonal.
-        {
-            alias Diag = DiagonalMatrix!(uint, float);
-            auto m1 = new Diag(1_000_000, 1.0f);
-            auto v2 = new Vectoruf(m1.mat);
-            auto vr = new Vectoruf(1_000_000, 1000.0f);
-            auto ur = new Vectoruf(vr);
-
-            assert(vr.norm!"min" == ur.norm!"min");
-            vr *= m1;
-            assert(vr.norm!"L2" != ur.norm!"L2");
-            ur *= v2;
-            assert(vr.norm!"L2" == ur.norm!"L2");
-            assert(vr.norm!"min" == ur.norm!"min");
-            assert(vr.norm!"L1" == ur.norm!"L1");
-        }
-
-        // Permutation
-        {
-            alias Perm = PermutationMatrix!(uint, float);
-            auto p = new Perm(1_000_000, 1);
-            auto vp = new Vectoruf(1_000_000, 0.01f);
-            auto vpcop = new Vectoruf(vp);
-            vp *= p;
-            assert(std.math.abs(vp.norm!"L1" - vpcop.norm!"L1") < 1);
-            assert(std.math.abs(vp.norm!"Linf" - vpcop.norm!"Linf") < 1);
-            assert(std.math.abs(vp.norm!"min" - vpcop.norm!"min") < 1);
-
-            foreach(i; 0 .. vp.length)
-                assert(vp[i] == vpcop[p.permute(i)]);
-        }
-
-        //Reflection
-        {
-            // Reflection are involution, so applying 2 times the matrix to a vector
-            // should give that vector
-            auto matr = new ReflectionMatrix!(size_t, Complex!real)(1_000_000, 1.0f);
-            auto matu = new ReflectionMatrix!(size_t, Complex!real)(matr);
-            //
-            auto tmp = new Vector!(size_t, Complex!real)(matr.vec);
-            tmp -= matu.vec;
-            assert(tmp.norm!"L1" < 0.0001);
-
-            auto v1 = new Vector!(size_t, Complex!real)(1_000_000, 1000.0f);
-            auto w1 = new Vector!(size_t, Complex!real)(v1);
-            //
-            tmp = new Vector!(size_t, Complex!real)(v1);
-            tmp -= w1;
-            assert(tmp.norm!"L1" < 0.0001);
-
-
-            v1 *= matr;
-            v1 *= matu; // same as matr
-            v1 -= w1; // w1 is the same as v1 before the change.
-
-            assert(v1.norm!"L2" < 0.0001);
-        }
-        {
-            auto matr = new ReflectionMatrix!(size_t, real)(1_000_000, 1.0f);
-            auto matu = new ReflectionMatrix!(size_t, real)(matr);
-            //
-            auto tmp = new Vector!(size_t, real)(matr.vec);
-            tmp -= matu.vec;
-            assert(tmp.norm!"L1" < 0.0001);
-
-            auto v1 = new Vector!(size_t, real)(1_000_000, 1000.0f);
-            auto w1 = new Vector!(size_t, real)(v1);
-            //
-            tmp = new Vector!(size_t, real)(v1);
-            tmp -= w1;
-            assert(tmp.norm!"L1" < 0.0001);
-
-
-            v1 *= matr;
-            v1 *= matu; // same as matr
-            v1 -= w1; // w1 is the same as v1 before the change.
-
-            assert(v1.norm!"L2" < 0.0001);
-        }
-
-        // Fourier
-        {
-            alias Fourier = FourierMatrix!(size_t, Complex!double);
-            auto f = new Fourier(pow(2, 19));
-            auto v = new Vector!(size_t, Complex!double)(pow(2, 19), 1.0);
-
-            auto vtmp = v.dup;
-            v *= f;
-            v /= f;
-            v -= vtmp;
-            assert(v.norm!"L2" < 0.01);
-        }
-
-        // General matrix
-        {
-            auto m = new Matrix!(ulong, float)(4, 4);
-            m.mat = [1.0, 0.0, 0.0, 0.0,
-                     0.0, 0.0, 2.0, 0.0,
-                     0.0, 0.5, 0.0, 0.0,
-                     0.0, 0.0, 0.0, 1.0];
-            auto v = new Vector!(ulong, float)(4);
-            v[0] = 38.50;
-            v[1] = 13.64;
-            v[2] = 90.01;
-            v[3] = 27.42;
-
-            auto w = v.dup;
-            w *= m;
-
-        }
-    }
-    write("Done.\n");
-    }
 }
+unittest
+{
+  import std.stdio : write;
+  write("Unittest Vector ... ");
+
+  foreach(____;0 .. 10){
+
+    alias Vectoruf = Vector!(uint, float);
+    {
+        Vectoruf v = new Vectoruf([1.0f, 2.0f, 1000.0f]);
+        v[2] = 3.75f;
+
+        Vectoruf u = new Vectoruf(v);
+        u[0] = 1.25f;
+
+        assert(v.length == 3, "1");
+        assert(u.length == 3, "2");
+        assert(v.sum == 6.75f, "3");
+        assert(u.sum == 7.0f, "4");
+        assert(u.dot(v) == v.dot(u), "5");
+        assert(u.dot(v) == 19.3125f, "6");
+
+        auto w = u.dup;
+        
+        w -= u;
+        assert(w.sum == 0.0f, "7");
+        assert(w[2] == 0.0f, "8");
+
+        w += v;
+        assert(w.sum == v.sum, "9");
+        assert(w[1] == v[1], "10");
+
+        v /= w;
+        assert(v.sum == 3.0f, "11");
+        assert(v[0] == 1.0f, "12");
+
+        v *= u;
+        assert(v.sum == u.sum, "13");
+        assert(v[1] == u[1], "14");
+
+        u -= v;
+        assert(u.sum == 0.0f, "15");
+        assert(u[2] == 0.0f, "16");
+
+        // u=0
+        // v=u
+        // w=v
+
+        assert(v.sum == v.norm!"L1");
+        assert(std.math.abs(std.math.sqrt(w.dot(w)) - w.norm!"L2") < 0.0001);
+        assert(v.norm!"Linf" == 3.75f);
+        u[0] = 9;
+        assert(u.norm!"L0" == 1);
+    }
+
+    import std.complex : abs;
+    {
+        // The following test work every time if and only if
+        // the period of the random number generator is odd.
+        // It is the case with the one used here: Mersenne twister.
+        auto vc = new Vector!(uint, Complex!real)(3, 10.5f);
+        auto uc = new Vector!(uint, Complex!real)(3, 10.5f);
+        auto vc1 = new Vector!(uint, Complex!real)(vc);
+        auto uc1 = new Vector!(uint, Complex!real)(uc);
+
+        vc -= uc;
+        assert(vc.norm!"Linf" != complex(0));
+        vc += uc;
+        vc.conjmult(uc);
+        Complex!real sc = complex(0.0,0.0);
+        foreach(i; 0 .. vc1.length)
+            sc += vc1[i]*uc1[i].conj;
+        sc -= vc.sum;
+        assert(sc.abs < 0.00001);
+        assert(std.complex.abs(uc1.conjdot(vc1) -
+                               uc1.conjdot(uc1.v, vc1)) < 0.0001);
+    }
+    {
+        auto vc = new Vector!(uint, real)(3, 10.5f);
+        auto uc = new Vector!(uint, real)(3, 10.5f);
+        auto vc1 = new Vector!(uint, real)(vc);
+        auto uc1 = new Vector!(uint, real)(uc);
+
+        vc -= uc;
+        assert(vc.norm!"Linf" != complex(0));
+        vc += uc;
+        vc.conjmult(uc);
+        real sc = 0.0;
+        foreach(i; 0 .. vc1.length)
+            sc += vc1[i]*uc1[i];
+        sc -= vc.sum;
+        assert(std.math.abs(sc) < 0.00001);
+
+        assert(std.math.abs(vc1.conjdot(uc1) - uc1.dot(vc1)) < 0.01);
+        assert(std.math.abs(vc1.conjdot(uc1) - uc1.conjdot(uc1.v, vc1)) < 0.01);
+    }
+
+    /// Test with matrix.
+
+    // Diagonal.
+    {
+        alias Diag = DiagonalMatrix!(uint, float);
+        auto m1 = new Diag(1_000, 1.0f);
+        auto v2 = new Vectoruf(m1.mat);
+        auto vr = new Vectoruf(1_000, 1000.0f);
+        auto ur = new Vectoruf(vr);
+
+        assert(vr.norm!"min" == ur.norm!"min");
+        vr *= m1;
+        assert(vr.norm!"L2" != ur.norm!"L2");
+        ur *= v2;
+        assert(vr.norm!"L2" == ur.norm!"L2");
+        assert(vr.norm!"min" == ur.norm!"min");
+        assert(vr.norm!"L1" == ur.norm!"L1");
+    }
+
+    // Permutation
+    {
+        alias Perm = PermutationMatrix!(uint, float);
+        auto p = new Perm(1_000, 1);
+        auto vp = new Vectoruf(1_000, 0.01f);
+        auto vpcop = new Vectoruf(vp);
+        vp *= p;
+        assert(std.math.abs(vp.norm!"L1" - vpcop.norm!"L1") < 1);
+        assert(std.math.abs(vp.norm!"Linf" - vpcop.norm!"Linf") < 1);
+        assert(std.math.abs(vp.norm!"min" - vpcop.norm!"min") < 1);
+
+        foreach(i; 0 .. vp.length)
+            assert(vp[i] == vpcop[p.permute(i)]);
+    }
+
+    //Reflection
+    {
+        // Reflection are involution, so applying 2 times the matrix to a vector
+        // should give that vector
+        auto matr = new ReflectionMatrix!(size_t, Complex!real)(1_000, 1.0f);
+        auto matu = new ReflectionMatrix!(size_t, Complex!real)(matr);
+        //
+        auto tmp = new Vector!(size_t, Complex!real)(matr.vec);
+        tmp -= matu.vec;
+        assert(tmp.norm!"L1" < 0.0001);
+
+        auto v1 = new Vector!(size_t, Complex!real)(1_000, 1000.0f);
+        auto w1 = new Vector!(size_t, Complex!real)(v1);
+        //
+        tmp = new Vector!(size_t, Complex!real)(v1);
+        tmp -= w1;
+        assert(tmp.norm!"L1" < 0.0001);
+
+
+        v1 *= matr;
+        v1 *= matu; // same as matr
+        v1 -= w1; // w1 is the same as v1 before the change.
+
+        assert(v1.norm!"L2" < 0.0001);
+    }
+    {
+        auto matr = new ReflectionMatrix!(size_t, real)(1_000, 1.0f);
+        auto matu = new ReflectionMatrix!(size_t, real)(matr);
+        //
+        auto tmp = new Vector!(size_t, real)(matr.vec);
+        tmp -= matu.vec;
+        assert(tmp.norm!"L1" < 0.0001);
+
+        auto v1 = new Vector!(size_t, real)(1_000, 1000.0f);
+        auto w1 = new Vector!(size_t, real)(v1);
+        //
+        tmp = new Vector!(size_t, real)(v1);
+        tmp -= w1;
+        assert(tmp.norm!"L1" < 0.0001);
+
+
+        v1 *= matr;
+        v1 *= matu; // same as matr
+        v1 -= w1; // w1 is the same as v1 before the change.
+
+        assert(v1.norm!"L2" < 0.0001);
+    }
+
+    // Fourier
+    {
+        alias Fourier = FourierMatrix!(size_t, Complex!double);
+        auto f = new Fourier(pow(2, 11));
+        auto v = new Vector!(size_t, Complex!double)(pow(2, 11), 1.0);
+
+        auto vtmp = v.dup;
+        v *= f;
+        v /= f;
+        v -= vtmp;
+        assert(v.norm!"L2" < 0.01);
+    }
+
+    // General matrix
+    {
+        auto m = new Matrix!(ulong, float)(4, 4);
+        m.mat = [1.0, 0.0, 0.0, 0.0,
+                 0.0, 0.0, 2.0, 0.0,
+                 0.0, 0.5, 0.0, 0.0,
+                 0.0, 0.0, 0.0, 1.0];
+        auto v = new Vector!(ulong, float)(4);
+        v[0] = 38.50;
+        v[1] = 13.64;
+        v[2] = 90.01;
+        v[3] = 27.42;
+
+        auto w = v.dup;
+        w *= m;
+    }
+  }
+  write("Done.\n");
+}
+

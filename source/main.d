@@ -72,37 +72,12 @@ class RecurrentLayer : Layer
 
 void main()
 {
-    auto length = 15;
-
-    writeln("Begin");
-    auto stattime = Clock.currTime();
-
-    if (false)
-    {
-        auto v = new Vector!(uint, float)(5);
-        auto c = new Vector!(uint, Complex!double)(5);
-        auto m = new Matrix!(uint, float)(10);
-        auto d = new DiagonalMatrix!(uint, Complex!double)(5);
-        auto p = new PermutationMatrix!(uint, Complex!double)(5);
-        auto b = new BlockMatrix!(uint, Complex!double)(10u, 5u, [p, d], true);
-        auto r = new ReflectionMatrix!(long, Complex!float)(10);
-        auto f = new FourierMatrix!(ushort, Complex!real)(cast(ushort) 65536u);
-    }
-
-    auto len = 65536;
-
-    auto vec = new Vector!(size_t, float)(len, 0.01);
-    auto wec = new Vector!(size_t, float)(len, 0.01);
-
-    writeln(vec.dot(wec));
-
-
-
-
-
-    auto endttime = Clock.currTime();
-    auto duration = endttime - stattime;
-    writeln("Time ", duration);
-    writeln("End");
-
+    auto v = new Vector!(uint, float)(5);
+    auto c = new Vector!(size_t, Complex!double)(5);
+    auto m = new Matrix!(uint, float)(10);
+    auto d = new DiagonalMatrix!(uint, Complex!double)(5);
+    auto p = new PermutationMatrix!(uint, Complex!double)(5);
+    auto b = new BlockMatrix!(uint, Complex!double)(10u, 5u, [p, d], true);
+    auto r = new ReflectionMatrix!(long, Complex!float)(10);
+    auto f = new FourierMatrix!(ushort, Complex!real)(cast(ushort) 65536u);
 }
