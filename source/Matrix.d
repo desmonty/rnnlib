@@ -28,6 +28,13 @@ class MatrixAbstract(S, T) : Parameter {
         return new Vector!(S,T)(res);
     }
 
+    const
+    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
+    if (op=="*")
+    {
+        auto res = new Vector!(S,T)(this * v.v);
+        return res;
+    }
 
     const
     T[] opBinary(string op)(in T[] v)
@@ -62,104 +69,50 @@ class MatrixAbstract(S, T) : Parameter {
                                       clause of MatrixAbstract");
         }
     }
-}
-
-
-
-class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
-    /+
-        This matrix is defined in 
-            Unitary Evolution Recurrent Neural Networks,
-            Arjovsky, Shah, Bengio
-            (http://proceedings.mlr.press/v48/arjovsky16.pdf)
-
-        Its aim is to allow one to learn a unitary matrix that
-        depends on number of parameters that is linear relatively
-        to the size of matrix.
-
-        The resulting function is:
-            D_3 * R_2 * invF * D_2 * P * R_1 * F * D_1
-
-        where D_i are diagonal unitary complex matrices,
-              R_i are reflection unitary complex matrices,
-              F and invF are respectivelly the fourier
-                and inverse fourier transform,
-              P is a permutation matrix.
-     +/
-
-
-    PermutationMatrix!(S,T) perm;
-    FourierMatrix!(S,T) fourier;
-    Vector!(S,Tc) params;
-
-    /+ The params vector include in the following order:
-       + 3 diagonal unitary complex matrices.
-       + 2 reflection unitary complex matrices.
-
-       This will provide us with a simple way to change these
-       parameters.
-     +/
-
-    this(){}
-
-    this(in S size)
-    {
-        typeId = "UnitaryMatrix";
-
-        rows = size;
-        cols = size;
-
-        perm = new PermutationMatrix!(S,T)(size, 1.0);
-        fourier = new FourierMatrix!(S,T)(size);
-        params = new Vector!(S,Tc)(7*size);
-    }
-
-    this(in S size, in T randomBound)
-    {
-        this(size);
-
-        foreach(i;0 .. params.length)
-            params[i] = uniform(-randomBound, randomBound, rnd);
-    }
-
-
-    /// Apply the "num"th diagonal matrix on the given vector.
-    const
-    auto applyDiagonal(T[] v, in int num)
-    {
-        // we use expi to convert each value to a complex number
-        // the value is the angle of the complex number with radius 1.
-        S start_index = num*rows;
-        foreach(i; 0 .. rows)
-            v[i] *= std.math.expi(params[start_index + i]);
-    }
-
-    /// Apply the "num"th reflection matrix on the given vector.
-    const
-    auto applyReflection(T[] v, in int num)
-    {
-        
-    }
 
     const
-    auto opBinary(string op)(in Vector!(S,T) v)
-    if (op=="*")
+    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
+    if (op=="/")
     {
-        auto res = this * v.v;
-        return new Vector!(S,T)(res);
-    }
-
-
-    const
-    auto opBinary(string op)(in T[] v)
-    if (op=="*")
-    {
-        //TODO: Implement
-        auto res = v;
+        auto res = new Vector!(S,T)(v.v / this);
         return res;
     }
 
+    const
+    T[] opBinaryRight(string op)(in T[] v)
+    if (op=="/")
+    {
+        // TODO: Refactor. This is ugly but one can't simply use mixin here.
+        auto tmptypeId = split(typeId, "!")[0];
+        switch (tmptypeId)
+        {
+            case "BlockMatrix":
+                return v / cast(BlockMatrix!(S,T)) this;
+            case "UnitaryMatrix":
+                static if (T.stringof.startsWith("Complex")) {
+                    return v / cast(UnitaryMatrix!(S,T)) this;
+                }
+                else assert(0, "Unitary matrices must be of complex type.");
+            case "DiagonalMatrix":
+                return v / cast(DiagonalMatrix!(S,T)) this;
+            case "ReflectionMatrix":
+                return v / cast(ReflectionMatrix!(S,T)) this;
+            case "PermutationMatrix":
+                return v / cast(PermutationMatrix!(S,T)) this;
+            case "FourierMatrix":
+                static if (T.stringof.startsWith("Complex")) {
+                    return v / cast(FourierMatrix!(S,T)) this;
+                }
+                else assert(0, "Fourier matrices must be of complex type.");
+            case "Matrix":
+                return v / cast(Matrix!(S,T)) this;
+            default:
+                assert(0, tmptypeId~" is not in the 'switch'
+                                      clause of MatrixAbstract");
+        }
+    }
 }
+
 
 class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
     MatrixAbstract!(S,T)[] blocks;
@@ -244,7 +197,6 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
         this(size, size, size_blocks, blocks, randperm);
     }
 
-
     const
     auto opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
@@ -252,7 +204,6 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
         auto res = this * v.v;
         return new Vector!(S,T)(res);
     }
-
 
     const
     T[] opBinary(string op)(in T[] v)
@@ -267,7 +218,9 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
         T[] s;
         S index;
 
+        import std.stdio: writeln;
         foreach(S b; 0 .. blocks_out) {
+            writeln(b);
             // We take the first block matrix and multiply it with
             // the corresponding part of the vector.
             s = blocks[b] * vec[(b*size_blocks) .. ((b+1)*size_blocks)];
@@ -278,13 +231,44 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
                 s[] += (blocks[index] *
                        vec[(index*size_blocks) .. ((index+1)*size_blocks)])[];
             }
-            import std.stdio: writeln;
-            writeln(b, " ", size_blocks);
+
+            writeln(s.length, " ", res[(b*size_blocks) .. ((b+1)*size_blocks)] .length);
 
             res[(b*size_blocks) .. ((b+1)*size_blocks)] = s;
         }
 
         res = this.Q * res;
+        return res;
+    }
+
+    const
+    auto opBinaryRight(string op)(in Vector!(S,T) v)
+    if (op=="/")
+    {
+        return new Vector!(S,T)(v.v / this);
+    }
+
+    const
+    T[] opBinaryRight(string op)(in T[] v)
+    if (op=="/")
+    {
+        enforce(size_out == size_in, "Warning: Inverse of rectangular
+                                          block matrix is not implemented");
+        T[] vec = v / this.Q;
+
+        S blocks_in = size_in / size_blocks;
+        S blocks_out = size_out / size_blocks;
+
+        T[] res = new T[size_out];
+
+        foreach(S b; 0 .. blocks_out) {
+            // We take the first block matrix and multiply it with
+            // the corresponding part of the vector.
+            res[(b*size_blocks) .. ((b+1)*size_blocks)] =
+                vec[(b*size_blocks) .. ((b+1)*size_blocks)] / blocks[b];
+        }
+
+        res = res / this.P;
         return res;
     }
 
@@ -295,7 +279,7 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
         auto m2 = new DiagonalMatrix!(uint, real)(4, 0.1);
         auto m3 = new ReflectionMatrix!(uint, real)(4, 0.1);
         auto m4 = new FourierMatrix!(uint, real)(4);
-        auto bm = new BlockMatrix!(uint, real)(16, 16, [m1,m2,m3,m4], false);
+        auto bm = new BlockMatrix!(uint, real)(16, 4, [m1,m2,m3,m4], false);
 
         auto v = new Vector!(uint, real)(16);
         v[0]=0;   v[1]=1;
@@ -315,6 +299,115 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 }
 
+class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
+    /+
+        This matrix is defined in 
+            Unitary Evolution Recurrent Neural Networks,
+            Arjovsky, Shah, Bengio
+            (http://proceedings.mlr.press/v48/arjovsky16.pdf)
+
+        Its aim is to allow one to learn a unitary matrix that
+        depends on number of parameters that is linear relatively
+        to the size of matrix.
+
+        The resulting function is:
+            D_3 * R_2 * invF * D_2 * P * R_1 * F * D_1
+
+        where D_i are diagonal unitary complex matrices,
+              R_i are reflection unitary complex matrices,
+              F and invF are respectivelly the fourier
+                and inverse fourier transform,
+              P is a permutation matrix.
+     +/
+
+
+    PermutationMatrix!(S,T) perm;
+    FourierMatrix!(S,T) fourier;
+    Vector!(S,Tc) params;
+
+    /+ The params vector include in the following order:
+       + 3 diagonal unitary complex matrices.
+       + 2 reflection unitary complex matrices.
+
+       This will provide us with a simple way to change these
+       parameters.
+     +/
+
+    this(){}
+
+    this(in S size)
+    {
+        typeId = "UnitaryMatrix";
+
+        rows = size;
+        cols = size;
+
+        perm = new PermutationMatrix!(S,T)(size, 1.0);
+        fourier = new FourierMatrix!(S,T)(size);
+        params = new Vector!(S,Tc)(7*size);
+    }
+
+    this(in S size, in Tc randomBound)
+    {
+        this(size);
+
+        foreach(i;0 .. params.length)
+            params[i] = uniform(-randomBound, randomBound, rnd);
+    }
+
+
+    /// Apply the "num"th diagonal matrix on the given vector.
+    const
+    auto applyDiagonal(ref T[] v, in int num)
+    {
+        // we use expi to convert each value to a complex number
+        // the value is the angle of the complex number with radius 1.
+        S start_index = num*rows;
+        foreach(i; 0 .. rows)
+            v[i] *= cast(T) std.complex.expi(params[start_index + i]);
+    }
+
+    /// Apply the "num"th reflection matrix on the given vector.
+    const
+    auto applyReflection(T[] v, in int num)
+    {
+        
+    }
+
+    const
+    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
+    if (op=="*")
+    {
+        return new Vector!(S,T)(this * v.v);
+    }
+
+    const
+    T[] opBinary(string op)(in T[] v)
+    if (op=="*")
+    {
+        //TODO: Implement
+        T[] res = v.dup;
+        return res;
+    }
+
+    const
+    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
+    if (op=="/")
+    {
+        return new Vector!(S,T)(v.v / this);
+    }
+
+    const
+    T[] opBinaryRight(string op)(in T[] v)
+    if (op=="/")
+    {
+        //TODO: Implement
+        T[] res = v.dup;
+        return res;
+    }
+
+}
+
 class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
     Fft objFFT;
     
@@ -326,18 +419,32 @@ class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
 
 
     const
-    auto opBinary(string op)(in T[] other)
+    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
-        return objFFT.fft(other);
+        return new Vector!(S,T)(this * v.v);
+    }
+
+    const
+    T[] opBinary(string op)(in T[] v)
+    if (op=="*")
+    {
+        return cast(T[]) objFFT.fft(v);
     }
 
 
     const
-    auto opBinaryRight(string op)(in T[] other)
+    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
     if (op=="/")
     {
-        return objFFT.inverseFft(other);
+        return new Vector!(S,T)(v.v / this);
+    }
+
+    const
+    T[] opBinaryRight(string op)(in T[] v)
+    if (op=="/")
+    {
+        return cast(T[]) objFFT.inverseFft(v);
     }
 
     unittest
@@ -452,6 +559,25 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         return res;
     }
 
+    /// Operation-Assign +-*/ between Diagonal Matrix.
+    void opOpAssign(string op)(in DiagonalMatrix other)
+    if (op=="+" || op=="-" || op=="*" || op=="/")
+    {
+        foreach(i;0 .. rows)
+            mixin("mat[i] " ~ op ~ "= other.mat[i];");
+    }
+
+    ///  Vector multiplication.
+    const
+    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
+    if (op=="*")
+    {
+        auto vres = v.dup;
+        foreach(i; 0 .. v.length)
+            vres[i] = mat[i] * vres[i];
+        return vres;
+    }
+
     const
     auto opBinary(string op)(in T[] other)
     if (op=="*")
@@ -462,25 +588,25 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         return res;
     }
 
-    /// Operation-Assign +-*/ between Diagonal Matrix.
-    void opOpAssign(string op)(in DiagonalMatrix other)
-    if (op=="+" || op=="-" || op=="*" || op=="/")
+    const
+    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
+    if (op=="/")
     {
-        foreach(i;0 .. rows)
-            mixin("mat[i] " ~ op ~ "= other.mat[i];");
+        return new Vector!(S,T)(v.v / this);
     }
 
-    ///  Vector multiplication.
-    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
-    if (op=="*")
+    const
+    auto opBinaryRight(string op)(in T[] other)
+    if (op=="/")
     {
-        auto vres = v.dup;
-        foreach(i; 0 .. v.length)
-            vres[i] = mat[i] * vres[i];
-        return vres;
+        auto res = new T[other.length];
+        foreach(i;0 .. rows)
+            res[i] = other[i] / mat[i];
+        return res;
     }
 
     /// Operation +-*/ on Matrix.
+    const
     Matrix!(S,T) opBinary(string op)(in Matrix!(S,T) M)
     {
         static if (op=="+" || op=="-") {
@@ -498,12 +624,15 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         }
         else static assert(0, "Binary operation '"~op~"' is not implemented.");
     }
+
+    const
     Matrix!(S,T) opBinary(string op)(in Matrix!(S,T) M)
     if (op=="*" || op=="/")
     {
         auto res = M.dup;
         foreach(i;0 .. M.rows)
             mixin("res[i,i] " ~ op ~ "= M[i,i];");
+        return res;
     }
 
     @property const
@@ -653,7 +782,8 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
      + As we only store the vector that define the reflection
      + We can comme up with a linear-time matrix-vector multiplication.
      +/
-    auto opBinary(string op)(in Vector!(S, T) v)
+    const
+    Vector!(S,T) opBinary(string op)(in Vector!(S, T) v)
     if (op=="*")
     {
         return this * v.v;
@@ -667,11 +797,34 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         T s = vec.conjdot(v, vec);
         T[] tmp = vec.v.dup;
         s *= invSqNormVec2;
-        tmp[] *= s[];
-        vres[] += tmp.v[];
+        tmp[] *= s;
+        vres[] += tmp[];
         return vres;
     }
 
+    const
+    Vector!(S,T) opBinaryRight(string op)(in Vector!(S, T) v)
+    if (op=="/")
+    {
+        return v.v / this;
+    }
+
+    const
+    T[] opBinaryRight(string op)(in T[] v)
+    if (op=="/")
+    {
+        // This is not a bug !
+        // The inverse of a reflection is the very same reflection.
+        T[] vres = v.dup;
+        T s = vec.conjdot(v, vec);
+        T[] tmp = vec.v.dup;
+        s *= invSqNormVec2;
+        tmp[] *= s;
+        vres[] += tmp[];
+        return vres;
+    }
+
+    const
     Matrix!(S,T) toMatrix()
     {
         auto res = new Matrix!(S,T)(rows, cols);
@@ -819,6 +972,23 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
+    const
+    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
+    if (op=="/")
+    {
+        return new Vector!(S,T)(v.v / this);
+    }
+
+    const
+    T[] opBinaryRight(string op)(in T[] v)
+    if (op=="/")
+    {
+        auto vres = new T[v.length];
+        foreach(i; 0 .. v.length)
+            vres[perm[i]] = v[i];
+        return vres;
+    }
+
     unittest
     {
         import std.stdio : write;
@@ -937,11 +1107,6 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     const
-    auto opOpAssign(string op)(in Vector!(S,T) v)
-    if (op=="*")
-    { v = res * v; }
-
-    const
     auto opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
@@ -960,6 +1125,24 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
                 s += mat[i*cols + j]*v[j];
             res[i] = s;
         }
+        return res;
+    }
+    
+    const
+    auto opBinaryRight(string op)(in Vector!(S,T) v)
+    if (op=="/")
+    {
+        return new Vector!(S,T)(v.v / this);
+    }
+
+    const
+    T[] opBinaryRight(string op)(in T[] v)
+    if (op=="/")
+    {
+        // To implement
+        assert(0, "Multiplication by the inverse of a general Matrix
+                   is not yet implemented.");
+        T[] res = v.dup;
         return res;
     }
 
