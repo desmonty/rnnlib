@@ -82,9 +82,9 @@ void main()
         auto v = new Vector!(uint, float)(5);
         auto c = new Vector!(uint, Complex!double)(5);
         auto m = new Matrix!(uint, float)(10);
-        auto d = new DiagonalMatrix!(uint, double)(5);
+        auto d = new DiagonalMatrix!(uint, Complex!double)(5);
         auto p = new PermutationMatrix!(uint, Complex!double)(5);
-        //auto b = new BlockMatrix!(uint, Complex!double)(10, 10, [p, c], true);
+        auto b = new BlockMatrix!(uint, Complex!double)(10u, 5u, [p, d], true);
         auto r = new ReflectionMatrix!(long, Complex!float)(10);
         auto f = new FourierMatrix!(ushort, Complex!real)(cast(ushort) 65536u);
     }
@@ -97,27 +97,7 @@ void main()
     writeln(vec.dot(wec));
 
 
-    auto m1 = new PermutationMatrix!(ulong, Complex!real)(len/4, 1.0);
-    auto m2 = new DiagonalMatrix!(ulong, Complex!real)(len/4, 1.0);
-    auto m3 = new ReflectionMatrix!(ulong, Complex!real)(len/4, 1.0);
-    auto m4 = new FourierMatrix!(ulong, Complex!real)(len/4);
-    auto bm = new BlockMatrix!(ulong, Complex!real)(len, len/4, [m1,m2,m3,m4], false);
 
-    auto v = new Vector!(ulong, Complex!real)(len);
-    foreach(i; 0 .. len)
-        v[i] = complex(cast(real)(i*2 - len/2), cast(real)(len/3 - i/3.0));
-
-    auto mem= v.dup;
-
-
-    auto v2 = bm * v;
-    auto v3 = v2 / bm;
-    v3 -= v;
-    writeln(v3.norm!"L2");
-    assert(v3.norm!"L2" < 0.01);
-    v2 -= v;
-    writeln(v2.norm!"L2");
-    assert(v2.norm!"L2" > 1.0);
 
 
     auto endttime = Clock.currTime();

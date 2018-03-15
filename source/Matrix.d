@@ -220,7 +220,6 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
 
         import std.stdio: writeln;
         foreach(S b; 0 .. blocks_out) {
-            writeln(b);
             // We take the first block matrix and multiply it with
             // the corresponding part of the vector.
             s = blocks[b] * vec[(b*size_blocks) .. ((b+1)*size_blocks)];
@@ -231,8 +230,6 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
                 s[] += (blocks[index] *
                        vec[(index*size_blocks) .. ((index+1)*size_blocks)])[];
             }
-
-            writeln(s.length, " ", res[(b*size_blocks) .. ((b+1)*size_blocks)] .length);
 
             res[(b*size_blocks) .. ((b+1)*size_blocks)] = s;
         }
@@ -275,25 +272,27 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
     unittest {
         import std.stdio: write;
         write("Unittest Block Matrix ... ");
-        auto m1 = new Matrix!(uint, real)(4, 4, 0.1);
-        auto m2 = new DiagonalMatrix!(uint, real)(4, 0.1);
-        auto m3 = new ReflectionMatrix!(uint, real)(4, 0.1);
-        auto m4 = new FourierMatrix!(uint, real)(4);
-        auto bm = new BlockMatrix!(uint, real)(16, 4, [m1,m2,m3,m4], false);
 
-        auto v = new Vector!(uint, real)(16);
-        v[0]=0;   v[1]=1;
-        v[2]=2;   v[3]=3;
-        v[4]=4;   v[5]=5;
-        v[6]=6;   v[7]=7;
-        v[8]=8;   v[9]=9;
-        v[10]=10; v[11]=11;
-        v[12]=12; v[13]=13;
-        v[14]=14; v[15]=15;
+        auto len = 65536;
+        auto m1 = new PermutationMatrix!(ulong, Complex!float)(len/4, 1.0);
+        auto m2 = new DiagonalMatrix!(ulong, Complex!float)(len/4, 1.0);
+        auto m3 = new ReflectionMatrix!(ulong, Complex!float)(len/4, 1.0);
+        auto m4 = new FourierMatrix!(ulong, Complex!float)(len/4);
+        auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4, [m1,m2,m3,m4], false);
 
-        write(v.v, "\n");
-        v = bm * v;
-        write(v.v, "\n");
+        auto v = new Vector!(ulong, Complex!float)(len);
+        foreach(i; 0 .. len)
+            v[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
+
+        auto mem= v.dup;
+
+
+        auto v2 = bm * v;
+        auto v3 = v2 / bm;
+        v3 -= v;
+        assert(v3.norm!"L2" < 1.0);
+        v2 -= v;
+        assert(v2.norm!"L2" > 1.0);
 
         write("Done.\n");
     }
@@ -414,6 +413,8 @@ class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
     this(S size)
     {
         typeId = "FourierMatrix";
+        rows = size;
+        cols = size;
         objFFT = new Fft(size);
     };
 
@@ -429,7 +430,7 @@ class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        return cast(T[]) objFFT.fft(v);
+        return objFFT.fft!(Tc)(v);
     }
 
 
@@ -444,7 +445,7 @@ class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        return cast(T[]) objFFT.inverseFft(v);
+        return objFFT.inverseFft!(Tc)(v);
     }
 
     unittest
