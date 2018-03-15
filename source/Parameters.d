@@ -180,14 +180,7 @@ class Vector(S, T) : Parameter {
     void opOpAssign(string op)(in Matrix!(S,T) M)
     if (op == "*")
     {
-        auto res = this.v.dup;
-        foreach(i; 0 .. length){
-            T s = M[i,0]*this[0];
-            foreach(j; 1 .. length)
-                s += M[i,j]*this[j];
-            res[i] = s;
-        }
-        this.v = res;
+        this.v = M * this;
     }
 
     void opOpAssign(string op)(in DiagonalMatrix!(S,T) M)
@@ -257,7 +250,7 @@ class Vector(S, T) : Parameter {
             return s;
         }
         else {
-            return this.dot(u);
+            return vtmp.dot(u);
         }
     }
 
@@ -363,6 +356,9 @@ class Vector(S, T) : Parameter {
                 sc += vc1[i]*uc1[i];
             sc -= vc.sum;
             assert(std.math.abs(sc) < 0.00001);
+
+            assert(std.math.abs(vc1.conjdot(uc1) - uc1.dot(vc1)) < 0.0001);
+            assert(std.math.abs(vc1.conjdot(uc1) - uc1.conjdot(uc1.v, vc1)) < 0.0001);
         }
 
         /// Test with matrix.
@@ -458,6 +454,24 @@ class Vector(S, T) : Parameter {
             v /= f;
             v -= vtmp;
             assert(v.norm!"L2" < 0.01);
+        }
+
+        // General matrix
+        {
+            auto m = new Matrix!(ulong, float)(4, 4);
+            m.mat = [1.0, 0.0, 0.0, 0.0,
+                     0.0, 0.0, 2.0, 0.0,
+                     0.0, 0.5, 0.0, 0.0,
+                     0.0, 0.0, 0.0, 1.0];
+            auto v = new Vector!(ulong, float)(4);
+            v[0] = 38.50;
+            v[1] = 13.64;
+            v[2] = 90.01;
+            v[3] = 27.42;
+
+            auto w = v.dup;
+            w *= m;
+
         }
     }
     write("Done.\n");
