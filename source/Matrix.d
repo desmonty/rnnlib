@@ -4,7 +4,7 @@ import std.algorithm;
 import std.complex;
 import std.exception : enforce;
 import std.math;
-import std.numeric : Fft;
+import std.numeric : Fft, dotProduct;
 import std.random;
 import std.range : iota, array;
 import std.string;
@@ -383,20 +383,50 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
 
     /// Apply the "num"th diagonal matrix on the given vector.
     const
-    auto applyDiagonal(ref T[] v, in int num)
+    void applyDiagonal(ref T[] v, in int num)
     {
         // we use expi to convert each value to a complex number
         // the value is the angle of the complex number with radius 1.
         S start_index = num*rows;
         foreach(i; 0 .. rows)
             v[i] *= cast(T) std.complex.expi(params[start_index + i]);
+    }    /// Apply the "num"th diagonal matrix on the given vector.
+    
+    const
+    void applyDiagonalInv(ref T[] v, in int num)
+    {
+        // we use expi to convert each value to a complex number
+        // the value is the angle of the complex number with radius 1.
+        S start_index = num*rows;
+        foreach(i; 0 .. rows)
+            v[i] /= cast(T) std.complex.expi(params[start_index + i]);
     }
 
     /// Apply the "num"th reflection matrix on the given vector.
     const
-    auto applyReflection(T[] v, in int num)
+    void applyReflection(ref T[] v, in int num)
     {
-        
+        // The '+3' is because the diagonal matrices are first
+        // in the params array.
+        // The '*2' is because each reflection matrix need
+        // 2 * rows parameters to be defined.
+        S start_index = (2*num + 3)*rows;
+        T[] tmp_a = dotProduct(v, params[start_index .. start_index + rows]);
+        T[] tmp_b = dotProduct(v, params[start_index + rows .. start_index + 2*rows]);
+        T[] tmp = new T[rows];
+        T a, b;
+        Tc invsq = -2 / (dotProduct(params[start_index .. start_index + rows],
+                                    params[start_index .. start_index + rows])
+                      + (dotProduct(params[start_index + rows .. start_index + 2*rows],
+                                    params[start_index + rows .. start_index + 2*rows])));
+
+        foreach(i; 0 .. rows){
+            a = params[start_index + i]];
+            b = params[start_index + i + rows]];
+            tmp[i] = complex(a*tmp_a + b*tmp_b, b*tmp_a - a*tmp_b) * invsq;
+        }
+
+        v[] -= tmp[];
     }
 
     const
@@ -410,8 +440,21 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        //TODO: Implement
         T[] res = v.dup;
+
+        applyDiagonal(res, 0);
+        
+        res = fourier * res;
+
+        applyReflection(res, 0);
+        res = perm * res;
+        applyDiagonal(res, 1);
+        
+        res = res / fourier;
+        
+        applyReflection(res, 1);
+        applyDiagonal(res, 2);
+
         return res;
     }
 
@@ -426,8 +469,21 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        //TODO: Implement
         T[] res = v.dup;
+
+        applyDiagonalInv(res, 2);
+        applyReflection(res, 1);
+        
+        res = fourier * res;
+
+        applyDiagonalInv(res, 1);
+        res = res / perm;
+        applyReflection(res, 0);
+        
+        res = res / fourier;
+        
+        applyDiagonalInv(res, 0);
+
         return res;
     }
 }
