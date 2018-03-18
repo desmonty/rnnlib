@@ -72,12 +72,16 @@ class RecurrentLayer : Layer
 
 void main()
 {
-    auto v = new Vector!(uint, float)(5);
-    auto c = new Vector!(size_t, Complex!double)(5);
-    auto m = new Matrix!(uint, float)(10);
-    auto d = new DiagonalMatrix!(uint, Complex!double)(5);
-    auto p = new PermutationMatrix!(uint, Complex!double)(5);
-    auto b = new BlockMatrix!(uint, Complex!double)(10u, 5u, [p, d], true);
-    auto r = new ReflectionMatrix!(long, Complex!float)(10);
-    auto f = new FourierMatrix!(ushort, Complex!real)(cast(ushort) 65536u);
+    if (false)
+    {
+        auto v = new Vector!(uint, float)(5);
+        auto c = new Vector!(size_t, Complex!double)(5);
+        auto m = new Matrix!(uint, float)(10);
+        auto d = new DiagonalMatrix!(uint, Complex!double)(5);
+        auto p = new PermutationMatrix!(uint, Complex!double)(5);
+        auto b = new BlockMatrix!(uint, Complex!double)(10u, 5u, [p, d], true);
+        auto r = new ReflectionMatrix!(long, Complex!float)(10);
+        auto f = new FourierMatrix!(ushort, Complex!real)(cast(ushort) 65536u);
+    }
+
 }

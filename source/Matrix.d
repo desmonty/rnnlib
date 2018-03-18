@@ -11,6 +11,13 @@ import std.string;
 
 import source.Parameters;
 
+auto dot(R1, R2)(in R1[] lhs, in R2[] rhs)
+{
+    R1 s = lhs[0] + rhs[0];
+    foreach(i; 1 .. lhs.length)
+        s += lhs[i] * rhs[i];
+    return s;
+}
 
 
 class MatrixAbstract(S, T) : Parameter {
@@ -348,7 +355,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
 
     PermutationMatrix!(S,T) perm;
     FourierMatrix!(S,T) fourier;
-    Vector!(S,Tc) params;
+    Tc[] params;
 
     /+ The params vector include in the following order:
        + 3 diagonal unitary complex matrices.
@@ -369,7 +376,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
 
         perm = new PermutationMatrix!(S,T)(size, 1.0);
         fourier = new FourierMatrix!(S,T)(size);
-        params = new Vector!(S,Tc)(7*size);
+        params = new Tc[7*size];
     }
 
     this(in S size, in Tc randomBound)
@@ -404,29 +411,30 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
 
     /// Apply the "num"th reflection matrix on the given vector.
     const
-    void applyReflection(ref T[] v, in int num)
+    auto applyReflection(ref T[] v, in int num)
     {
         // The '+3' is because the diagonal matrices are first
         // in the params array.
         // The '*2' is because each reflection matrix need
         // 2 * rows parameters to be defined.
         S start_index = (2*num + 3)*rows;
-        T[] tmp_a = dotProduct(v, params[start_index .. start_index + rows]);
-        T[] tmp_b = dotProduct(v, params[start_index + rows .. start_index + 2*rows]);
-        T[] tmp = new T[rows];
-        T a, b;
-        Tc invsq = -2 / (dotProduct(params[start_index .. start_index + rows],
+        T tmp_c = dot(v, params[start_index .. start_index + rows]);
+                 + complex(0, 1) * 
+                   dot(v, params[start_index + rows .. start_index + 2*rows]);
+        T[] tmp_vec = new T[rows];
+        Tc a, b;
+        Tc invsq = -2 / (dot(params[start_index .. start_index + rows],
                                     params[start_index .. start_index + rows])
-                      + (dotProduct(params[start_index + rows .. start_index + 2*rows],
+                       + (dot(params[start_index + rows .. start_index + 2*rows],
                                     params[start_index + rows .. start_index + 2*rows])));
 
         foreach(i; 0 .. rows){
-            a = params[start_index + i]];
-            b = params[start_index + i + rows]];
-            tmp[i] = complex(a*tmp_a + b*tmp_b, b*tmp_a - a*tmp_b) * invsq;
+            a = params[start_index + i];
+            b = params[start_index + i + rows];
+            tmp_vec[i] = invsq * tmp_c * complex(a, b);
         }
 
-        v[] -= tmp[];
+        v[] -= tmp_vec[];
     }
 
     const
@@ -489,6 +497,22 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
+    import std.stdio : write;
+    write("Unittest Unitary Matrix ... ");
+    {
+        auto m = new UnitaryMatrix!(uint, Complex!double)(16, 0.1);
+        auto v = new Vector!(uint, Complex!double)(16, 0.2);
+        m.applyReflection(v.v, 0);
+
+        auto r = m * v;
+        auto k = r / m;
+
+        k -= v;
+
+        assert(k.norm!"L2" < 0.001);
+    }
+
+    write("Done.\n");
 }
 
 class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
