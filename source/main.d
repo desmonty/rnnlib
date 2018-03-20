@@ -72,7 +72,7 @@ class RecurrentLayer : Layer
 
 void main()
 {
-    if (false)
+    if (true)
     {
         auto v = new Vector!(uint, float)(5);
         auto c = new Vector!(size_t, Complex!double)(5);

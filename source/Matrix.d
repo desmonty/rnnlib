@@ -11,14 +11,25 @@ import std.string;
 
 import source.Parameters;
 
+import std.stdio: write;
 auto dot(R1, R2)(in R1[] lhs, in R2[] rhs)
 {
-    R1 s = lhs[0] + rhs[0];
+    R1 s = lhs[0] * rhs[0];
     foreach(i; 1 .. lhs.length)
         s += lhs[i] * rhs[i];
     return s;
 }
+unittest
+{
+    assert(dot([1.0, 2.0, 3.0], [-6.0, -5.0, -1.0]) ==
+           dot([-6.0, -5.0, -1.0], [1.0, 2.0, 3.0]));
 
+    assert(abs(dot([complex(1.0, 8.5), complex(6.4, 3.58), complex(10.8, 7.65)],
+               [-6.0, -5.0, -1.0])
+           -
+           dot([complex(6.4, 3.58), complex(10.8, 7.65), complex(1.0, 8.5)],
+               [-5.0, -1.0, -6.0])) < 0.001);
+}
 
 class MatrixAbstract(S, T) : Parameter {
     private S rows, cols;
@@ -365,8 +376,6 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
        parameters.
      +/
 
-    this(){}
-
     this(in S size)
     {
         typeId = "UnitaryMatrix";
@@ -418,21 +427,15 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
         // The '*2' is because each reflection matrix need
         // 2 * rows parameters to be defined.
         S start_index = (2*num + 3)*rows;
-        T tmp_c = dot(v, params[start_index .. start_index + rows]);
-                 + complex(0, 1) * 
-                   dot(v, params[start_index + rows .. start_index + 2*rows]);
+        S start_indexPlRows = start_index + rows;
+        auto a = params[start_index .. start_indexPlRows];
+        auto b = params[start_indexPlRows .. start_indexPlRows + rows];
+        T tmp_c = dot(v, a) - complex(0, 1) * dot(v, b);
         T[] tmp_vec = new T[rows];
-        Tc a, b;
-        Tc invsq = -2 / (dot(params[start_index .. start_index + rows],
-                                    params[start_index .. start_index + rows])
-                       + (dot(params[start_index + rows .. start_index + 2*rows],
-                                    params[start_index + rows .. start_index + 2*rows])));
+        tmp_c *= 2 / (dot(a, a) + dot(b, b));
 
-        foreach(i; 0 .. rows){
-            a = params[start_index + i];
-            b = params[start_index + i + rows];
-            tmp_vec[i] = invsq * tmp_c * complex(a, b);
-        }
+        foreach(i; 0 .. rows)
+            tmp_vec[i] = complex(a[i], b[i]) *  tmp_c;
 
         v[] -= tmp_vec[];
     }
@@ -500,16 +503,17 @@ unittest
     import std.stdio : write;
     write("Unittest Unitary Matrix ... ");
     {
-        auto m = new UnitaryMatrix!(uint, Complex!double)(16, 0.1);
-        auto v = new Vector!(uint, Complex!double)(16, 0.2);
-        m.applyReflection(v.v, 0);
+        auto m = new UnitaryMatrix!(uint, Complex!double)(1024, 9.0);
+        auto v = new Vector!(uint, Complex!double)(1024, 1.2);
+
+        auto k = v.dup;
 
         auto r = m * v;
-        auto k = r / m;
+        v = r / m;
 
         k -= v;
 
-        assert(k.norm!"L2" < 0.001);
+        assert(k.norm!"L2" < 0.00001);
     }
 
     write("Done.\n");
@@ -815,7 +819,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     
     /+
      + We define a reflection matrix to be of the form:
-     +	I - 2vv*/||v||^2
+     +  I - 2vv*/||v||^2
      + where I is the identity matrix
      + v is a complex vector
      + v* denotes the conjugate transpose of v
@@ -880,7 +884,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     @property const
     auto dup()
     {
-    	return new ReflectionMatrix(this);
+        return new ReflectionMatrix(this);
     }
 
     @property const
