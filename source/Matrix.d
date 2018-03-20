@@ -2,7 +2,7 @@ module source.Matrix;
 
 import std.algorithm;
 import std.complex;
-import std.exception : enforce;
+import std.exception: assertThrown, enforce;
 import std.math;
 import std.numeric : Fft, dotProduct;
 import std.random;
@@ -12,6 +12,15 @@ import std.string;
 import source.Parameters;
 
 import std.stdio: write;
+
+version(unittest)
+{
+    import std.stdio : writeln, write;
+    import source.Parameters;
+    import std.datetime;
+}
+
+
 auto dot(R1, R2)(in R1[] lhs, in R2[] rhs)
 {
     R1 s = lhs[0] * rhs[0];
@@ -33,7 +42,7 @@ unittest
 
 class MatrixAbstract(S, T) : Parameter {
     private S rows, cols;
-    protected string typeId;
+    string typeId;
 
     static if (T.stringof.startsWith("Complex"))
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
@@ -124,7 +133,6 @@ class MatrixAbstract(S, T) : Parameter {
 }
 unittest
 {
-    import std.stdio: write;
     write("Unittest Matrix Abstract ... ");
 
     auto len = 1024;
@@ -262,7 +270,6 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
         T[] s;
         S index;
 
-        import std.stdio: writeln;
         foreach(S b; 0 .. blocks_out) {
             // We take the first block matrix and multiply it with
             // the corresponding part of the vector.
@@ -273,6 +280,7 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
             while(index < blocks_in) {
                 s[] += (blocks[index] *
                        vec[(index*size_blocks) .. ((index+1)*size_blocks)])[];
+                index += blocks_out;
             }
 
             res[(b*size_blocks) .. ((b+1)*size_blocks)] = s;
@@ -294,7 +302,7 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
     if (op=="/")
     {
         enforce(size_out == size_in, "Warning: Inverse of rectangular
-                                          block matrix is not implemented");
+                                      block matrix is not implemented");
         T[] vec = v / this.Q;
 
         S blocks_in = size_in / size_blocks;
@@ -315,7 +323,6 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    import std.stdio: write;
     write("Unittest Block Matrix ... ");
 
     auto len = 1024;
@@ -329,7 +336,7 @@ unittest
     foreach(i; 0 .. len)
         v[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
 
-    auto mem= v.dup;
+    auto mem = v.dup;
 
 
     auto v2 = bm * v;
@@ -339,10 +346,13 @@ unittest
     v2 -= v;
     assert(v2.norm!"L2" > 1.0);
 
+    assertThrown(new BlockMatrix!(uint, real)(4u, 4u, 3u));
+
     write("Done.\n");
 }
 
-class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
+class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
+{
     /+
         This matrix is defined in 
             Unitary Evolution Recurrent Neural Networks,
@@ -500,7 +510,6 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    import std.stdio : write;
     write("Unittest Unitary Matrix ... ");
     {
         auto m = new UnitaryMatrix!(uint, Complex!double)(1024, 9.0);
@@ -562,8 +571,6 @@ class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    import std.stdio : write;
-    import std.datetime;
     write("Unittest Fourrier Matrix ... ");
     {
         alias Fourier = FourierMatrix!(uint, Complex!double);
@@ -757,7 +764,6 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    import std.stdio : write;
     write("Unittest DiagonalMatrix ... ");
     {
         alias Diag = DiagonalMatrix!(uint, double);
@@ -964,8 +970,6 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    import std.stdio : writeln, write;
-    import source.Parameters;
     write("Unittest Reflection ... ");
     {
         // Verification of the multiplication algorithm.
@@ -1108,7 +1112,6 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    import std.stdio : write;
     write("Unittest Permutation ... ");
     
     alias Perm = PermutationMatrix!(uint, float);

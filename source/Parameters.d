@@ -2,12 +2,22 @@ module source.Parameters;
 
 import std.algorithm;
 import std.complex;
+import std.exception: assertThrown;
 import std.math;
 import std.datetime;
 import std.random;
+import std.string: split;
 
 
 import source.Matrix;
+
+
+version(unittest)
+{
+    import std.stdio : writeln, write;
+    import std.datetime;
+    import std.asserterror;
+}
 
 abstract class Parameter {
     static private bool init = true;
@@ -23,6 +33,17 @@ abstract class Parameter {
     }
 }
 
+/+  Vector class.
+    This is a simple vector class that add utilities
+    around an array.
+
+    Args:
+        T: Type of the element of the vector.
+        S: Type of the indices. It should allow us
+           to deploy small vector with small indices (e.g. ushort)
+           which will be useful for memory optmization in some matrix
+           multiplication (e.g. permutation).
+ +/
 class Vector(S, T) : Parameter {
     T[] v;
 
@@ -184,19 +205,39 @@ class Vector(S, T) : Parameter {
     }
 
     void opOpAssign(string op)(in DiagonalMatrix!(S,T) M)
-    if (op == "*") { v[] *= M.mat[]; }
+    { 
+        static if (op == "*")
+        {
+            v[] *= M.mat[]; 
+        }
+        else static if (op == "/")
+        {
+            v[] /= M.mat[]; 
+        }
+        else static assert(0, "Operator "~op~" not implemented.");
+    }
 
     void opOpAssign(string op)(in PermutationMatrix!(S,T) M)
-    if (op == "*") 
     {
-        auto tmpvec = this.dup;
-        foreach(i; 0 .. length)
-            v[i] = tmpvec[M.permute(i)];
+        static if (op == "*")
+        {
+            auto tmpvec = this.dup;
+            foreach(i; 0 .. length)
+                v[i] = tmpvec[M.permute(i)];
+        }
+        else static if (op == "/")
+        {
+            auto tmpvec = this.dup;
+            foreach(i; 0 .. length)
+                v[M.permute(i)] = tmpvec[i];
+        }
+        else static assert(0, "Operator "~op~" not implemented.");
     }
 
     void opOpAssign(string op)(in ReflectionMatrix!(S,T) M)
-    if (op == "*") 
     {
+        static if (op != "*" && op != "/")
+            assert(0, "Operator "~op~" not implemented.");
         auto s = this.conjdot(M.vec);
         auto tmp = M.vec.dup;
         tmp *= M.invSqNormVec2*s;
@@ -209,16 +250,121 @@ class Vector(S, T) : Parameter {
             assert(0, "Fourier transform can only be applied to complex"
                       ~"vector as this is what it'll return.");
         
-        static if (op=="*") v = F.objFFT.fft(v);
-        else static if (op=="/") v = F.objFFT.inverseFft(v);
+        static if (op=="*") v = F.objFFT.fft!(Tc)(v);
+        else static if (op=="/") v = F.objFFT.inverseFft!(Tc)(v);
         else static assert(0, "Operator "~op~" not implemented.");
     }
 
-    void opOpAssign(string op)(in T scalar)
-    if (op == "*") 
+    void opOpAssign(string op)(in MatrixAbstract!(S,T) M)
     {
-        foreach(i; 0 .. length)
-            v[i] *= scalar;
+        /+ This should only be used to handle Matrix that
+           have a template definition which can only
+           be created if the type is Complex.
+           E.g. compiling the unitary matrix with T=real will
+           give you compile-time error. 
+         +/
+        auto tmptypeId = split(M.typeId, "!")[0];
+        if (tmptypeId == "UnitaryMatrix") {
+            static if (T.stringof.startsWith("Complex")) {
+                auto mat = cast(UnitaryMatrix!(S,T)) M;
+                static if (op == "*") 
+                {
+                    mat.applyDiagonal(v, 0);
+                    
+                    this *= mat.fourier;
+
+                    mat.applyReflection(v, 0);
+                    this *= mat.perm;
+                    mat.applyDiagonal(v, 1);
+                    
+                    this /= mat.fourier;
+                    
+                    mat.applyReflection(v, 1);
+                    mat.applyDiagonal(v, 2);
+                }
+
+                else static if (op == "/") 
+                {
+                    mat.applyDiagonalInv(v, 2);
+                    mat.applyReflection(v, 1);
+
+                    this *= mat.fourier;
+
+                    mat.applyDiagonalInv(v, 1);
+                    this /= mat.perm;
+                    mat.applyReflection(v, 0);
+
+                    this /= mat.fourier;
+
+                    mat.applyDiagonalInv(v, 0);
+                }
+                else static assert(0, "Operator "~op~" not implemented.");
+            }
+            else {
+                assert(0, "Unitary transform can only be applied to complex"
+                  ~"vector as this is what it'll return.");
+            }
+        }
+    }
+
+    void opOpAssign(string op)(in BlockMatrix!(S,T) M)
+    {
+        static if (op == "*") {
+            T[] vec = M.P * v;
+
+            S blocks_in = M.size_in / M.size_blocks;
+            S blocks_out = M.size_out / M.size_blocks;
+
+            T[] res = new T[M.size_out];
+            T[] s;
+            S index;
+
+            foreach(S b; 0 .. blocks_out) {
+                // We take the first block matrix and multiply it with
+                // the corresponding part of the vector.
+                s = M.blocks[b] * vec[(b*M.size_blocks) .. ((b+1)*M.size_blocks)];
+                // We then increment the index in case the block matrix
+                // is rectangular with more columns than rows.
+                index = b + blocks_out;
+                while(index < blocks_in) {
+                    s[] += (M.blocks[index] *
+                           vec[(index*M.size_blocks) .. ((index+1)*M.size_blocks)])[];
+                    index += blocks_out;
+                }
+
+                res[(b*M.size_blocks) .. ((b+1)*M.size_blocks)] = s;
+            }
+
+            v = M.Q * res;
+        }
+
+        else static if (op == "/"){
+            assert(M.size_out == M.size_in, "Warning: Inverse of rectangular
+                                             block matrix is not implemented");
+            T[] vec = v / M.Q;
+
+            S blocks_in = M.size_in / M.size_blocks;
+            S blocks_out = M.size_out / M.size_blocks;
+
+            T[] res = new T[M.size_out];
+
+            foreach(S b; 0 .. blocks_out) {
+                // We take the first block matrix and multiply it with
+                // the corresponding part of the vector.
+                res[(b*M.size_blocks) .. ((b+1)*M.size_blocks)] =
+                    vec[(b*M.size_blocks) .. ((b+1)*M.size_blocks)] / M.blocks[b];
+            }
+
+            v = res / M.P;
+        }
+        else static assert(0, "Operator "~op~" not implemented.");
+    }
+
+
+
+    void opOpAssign(string op)(in T scalar)
+    {
+        mixin("v[] "~op~"= scalar;");
     }
 
     const
@@ -269,7 +415,6 @@ class Vector(S, T) : Parameter {
 }
 unittest
 {
-  import std.stdio : write;
   write("Unittest Vector ... ");
 
   foreach(____;0 .. 10){
@@ -474,6 +619,75 @@ unittest
 
         auto w = v.dup;
         w *= m;
+    }
+
+    // Unitary matrix
+    {
+        auto m = new UnitaryMatrix!(uint, Complex!double)(4, 9.0);
+        auto v = new Vector!(uint, Complex!double)(4, 1.2);
+
+        auto k = v.dup;
+        auto w = m * v;
+
+        v *= m;
+        w -= v;
+        assert(w.norm!"L2" < 0.00001);
+        v /= m;
+
+        k -= v;
+        assert(k.norm!"L2" < 0.00001);
+    }
+
+    // Block matrix
+    {
+        auto len = 1024;
+        auto m1 = new PermutationMatrix!(ulong, Complex!float)(len/4, 1.0);
+        auto m2 = new DiagonalMatrix!(ulong, Complex!float)(len/4, 1.0);
+        auto m3 = new ReflectionMatrix!(ulong, Complex!float)(len/4, 1.0);
+        auto m4 = new FourierMatrix!(ulong, Complex!float)(len/4);
+        auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4, [m1,m2,m3,m4], false);
+
+        auto v = new Vector!(ulong, Complex!float)(len);
+        foreach(i; 0 .. len)
+            v[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
+
+        auto mem= v.dup;
+
+
+        auto v2 = bm * v;
+        auto v3 = v2 / bm;
+
+        v *= bm;
+        v2 -= v;
+        assert(v2.norm!"L2" < 0.1);
+        v /= bm;
+
+        v -= mem;
+        v3 -= mem;
+        assert(v3.norm!"L2" < 0.1);
+        assert(v.norm!"L2" < 0.1);
+
+        auto bmrec = new BlockMatrix!(ulong, Complex!float)(len, len/2, len/4, [m1,m2,m3,m4], true);
+        auto vv = new Vector!(ulong, Complex!float)(len);
+        foreach(i; 0 .. len)
+            vv[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
+
+        auto mev = vv.dup;
+        auto w = v.dup;
+
+        vv *= bmrec;
+        w = bmrec * mev;
+
+        vv -= w;
+        assert(vv.norm!"L2" < 0.001);
+        bool error =  false;
+        try {
+            vv /= bmrec;
+        }
+        catch (std.asserterror.AssertError e) {
+            error = true;
+        }
+        assert(error);
     }
   }
   write("Done.\n");
