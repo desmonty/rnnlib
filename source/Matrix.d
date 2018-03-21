@@ -38,7 +38,7 @@ unittest
     assert(abs(dot([complex(1.0, 8.5), complex(6.4, 3.58), complex(10.8, 7.65)],
                [-6.0, -5.0, -1.0])
            -
-           dot([complex(6.4, 3.58), complex(10.8, 7.65), complex(1.0, 8.5)],
+               dot([complex(6.4, 3.58), complex(10.8, 7.65), complex(1.0, 8.5)],
                [-5.0, -1.0, -6.0])) < 0.001);
 }
 

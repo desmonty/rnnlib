@@ -7,67 +7,12 @@ import std.math;
 import std.random;
 import std.stdio : writeln;
 
+import source.Layers;
 import source.Parameters;
 import source.Matrix;
 
 // source ~/dlang/ldc-1.7.0/activate
 //ldc2 -O3 -ffast-math *.d
-/+
-abstract class Layer
-{
-    ///
-    string name;
-
-    /// Neural layers pointing to this layer.
-    Layer[] inLayers;
-
-    /// Neural layers the layer is pointing to.
-    Layer[] outLayers;
-
-    bool Ps_parameter;
-
-    this(){}
-
-    void set_name(string _name)
-    {
-        if (_name !is null)
-            name = _name;
-    }
-
-    abstract void apply();
-    abstract Vector pop();
-}
-
-class LinearLayer : Layer
-{
-    Matrix W;
-    Vector bias;
-    Vector hidden;
-
-
-    void init()
-
-
-    override Vector pop()
-    {
-        return hidden;
-    }
-
-    override void apply()
-    {
-        hidden[] = 0;
-        foreach(layer; inLayers)
-        {
-
-        }
-    }
-}
-
-class InputLayer : Layer
-class FunctionLayer : Layer
-class RecurrentLayer : Layer
-+/
-
 
 
 void main()
