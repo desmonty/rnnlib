@@ -18,12 +18,12 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * ~~Reflection~~
     * ~~Permutation~~
     * ~~Fourier~~
-    * Unitary
-    * Block
-    * Unittest
+    * ~~Unitary~~
+    * ~~Block~~
+    * ~~Unittest~~
     * Optimization
   * _Vectors_
-    * Unittest
+    * ~~Unittest~~
     * Optimization
   * _Layers_
     * Linear
