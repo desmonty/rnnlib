@@ -22,9 +22,12 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * ~~Block~~
     * ~~Unittest~~
     * Optimization
+      * Use a single "dot" product and optimize it.
   * _Vectors_
     * ~~Unittest~~
     * Optimization
+      * alias array for vector ?
+      * use arrayfire ? 
   * _Layers_
     * Linear
     * Functional
