@@ -16,7 +16,7 @@ version(unittest)
 {
     import std.stdio : writeln, write;
     import std.datetime;
-    import std.asserterror;
+    import core.exception;
 }
 
 abstract class Parameter {
@@ -201,7 +201,7 @@ class Vector(S, T) : Parameter {
     void opOpAssign(string op)(in Matrix!(S,T) M)
     if (op == "*")
     {
-        this.v = M * this;
+        this.v = M * this.v;
     }
 
     void opOpAssign(string op)(in DiagonalMatrix!(S,T) M)
@@ -645,7 +645,8 @@ unittest
         auto m2 = new DiagonalMatrix!(ulong, Complex!float)(len/4, 1.0);
         auto m3 = new ReflectionMatrix!(ulong, Complex!float)(len/4, 1.0);
         auto m4 = new FourierMatrix!(ulong, Complex!float)(len/4);
-        auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4, [m1,m2,m3,m4], false);
+        auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4,
+                                                         [m1,m2,m3,m4], false);
 
         auto v = new Vector!(ulong, Complex!float)(len);
         foreach(i; 0 .. len)
@@ -667,7 +668,8 @@ unittest
         assert(v3.norm!"L2" < 0.1);
         assert(v.norm!"L2" < 0.1);
 
-        auto bmrec = new BlockMatrix!(ulong, Complex!float)(len, len/2, len/4, [m1,m2,m3,m4], true);
+        alias Block = BlockMatrix!(ulong, Complex!float);
+        auto bmrec = new Block(len, len/2, len/4, [m1,m2,m3,m4], true);
         auto vv = new Vector!(ulong, Complex!float)(len);
         foreach(i; 0 .. len)
             vv[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
@@ -684,7 +686,7 @@ unittest
         try {
             vv /= bmrec;
         }
-        catch (std.asserterror.AssertError e) {
+        catch (AssertError e) {
             error = true;
         }
         assert(error);

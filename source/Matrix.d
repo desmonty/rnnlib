@@ -18,6 +18,7 @@ version(unittest)
     import std.stdio : writeln, write;
     import source.Parameters;
     import std.datetime;
+    import core.exception;
 }
 
 
@@ -28,6 +29,7 @@ auto dot(R1, R2)(in R1[] lhs, in R2[] rhs)
         s += lhs[i] * rhs[i];
     return s;
 }
+
 unittest
 {
     assert(dot([1.0, 2.0, 3.0], [-6.0, -5.0, -1.0]) ==
@@ -135,19 +137,35 @@ unittest
 {
     write("Unittest Matrix Abstract ... ");
 
+
+    class ErrorMatrix(S,T) : MatrixAbstract!(S,T) {
+        this() {
+            typeId = "ErrorMatrix";
+            rows = 0;
+            cols = 0;
+        }
+    }
+
     auto len = 1024;
     auto m1 = new PermutationMatrix!(ulong, Complex!real)(len/4, 1.0);
     auto m2 = new DiagonalMatrix!(ulong, Complex!real)(len/4, 1.0);
     auto m3 = new ReflectionMatrix!(ulong, Complex!real)(len/4, 1.0);
     auto m4 = new FourierMatrix!(ulong, Complex!real)(len/4);
     auto bm = new BlockMatrix!(ulong, Complex!real)(len, len/4, [m1,m2,m3,m4], false);
-    
-    auto list_mat = [m1, m2, m3, m4, bm];
-    auto m1_hiden = list_mat[0];
-    auto m2_hiden = list_mat[1];
-    auto m3_hiden = list_mat[2];
-    auto m4_hiden = list_mat[3];
-    auto bm_hiden = list_mat[4];
+    auto um = new UnitaryMatrix!(ulong, Complex!real)(len, 3.14159265351313);
+    auto mm = new Matrix!(ulong, Complex!real)(len, 5.6);
+    auto em = new ErrorMatrix!(ulong, Complex!real)();
+
+    auto list_mat = [m1, m2, m3, m4, bm, um, mm, em];
+    auto m1_hyde = list_mat[0];
+    auto m2_hyde = list_mat[1];
+    auto m3_hyde = list_mat[2];
+    auto m4_hyde = list_mat[3];
+    auto bm_hyde = list_mat[4];
+    auto um_hyde = list_mat[5];
+    auto mm_hyde = list_mat[6];
+    auto em_hyde = list_mat[7];
+
 
     auto v = new Vector!(ulong, Complex!real)(len);
     auto w = new Vector!(ulong, Complex!real)(len/4);
@@ -155,13 +173,49 @@ unittest
         v[i] = complex(cast(real)(i*2 - len/2), cast(real)(len/3 - i/3.0));
 
 
-    auto v2 = bm_hiden * v;
-    auto v3 = v2 / bm_hiden;
+    auto v2 = bm_hyde * v;
+    auto v3 = v2 / bm_hyde;
 
-    v3 -= v;
-    assert(v3.norm!"L2" < 1.0);
-    v2 -= v;
-    assert(v2.norm!"L2" > 1.0);
+    v3 -= v; assert(v3.norm!"L2" < 0.01);
+    v2 -= v; assert(v2.norm!"L2" > 1.0);
+
+    v2 = um_hyde * v;
+    v3 = v2 / um_hyde;
+
+    v3 -= v; assert(v3.norm!"L2" < 0.01);
+    v2 -= v; assert(v2.norm!"L2" > 1.0);
+
+
+    v2 = mm_hyde * v;
+    v3 = mm * v;
+
+    v3 -= v2; assert(v3.norm!"L2" < 0.01);
+    v2 -= v; assert(v2.norm!"L2" > 1.0);
+
+    bool error = false;
+    try {
+        auto ver = em_hyde * v;
+    }
+    catch (AssertError e) {
+        error = true;
+    }
+    assert(error);
+    error = false;
+    try {
+        auto ver = v / em_hyde;
+    }
+    catch (AssertError e) {
+        error = true;
+    }
+    assert(error);
+    error = false;
+    try {
+        auto ver = v / mm_hyde;
+    }
+    catch (AssertError e) {
+        error = true;
+    }
+    assert(error);
 
     write("Done.\n");
 }
@@ -347,6 +401,7 @@ unittest
     assert(v2.norm!"L2" > 1.0);
 
     assertThrown(new BlockMatrix!(uint, real)(4u, 4u, 3u));
+    assertThrown(new BlockMatrix!(uint, real)(4u, 3u, 3u));
 
     write("Done.\n");
 }
@@ -1235,8 +1290,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     auto opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
-        auto res = this * v.v;
-        return res;
+        return new Vector!(S,T)(this * v.v);
     }
 
     const
