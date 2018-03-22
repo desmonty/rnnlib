@@ -78,7 +78,7 @@ class LinearLayer(S,T) : Layer!(S,T)
 
     /// Apply the function implemented by the layer to the vector.
     override
-    auto apply(in Vector!(S,T) vec)
+    auto apply(Vector!(S,T) vec)
     {
         auto tmp_vec = new Vector!(S,T)(size_in);
         tmp *= W;
@@ -87,46 +87,87 @@ class LinearLayer(S,T) : Layer!(S,T)
         return tmp;
     }
 }
+unittest {
 
+}
+
+/+ This layer can implement any function that take as input a
+   Vector!(S,T) and return another Vector!(S,T).
+   WARNING : Right now, the function will change the vector
+   it is given in the case of a element-wise tranformation.
+ +/
 class FunctionLayer(S,T) : Layer!(S,T)
 {
     Vector!(S,T) delegate(Vector!(S,T) v) func;
+    Vector!(S,T) parameters;
+    bool is_learnable = false;
 
-    this(string easyfunc)
+    this(string easyfunc, in S size_in=0)
     {
-        static if 
-        func = delegate(Vector!(S,T) v) {
-
-        };
         switch (easyfunc)
         {
-            case "BlockMatrix":
-                return cast(BlockMatrix!(S,T)) this * v;
-            case "UnitaryMatrix":
-                static if (T.stringof.startsWith("Complex")) {
-                    return cast(UnitaryMatrix!(S,T)) this * v;
+            case "relu":
+                if (!T.stringof.startsWith("Complex")) {
+                    this( (T val) => val if val > 0 else 0);
+                    break;
                 }
-                else assert(0, "Unitary matrices must be of complex type.");
-            case "DiagonalMatrix":
-                return cast(DiagonalMatrix!(S,T)) this * v;
-            case "ReflectionMatrix":
-                return cast(ReflectionMatrix!(S,T)) this * v;
-            case "PermutationMatrix":
-                return cast(PermutationMatrix!(S,T)) this * v;
-            case "FourierMatrix":
-                static if (T.stringof.startsWith("Complex")) {
-                    return cast(FourierMatrix!(S,T)) this * v;
-                }
-                else assert(0, "Fourier matrices must be of complex type.");
-            case "Matrix":
-                return cast(Matrix!(S,T)) this * v;
+                // else with use modRelu by default.
+            case "modRelu":
+                if (!T.stringof.startsWith("Complex"))
+                    throw new Exception("the 'modRelu' function can only be used with complex number.");
+
+                is_learnable = true;
+                parameters = new Vector!(S,T)(size_in, 1.0);
+                func = delegate(Vector!(S,T) v) {
+                        auto tmp = v[0];
+                        foreach(i; 0 .. v.length) {
+                            tmp = v[i].abs + parameters[i];
+                            v[i] = tmp*v[i]/v[i].abs if tmp > 0 else 0;
+                        }
+                };
+                break;
             default:
-                assert(0, tmptypeId~" is not in the 'switch'
-                                      clause of MatrixAbstract");
+                try {
+                    // This should handle most of the case : tanh, cos, sin, sqrt, atanh, expi 
+                    func = delegate(Vector!(S,T) v) {
+                        foreach(i; 0 .. v.length)
+                            mixin("v[i] = "~easyfunc~"(v[i]);");
+                    };
+                }
+                catch (Exception e) {
+                    assert(0, easyfunc ~ " is not a known function. Implement it !");
+                }
         }
     }
+
+    // The function to apply to the vector. Can be anything.
+    this(Vector!(S,T) delegate(Vector!(S,T)) _func)
+    {
+
+    }
+
+    // Create an element-wise function that apply a provided
+    // function to a vector.
+    auto
+    this(T delegate(T) _func)
+    {
+        func =
+        delegate(Vector!(S,T) v) {
+            foreach(i; 0 .. v.length)
+                v[i] = _func(v[i]);
+        };
+    }
+
+    override
+    auto apply(Vector!(S,T) v)
+    {
+        return func(v);
+    }
 }
+unittest {
+    
+}
+
 /+
-class InputLayer : Layer
 class RecurrentLayer : Layer
 +/
