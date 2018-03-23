@@ -1,5 +1,12 @@
 module source.Layers;
 
+import std.complex;
+
+import std.string : startsWith;
+
+import source.Matrix;
+import source.Parameters;
+
 /+  The layers of the Neural Networks.
 
     Basically, each layer can be seen as a function,
@@ -48,7 +55,7 @@ abstract class Layer(S,T)
             name = _name;
     }
 
-    abstract Vector!(S,T) apply();
+    abstract Vector!(S,T) apply(ref Vector!(S,T));
 }
 
 /+ This layer implement a simple linear matrix transformation
@@ -61,33 +68,44 @@ class LinearLayer(S,T) : Layer!(S,T)
     Vector!(S,T) bias;
     bool keep_bias;
 
-    this(ref MatrixAbstract!(S,T) _W, bool _keep_bias = true)
+    this(out MatrixAbstract!(S,T) _W, bool _keep_bias = true)
     {
         W = _W;
         keep_bias = _keep_bias;
     }
 
     /// Random initialization of the matrix and vector.
-    void init(in S _size_in, in S _size_out)
+    void init()
     {
         if (keep_bias) {
-            bias = new Vector!(S,T)(size_out);
-            bias.v[] = 0;
+            bias = new Vector!(S,T)(W.rows, 0);
         }
     }
 
     /// Apply the function implemented by the layer to the vector.
     override
-    auto apply(Vector!(S,T) vec)
+    Vector!(S,T) apply(out Vector!(S,T) vec)
     {
-        auto tmp_vec = new Vector!(S,T)(size_in);
-        tmp *= W;
+        vec *= W;
         if (keep_bias)
-            tmp += bias;
-        return tmp;
+            vec += bias;
+        return vec;
     }
 }
 unittest {
+    auto m = new UnitaryMatrix!(uint, Complex!real)(10, 1.0);
+    auto l = new LinearLayer!(uint, Complex!real)(&m, false);
+    auto v = new Vector!(uint, Complex!real)(10, 1.0);
+    l.init();
+
+    auto w = m * v;
+    auto u = l.apply(v);
+
+    v -= u;
+
+    assert(v.norm!"L2" <= 0.001);
+    u -= w;
+    assert(u.norm!"L2" <= 0.001);
 
 }
 
@@ -108,27 +126,39 @@ class FunctionLayer(S,T) : Layer!(S,T)
         {
             case "relu":
                 if (!T.stringof.startsWith("Complex")) {
-                    this( (T val) => val if val > 0 else 0);
+                    this( delegate(T val) {
+                            if (val > 0) return val;
+                            return 0;
+                          }
+                    );
                     break;
                 }
                 // else with use modRelu by default.
             case "modRelu":
                 if (!T.stringof.startsWith("Complex"))
-                    throw new Exception("the 'modRelu' function can only be used with complex number.");
+                    throw new Exception("the 'modRelu' function can only
+                                         be used with complex number.");
 
                 is_learnable = true;
                 parameters = new Vector!(S,T)(size_in, 1.0);
                 func = delegate(Vector!(S,T) v) {
                         auto tmp = v[0];
+                        auto absv = v[0].abs;
                         foreach(i; 0 .. v.length) {
-                            tmp = v[i].abs + parameters[i];
-                            v[i] = tmp*v[i]/v[i].abs if tmp > 0 else 0;
+                            absv = v[i].abs;
+                            tmp = absv + parameters[i];
+                            if (tmp > 0) {
+                                v[i] = tmp*v[i]/absv;
+                            }
+                            else {
+                                v[i] = 0;
+                            }
                         }
                 };
                 break;
             default:
                 try {
-                    // This should handle most of the case : tanh, cos, sin, sqrt, atanh, expi 
+                    // This should handle most of the case : tanh, cos, sin, sqrt, expi .. 
                     func = delegate(Vector!(S,T) v) {
                         foreach(i; 0 .. v.length)
                             mixin("v[i] = "~easyfunc~"(v[i]);");
@@ -159,7 +189,7 @@ class FunctionLayer(S,T) : Layer!(S,T)
     }
 
     override
-    auto apply(Vector!(S,T) v)
+    Vector!(S,T) apply(ref Vector!(S,T) v)
     {
         return func(v);
     }

@@ -43,7 +43,7 @@ unittest
 }
 
 class MatrixAbstract(S, T) : Parameter {
-    private S rows, cols;
+    S rows, cols;
     string typeId;
 
     static if (T.stringof.startsWith("Complex"))
