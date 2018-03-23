@@ -23,6 +23,7 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * ~~Unittest~~
     * Optimization
       * Use a single "dot" product and optimize it.
+      * Matrix abstract multiplication: mult(auto override this T)
   * _Vectors_
     * ~~Unittest~~
     * Optimization
