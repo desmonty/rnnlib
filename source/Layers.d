@@ -7,6 +7,11 @@ import std.string : startsWith;
 import source.Matrix;
 import source.Parameters;
 
+version(unittest)
+{
+    import std.stdio : writeln, write;
+}
+
 /+  The layers of the Neural Networks.
 
     Basically, each layer can be seen as a function,
@@ -68,7 +73,7 @@ class LinearLayer(S,T) : Layer!(S,T)
     Vector!(S,T) bias;
     bool keep_bias;
 
-    this(out MatrixAbstract!(S,T) _W, bool _keep_bias = true)
+    this(ref MatrixAbstract!(S,T) _W, bool _keep_bias = true)
     {
         W = _W;
         keep_bias = _keep_bias;
@@ -84,7 +89,7 @@ class LinearLayer(S,T) : Layer!(S,T)
 
     /// Apply the function implemented by the layer to the vector.
     override
-    Vector!(S,T) apply(out Vector!(S,T) vec)
+    Vector!(S,T) apply(ref Vector!(S,T) vec)
     {
         vec *= W;
         if (keep_bias)
@@ -93,20 +98,27 @@ class LinearLayer(S,T) : Layer!(S,T)
     }
 }
 unittest {
-    auto m = new UnitaryMatrix!(uint, Complex!real)(10, 1.0);
-    auto l = new LinearLayer!(uint, Complex!real)(&m, false);
-    auto v = new Vector!(uint, Complex!real)(10, 1.0);
+    write("Unittest Matrix Abstract ... ");
+
+    uint len = 1024*256*2;
+    write(len);
+
+    MatrixAbstract!(uint, Complex!real) m = new UnitaryMatrix!(uint, Complex!real)(len, 1.0);
+    auto l = new LinearLayer!(uint, Complex!real)(m, false);
+    auto v = new Vector!(uint, Complex!real)(len, 1.0);
     l.init();
 
     auto w = m * v;
     auto u = l.apply(v);
+    auto mem = u.dup;
 
-    v -= u;
+    v -= mem;
 
     assert(v.norm!"L2" <= 0.001);
-    u -= w;
-    assert(u.norm!"L2" <= 0.001);
+    mem -= w;
+    assert(mem.norm!"L2" <= 0.001);
 
+    write("Done.\n");
 }
 
 /+ This layer can implement any function that take as input a

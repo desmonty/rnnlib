@@ -443,6 +443,8 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
 
     this(in S size)
     {
+        assert(std.math.isPowerOf2(size), "Size of Unitary Matrix
+                                           must be a power of 2.");
         typeId = "UnitaryMatrix";
 
         rows = size;

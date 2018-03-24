@@ -15,6 +15,15 @@ import source.Matrix;
 //ldc2 -O3 -ffast-math *.d
 
 
+unittest
+{
+    import std.stdio: writeln;
+
+    writeln("-------------------------------");
+    writeln("       Begin Unittesting       ");
+    writeln("-------------------------------");
+}
+
 void main()
 {
     if (true)
@@ -29,4 +38,7 @@ void main()
         auto f = new FourierMatrix!(ushort, Complex!real)(cast(ushort) 65536u);
     }
 
+    writeln("-------------------------------");
+    writeln("        End Unittesting        ");
+    writeln("-------------------------------");
 }
