@@ -11,8 +11,6 @@ import std.string;
 
 import source.Parameters;
 
-import std.stdio: write;
-
 version(unittest)
 {
     import std.stdio : writeln, write;
@@ -29,7 +27,6 @@ auto dot(R1, R2)(in R1[] lhs, in R2[] rhs)
         s += lhs[i] * rhs[i];
     return s;
 }
-
 unittest
 {
     assert(dot([1.0, 2.0, 3.0], [-6.0, -5.0, -1.0]) ==
@@ -56,6 +53,45 @@ class MatrixAbstract(S, T) : Parameter {
     {
         return new Vector!(S,T)(this * v.v);
     }
+
+/+
+    const @property
+    MatrixAbstract dup()
+    {
+        if (typeId.stringof.startsWith("BlockMatrix"))
+            return new BlockMatrix!(S,T)(cast(BlockMatrix!(S,T)) this);
+        else if (typeId.stringof.startsWith("UnitaryMatrix"))
+            return new UnitaryMatrix!(S,T)(cast(UnitaryMatrix!(S,T)) this);
+        else if (typeId.stringof.startsWith("DiagonalMatrix"))
+            return new DiagonalMatrix!(S,T)(cast(DiagonalMatrix!(S,T)) this);
+        else if (typeId.stringof.startsWith("ReflectionMatrix"))
+            return new ReflectionMatrix!(S,T)(cast(ReflectionMatrix!(S,T)) this);
+        else if (typeId.stringof.startsWith("PermutationMatrix"))
+            return new PermutationMatrix!(S,T)(cast(PermutationMatrix!(S,T)) this);
+        else if (typeId.stringof.startsWith("FourierMatrix"))
+            return new FourierMatrix!(S,T)(cast(FourierMatrix!(S,T)) this);
+        else if (typeId.stringof.startsWith("Matrix"))
+            return new Matrix!(S,T)(cast(Matrix!(S,T)) this);
+        else if (typeId.stringof.startsWith("PermutationMatrix"))
+            return new PermutationMatrix!(S,T)(cast(PermutationMatrix!(S,T)) this);
+    }
+
+    BlockMatrix!(S,T) opCast()
+    { return cast(BlockMatrix!(S,T)) this; }
+    UnitaryMatrix!(S,T) opCast()
+    { return cast(UnitaryMatrix!(S,T)) this; }
+    DiagonalMatrix!(S,T) opCast()
+    { return cast(DiagonalMatrix!(S,T)) this; }
+    ReflectionMatrix!(S,T) opCast()
+    { return cast(ReflectionMatrix!(S,T)) this; }
+    PermutationMatrix!(S,T) opCast()
+    { return cast(PermutationMatrix!(S,T)) this; }
+    FourierMatrix!(S,T) opCast()
+    { return cast(FourierMatrix!(S,T)) this; }
+    Matrix!(S,T) opCast()
+    { return cast(Matrix!(S,T)) this; }
+    PermutationMatrix!(S,T) opCast()
+    { return cast(PermutationMatrix!(S,T)) this; }+/
 
     const
     T[] opBinary(string op)(in T[] v)
@@ -126,7 +162,8 @@ class MatrixAbstract(S, T) : Parameter {
                 }
                 else assert(0, "Fourier matrices must be of complex type.");
             case "Matrix":
-                assert(0, "Division by a general matrix is not yet implemented.");
+                assert(0, "Division by a general matrix
+                           is not yet implemented.");
             default:
                 assert(0, tmptypeId~" is not in the 'switch'
                                       clause of MatrixAbstract");
@@ -151,7 +188,8 @@ unittest
     auto m2 = new DiagonalMatrix!(ulong, Complex!real)(len/4, 1.0);
     auto m3 = new ReflectionMatrix!(ulong, Complex!real)(len/4, 1.0);
     auto m4 = new FourierMatrix!(ulong, Complex!real)(len/4);
-    auto bm = new BlockMatrix!(ulong, Complex!real)(len, len/4, [m1,m2,m3,m4], false);
+    auto bm = new BlockMatrix!(ulong, Complex!real)(len, len/4, [m1,m2,m3,m4],
+                                                    false);
     auto um = new UnitaryMatrix!(ulong, Complex!real)(len, 3.14159265351313);
     auto mm = new Matrix!(ulong, Complex!real)(len, 5.6);
     auto em = new ErrorMatrix!(ulong, Complex!real)();
@@ -264,6 +302,8 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
             0 5 0
      +/
 
+    this(){}
+
     this(in S size_in, in S size_out, in S size_blocks)
     {
         typeId = "BlockMatrix";
@@ -296,12 +336,27 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
             Q = new PermutationMatrix!(S,T)(size_out.iota.array);
         }
     }
-    
-    this(in S size, in S size_blocks,
+
+    this(in S size_in, in S size_blocks,
          MatrixAbstract!(S,T)[] blocks, bool randperm=false)
     {
-        this(size, size, size_blocks, blocks, randperm);
+        this(size_in, size_in, size_blocks, blocks, randperm);
     }
+    /+
+    this(in BlockMatrix M)
+    {
+        this.size_blocks = M.size_blocks;
+        this.num_blocks = M.num_blocks;
+        this.size_out = M.size_out;
+        this.size_in = M.size_in;
+
+        this.P = M.P.dup;
+        this.Q = M.Q.dup;
+        auto tmp_blocks = new MatrixAbstract!(S,T)[M.num_blocks];
+        foreach(i; 0 .. M.num_blocks)
+            tmp_blocks[i] = M.blocks[i].dup;
+        this.blocks = tmp_blocks;
+    }+/
 
     const
     auto opBinary(string op)(in Vector!(S,T) v)
@@ -384,7 +439,8 @@ unittest
     auto m2 = new DiagonalMatrix!(ulong, Complex!float)(len/4, 1.0);
     auto m3 = new ReflectionMatrix!(ulong, Complex!float)(len/4, 1.0);
     auto m4 = new FourierMatrix!(ulong, Complex!float)(len/4);
-    auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4, [m1,m2,m3,m4], false);
+    auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4, [m1,m2,m3,m4],
+                                                     false);
 
     auto v = new Vector!(ulong, Complex!float)(len);
     foreach(i; 0 .. len)
@@ -441,6 +497,8 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
        parameters.
      +/
 
+    this() {}
+
     this(in S size)
     {
         assert(std.math.isPowerOf2(size), "Size of Unitary Matrix
@@ -461,6 +519,21 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
 
         foreach(i;0 .. params.length)
             params[i] = uniform(-randomBound, randomBound, rnd);
+    }
+
+    this(in UnitaryMatrix M)
+    {
+        auto res = new UnitaryMatrix!(S,T)();
+        res.perm = M.perm.dup;
+        res.fourier = M.fourier.dup;
+        res.fourier = M.fourier.dup;
+        res.params = M.params.dup;
+    }
+
+    const @property
+    auto dup()
+    {
+        return new UnitaryMatrix(this);
     }
 
 
@@ -596,6 +669,16 @@ class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
         objFFT = new Fft(size);
     };
 
+    this(in FourierMatrix M)
+    {
+        this(M.rows);
+    }
+
+    const @property
+    auto dup()
+    {
+        return new FourierMatrix(this);
+    }
 
     const
     Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
@@ -684,10 +767,11 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Copy-constructor
-    this(in DiagonalMatrix dupl)
+    this(in DiagonalMatrix M)
     {
-        this(dupl.cols);
-        mat = dupl.mat.dup;
+        this(M.rows);
+        foreach(i;0 .. rows)
+            this.mat[i] = M.mat[i];
     }
 
     /// Constructor from list
@@ -695,6 +779,13 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     {
         this(cast(S) valarr.length);
         mat = valarr.dup;
+    }
+
+
+    const @property
+    auto dup()
+    {
+        return new DiagonalMatrix(this);
     }
 
     @property const
@@ -716,17 +807,6 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     /// Return value by index.
     ref T opIndex(in S i)
     {return mat[i];}
-
-    /// Return a duplicate.
-    @property const
-    auto dup()
-    {
-        auto res = new DiagonalMatrix(rows);
-        foreach(i;0 .. rows)
-            res.mat[i] = mat[i];
-
-        return res;
-    }
 
     /// Operation +-*/ between Diagonal Matrix.
     const
@@ -937,17 +1017,17 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         this(valarr.v);
     }
 
+
+    const @property
+    auto dup()
+    {
+        return new ReflectionMatrix(this);
+    }
+
     /// Compute the norm (n) of the reflection vector and store -2n^-2
     void compute_invSqNormVec2()
     {
         invSqNormVec2 = -2*pow(vec.norm!"L2",-2);
-    }
-
-    /// Return a duplicate.
-    @property const
-    auto dup()
-    {
-        return new ReflectionMatrix(this);
     }
 
     @property const
@@ -1107,9 +1187,8 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
         perm = valarr.dup;
     }
 
-    /// Return a duplicate.
-    @property
-    const
+
+    const @property
     auto dup()
     {
         return new PermutationMatrix(this);
@@ -1231,6 +1310,12 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         }
     }
 
+    const @property
+    auto dup()
+    {
+        return new Matrix(this);
+    }
+
     @property const
     S length()
     {
@@ -1251,12 +1336,6 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         else static if (op == "-") { mat[] -= other.mat[]; }
         else static if (op == "*") { this  = this * other; }
         else static assert(0, "Operator "~op~" not implemented.");
-    }
-
-    @property const
-    auto dup()
-    {
-        return new Matrix!(S,T)(this);
     }
 
     const

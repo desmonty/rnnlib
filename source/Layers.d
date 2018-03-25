@@ -73,9 +73,9 @@ class LinearLayer(S,T) : Layer!(S,T)
     Vector!(S,T) bias;
     bool keep_bias;
 
-    this(ref MatrixAbstract!(S,T) _W, bool _keep_bias = true)
+    this(ref in MatrixAbstract!(S,T) _W, bool _keep_bias = true)
     {
-        W = _W;
+        W = cast(MatrixAbstract!(S,T)) _W;
         keep_bias = _keep_bias;
     }
 
@@ -98,12 +98,11 @@ class LinearLayer(S,T) : Layer!(S,T)
     }
 }
 unittest {
-    write("Unittest Matrix Abstract ... ");
+    write("Unittest LinearLayers Abstract ... ");
 
-    uint len = 1024*256*2;
-    write(len);
+    uint len = 1024;
 
-    MatrixAbstract!(uint, Complex!real) m = new UnitaryMatrix!(uint, Complex!real)(len, 1.0);
+    auto m = new UnitaryMatrix!(uint, Complex!real)(len, 1.0);
     auto l = new LinearLayer!(uint, Complex!real)(m, false);
     auto v = new Vector!(uint, Complex!real)(len, 1.0);
     l.init();
