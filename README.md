@@ -24,17 +24,27 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * Optimization
       * Use a single "dot" product and optimize it.
       * Matrix abstract multiplication: mult(auto override this T)
+    * Add Documentation
   * _Vectors_
     * ~~Unittest~~
     * Optimization
       * alias array for vector ?
       * use arrayfire ? 
+    * Add Documentation
   * _Layers_
     * Linear
     * Functional
     * Recurrent
-* EVO
-  * Evolution Strategy
-  * Genetic Algorithm
-  * Particle Swarm optimization
-  * Ant colony optimization
+    * Add Documentation
+* TRAINING
+  * _Evolutionary Algorithms_
+    * Evolution Strategy
+    * Genetic Algorithm
+    * Particle Swarm optimization
+    * Ant colony optimization
+  * _General Gradient-free Optimization_
+    * Nelder–Mead Simplex
+    * DIRECT
+    * DONE
+    * Pattern Search
+    * MCS
