@@ -40,3 +40,17 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * DONE
     * Pattern Search
     * MCS
+* TESTS
+  * _Functional Tests_
+    * [Some good examples](https://en.wikipedia.org/wiki/Test_functions_for_optimization)
+  * _Machine Learning Tests_
+    * Adding Problem
+    * XOR
+    * Copying memory
+    * Pixel-by-pixel MNIST (+ permuted)
+    * NLP ?
+    * Music Generation ?
+  * _Deep Reinforcement Learning Final Tests_
+    * [Gym](https://gym.openai.com/)
+    * [Universe](https://github.com/openai/universe)
+    * Zbaghul
