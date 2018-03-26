@@ -14,19 +14,11 @@ and the recurrent neural netwroks to enable anyone to use it independently.
 # TODO
 * RNN
   * _Matrices_
-    * ~~Diagonal~~
-    * ~~Reflection~~
-    * ~~Permutation~~
-    * ~~Fourier~~
-    * ~~Unitary~~
-    * ~~Block~~
-    * ~~Unittest~~
     * Optimization
       * Use a single "dot" product and optimize it.
       * Matrix abstract multiplication: mult(auto override this T)
     * Add Documentation
   * _Vectors_
-    * ~~Unittest~~
     * Optimization
       * alias array for vector ?
       * use arrayfire ? 
@@ -42,7 +34,7 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * Genetic Algorithm
     * Particle Swarm optimization
     * Ant colony optimization
-  * _General Gradient-free Optimization_
+  * _Other Gradient-free Optimization_
     * Nelder–Mead Simplex
     * DIRECT
     * DONE
