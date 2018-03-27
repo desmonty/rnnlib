@@ -151,15 +151,7 @@ class Vector(S, T) : Parameter {
     @property const
     auto norm(string method)()
     {
-        // TODO Refactor
-        // This is a hackish solution to get a zero of the
-        // type in the complex number.
-        static if (T.stringof.startsWith("Complex")) {
-            auto s = v[0].re*0.0f;
-        }
-        else {
-            auto s = v[0]*0.0f;
-        }
+        Tc s = v[0].re*0.0f;
         static if (method=="euclidean" || method=="L2")
         {
             foreach(e;v)

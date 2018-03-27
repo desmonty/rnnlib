@@ -1,7 +1,7 @@
 module source.Layers;
 
 import std.complex;
-
+import std.functional: toDelegate;
 import std.string : startsWith;
 
 import source.Matrix;
@@ -14,29 +14,39 @@ version(unittest)
 
 /+  The layers of the Neural Networks.
 
-    Basically, each layer can be seen as a function,
-    which take a vector and return another vecotr of
-    a possibly different length.
-    Those functions have parameters (matrix, bias, ..)
-    which are specific to each kind of layer (linear, recurrent, ..).
-    All the logic of how these layers are assembled is
+    Basically, each layer can be seen as a function, which take a vector and
+    return another vecotr of a possibly different length. Those functions have
+    parameters (matrix, bias, ..) which are specific to each kind of layer
+    (linear, recurrent, ..). All the logic of how these layers are assembled is
     in the NeuralNet object.
 
-    If they are trained with an evolutionary algorithm
-    (Which is the primary goal), we will need to have
-    some function to handle *mutation* and *crossover*.
-    This should be enough for many of the optimization
-    we will implement (PSA, GA, RS, ES, and other obscure
-    acronym...).
+    If they are trained with an evolutionary algorithm (Which is the primary
+    goal), we will need to have some function to handle *mutation* and
+    *crossover*. This should be enough for many of the optimization we will
+    implement (PSA, GA, RS, ES, and other obscure acronym...).
 
-    The gradient of the layer will be difficult to
-    compute due to the will to play with heavily recurrent
-    networks (which is not the common cas because of
-    the use of gradient-based optimization).
-    However, it would be very interesting to know the gradient
-    of the NeuralNet and could be investigated in this project.
+    The gradient of the layer will be difficult to compute due to the will to
+    play with heavily recurrent networks (which is not the common cas because
+    of the use of gradient-based optimization). However, it would be very
+    interesting to know the gradient of the NeuralNet and could be investigated
+    in this project.
+
+    In practice, each layers must implement two methods:
+        - apply
+        - compute
+    Both apply the function implemented by the layer 
 
 
+    TODO:
+        - Shared parameter = convnet
+        - share_parameter in NeuralNet between layer
+
+        - REFACTOR: idea
+            .The "layer" object should hold an array of parameters and a delegate
+            of the following form: {Vector delegate(Vector, Parameter)}
+            .Matrix/function layer should be easy to implement in this context
+            .It should provide every one with a "general" enough object to create
+             convnet (shared parameters), 
  +/
 
 abstract class Layer(S,T)
@@ -48,165 +58,176 @@ abstract class Layer(S,T)
     /// Name of the layer.
     string name;
 
-    /// Type of the layer. 
-    string typeId;
-
+    /// Sizes
     S size_in;
     S size_out;
 
+    /// Parameters, Layer-specific
+    Parameters[] params;
+
+    /// function applied to the vector.
+    Vector!(S,T) delegate(in Vector!(S,T), in Parameter[]) pure func;
+
+    /// Used by the optimizer to know if it must optimize the layer.
+    bool isLearnable = false;
+
+    /// Used
     void set_name(string _name)
     {
         if (_name !is null)
             name = _name;
     }
 
-    abstract Vector!(S,T) apply(ref Vector!(S,T));
+    abstract Vector!(S,T) compute(in Vector!(S,T));
 }
 
 /+ This layer implement a simple linear matrix transformation
    applied to the vector followed by adding a bias vector
    (which can be turner off). 
  +/
-class LinearLayer(S,T) : Layer!(S,T)
+class MatrixLayer(S,T) : Layer!(S,T)
 {
-    MatrixAbstract!(S,T) W;
-    Vector!(S,T) bias;
-    bool keep_bias;
 
-    this(ref in MatrixAbstract!(S,T) _W, bool _keep_bias = true)
-    {
-        W = cast(MatrixAbstract!(S,T)) _W;
-        keep_bias = _keep_bias;
-    }
-
-    /// Random initialization of the matrix and vector.
-    void init()
-    {
-        if (keep_bias) {
-            bias = new Vector!(S,T)(W.rows, 0);
-        }
-    }
-
-    /// Apply the function implemented by the layer to the vector.
-    override
-    Vector!(S,T) apply(ref Vector!(S,T) vec)
-    {
-        vec *= W;
-        if (keep_bias)
-            vec += bias;
-        return vec;
-    }
 }
 unittest {
-    write("Unittest LinearLayers Abstract ... ");
-
-    uint len = 1024;
-
-    auto m = new UnitaryMatrix!(uint, Complex!real)(len, 1.0);
-    auto l = new LinearLayer!(uint, Complex!real)(m, false);
-    auto v = new Vector!(uint, Complex!real)(len, 1.0);
-    l.init();
-
-    auto w = m * v;
-    auto u = l.apply(v);
-    auto mem = u.dup;
-
-    v -= mem;
-
-    assert(v.norm!"L2" <= 0.001);
-    mem -= w;
-    assert(mem.norm!"L2" <= 0.001);
+    write("Unittest MatrixLayers Abstract ... ");
 
     write("Done.\n");
 }
 
 /+ This layer can implement any function that take as input a
    Vector!(S,T) and return another Vector!(S,T).
-   WARNING : Right now, the function will change the vector
-   it is given in the case of a element-wise tranformation.
  +/
 class FunctionLayer(S,T) : Layer!(S,T)
 {
-    Vector!(S,T) delegate(Vector!(S,T) v) func;
-    Vector!(S,T) parameters;
-    bool is_learnable = false;
-
+    /+ This implements common functions most will want to use
+       like:
+            -SoftMax/SoftPlus
+            -relu/modRelu
+    TODO:
+        softmax
+        softplus
+        add parameter in delegate
+     +/
     this(string easyfunc, in S size_in=0)
     {
         switch (easyfunc)
         {
             case "relu":
                 if (!T.stringof.startsWith("Complex")) {
-                    this( delegate(T val) {
-                            if (val > 0) return val;
+                    this(
+                        delegate(T val) pure {
+                            if (val > 0)
+                                return val;
                             return 0;
-                          }
+                        }
                     );
                     break;
                 }
                 // else with use modRelu by default.
             case "modRelu":
                 if (!T.stringof.startsWith("Complex"))
-                    throw new Exception("the 'modRelu' function can only
+                    throw new Exception("The 'modRelu' function can only
                                          be used with complex number.");
 
+                if (size_in == 0)
+                    throw new Exception("'size_in' must be greater than zero
+                                         when using 'modRelu'.");
                 is_learnable = true;
                 parameters = new Vector!(S,T)(size_in, 1.0);
-                func = delegate(Vector!(S,T) v) {
+                
+                this(
+                    delegate(in Vector!(S,T) v) pure {
                         auto tmp = v[0];
                         auto absv = v[0].abs;
+                        auto res = v.dup;
                         foreach(i; 0 .. v.length) {
                             absv = v[i].abs;
                             tmp = absv + parameters[i];
                             if (tmp > 0) {
-                                v[i] = tmp*v[i]/absv;
+                                res[i] = tmp*v[i]/absv;
                             }
                             else {
-                                v[i] = 0;
+                                res[i] = complex(0);
                             }
                         }
-                };
+                    }
+                );
+                break;
+            case "softmax":
+                this(
+                    delegate(in Vector!(S,T)) pure {
+                    Tc s = 0;
+                    }
+                );
                 break;
             default:
                 try {
-                    // This should handle most of the case : tanh, cos, sin, sqrt, expi .. 
-                    func = delegate(Vector!(S,T) v) {
-                        foreach(i; 0 .. v.length)
+                    // This should handle most of the case : tanh, cos, sin, ...
+                    this(
+                        delegate(in Vector!(S,T) v) pure {
+                            foreach(i; 0 .. v.length)
                             mixin("v[i] = "~easyfunc~"(v[i]);");
-                    };
+                        }
+                    );
                 }
                 catch (Exception e) {
-                    assert(0, easyfunc ~ " is not a known function. Implement it !");
+                    assert(0, easyfunc ~ ": Unknown function. Implement it !");
                 }
         }
     }
 
-    // The function to apply to the vector. Can be anything.
-    this(Vector!(S,T) delegate(Vector!(S,T)) _func)
+    // The function to apply to the vector. Can be anything. DELEGATE
+    this(Vector!(S,T) delegate(in Vector!(S,T)) pure _func)
     {
-
-    }
-
-    // Create an element-wise function that apply a provided
-    // function to a vector.
-    auto
-    this(T delegate(T) _func)
-    {
-        func =
-        delegate(Vector!(S,T) v) {
-            foreach(i; 0 .. v.length)
-                v[i] = _func(v[i]);
+        func = delegate(in Vector!(S,T) _v, in Parameters[] _p=null) pure {
+            if (_p !is null)
+                throw new Exception("Parameters not allowed for 'func'.");
+            return _func(_v);
         };
     }
 
-    override
-    Vector!(S,T) apply(ref Vector!(S,T) v)
+    // The function to apply to the vector. Can be anything. FUNCTION
+    this(Vector!(S,T) function(in Vector!(S,T)) pure _func)
     {
-        return func(v);
+        this(toDelegate(_func));
+    }
+
+    // Create an element-wise function that apply a provided
+    // function to a vector. DELEGATE
+    this(T delegate(T) pure _func)
+    {
+        func = delegate(in Vector!(S,T) _v, in Parameters[] _p=null) pure {
+            if (_p !is null)
+                throw new Exception("Parameters not allowed for 'func'.");
+            auto res = _v.dup;
+            foreach(i; 0 .. v.length)
+                res[i] = _func(v[i]);
+            return res;
+        };
+    }
+
+    // Create an element-wise function that apply a provided
+    // function to a vector. FUNCTION
+    this(T delegate(T) pure _func)
+    {
+        this(toDelegate(_func));
+    }
+
+    override
+    Vector!(S,T) compute(in Vector!(S,T) v, in Parameters _p)
+    {
+        return func(res);
     }
 }
 unittest {
-    
+    write("Unittest FunctionLayers Abstract ... ");
+
+    uint len = 1024;
+    auto v = new Vector!(uint, Complex!real)(len, 1.0);
+    auto f = new FunctionLayers!(uint, Complex!real)(len);
+
+    write("Done.\n");
 }
 
 /+
