@@ -1,6 +1,7 @@
 module source.Layer;
 
 import std.complex;
+import std.conv: to;
 import std.functional: toDelegate;
 import std.string : startsWith;
 
@@ -66,7 +67,7 @@ abstract class Layer(S,T)
     Parameter[] params = null;
 
     /// function applied to the vector.
-    Vector!(S,T) delegate(in Vector!(S,T), in Parameter[]) pure func;
+    Vector!(S,T) delegate(in Vector!(S,T), in Parameter[]) func;
 
     /// Used by the optimizer to know if it must optimize the layer.
     bool isLearnable = false;
@@ -116,7 +117,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
             case "relu":
                 static if (!T.stringof.startsWith("Complex")) {
                     this(
-                        delegate(T val) pure {
+                        delegate(T val) {
                             if (val > 0)
                                 return val;
                             return 0;
@@ -132,25 +133,25 @@ class FunctionalLayer(S,T) : Layer!(S,T)
                                              when using 'modRelu'.");
                     isLearnable = true;
                     params = new Parameter[1];
-                    params[0] = new Vector!(S,T)(size_in, 1.0);
+                    params[0] = new Vector!(S,Tc)(size_in, 1.0);
                     
-                    this(
-                        delegate(in Vector!(S,T) v, in Parameter[] _p) pure {
-                            auto tmp = v[0];
-                            auto absv = v[0].abs;
-                            auto res = v.dup;
-                            foreach(i; 0 .. v.length) {
-                                absv = v[i].abs;
-                                tmp = absv + (cast(Vector!(S,T)) _p[0])[i];
+                    func = 
+                        delegate(in Vector!(S,T) _v, in Parameter[] _p) {
+                            auto absv = _v[0].abs;
+                            auto tmp = absv;
+                            auto res = _v.dup;
+                            foreach(i; 0 .. _v.length) {
+                                absv = _v[i].abs;
+                                tmp = absv + (cast(Vector!(S,_v.Tc)) _p[0])[i];
                                 if (tmp > 0) {
-                                    res[i] = tmp*v[i]/absv;
+                                    res[i] = tmp*_v[i]/absv;
                                 }
                                 else {
-                                    res[i] = complex(0);
+                                    res[i] = complex(cast(_v.Tc) 0);
                                 }
                             }
-                        }
-                    );
+                            return res;
+                        };
                 }
                 else
                     throw new Exception("The 'modRelu' function can only
@@ -159,7 +160,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
             case "softmax":
                 static if (!T.stringof.startsWith("Complex"))
                     this(
-                        delegate(in Vector!(S,T) _v) pure {
+                        delegate(in Vector!(S,T) _v) {
                             T s = 0;
                             auto res = _v.dup;
                             foreach(i; 0 .. _v.length) {
@@ -176,25 +177,18 @@ class FunctionalLayer(S,T) : Layer!(S,T)
                                          complex-valued softmax.");
                 break;
             default:
-                try {
-                    // This should handle most of the case : tanh, cos, sin, ...
-                    this(
-                        delegate(in Vector!(S,T) v) pure {
-                            foreach(i; 0 .. v.length)
-                            mixin("v[i] = "~easyfunc~"(v[i]);");
-                        }
-                    );
-                }
-                catch (Exception e) {
-                    assert(0, easyfunc ~ ": Unknown function. Implement it !");
-                }
+                assert(0, easyfunc ~ ": Unknown keyword. You can use one of the"
+                                   ~ " following:\n"
+                                   ~ " - 'relu' (for real-valued vectors)\n"
+                                   ~ " - 'modRelu' (for complex-valued vectors)\n"
+                                   ~ " - 'softmax' (for real-valued vectors)\n");
         }
     }
 
     // The function to apply to the vector. Can be anything. DELEGATE
-    this(Vector!(S,T) delegate(in Vector!(S,T)) pure _func)
+    this(Vector!(S,T) delegate(in Vector!(S,T)) _func)
     {
-        func = delegate(in Vector!(S,T) _v, in Parameter[] _p=null) pure {
+        func = delegate(in Vector!(S,T) _v, in Parameter[] _p=null) {
             if (_p !is null)
                 throw new Exception("Parameter not allowed for 'func'.");
             return _func(_v);
@@ -202,30 +196,45 @@ class FunctionalLayer(S,T) : Layer!(S,T)
     }
 
     // The function to apply to the vector. Can be anything. FUNCTION
-    this(Vector!(S,T) function(in Vector!(S,T)) pure _func)
+    this(Vector!(S,T) function(in Vector!(S,T)) _func)
     {
         this(toDelegate(_func));
     }
 
     // Create an element-wise function that apply a provided
     // function to a vector. DELEGATE
-    this(T delegate(T) pure _func)
+    this(T delegate(T) _func)
     {
-        func = delegate(in Vector!(S,T) _v, in Parameter[] _p=null) pure {
+        func = delegate(in Vector!(S,T) _v, in Parameter[] _p=null) {
             if (_p !is null)
                 throw new Exception("Parameter not allowed for 'func'.");
             auto res = _v.dup;
-            foreach(i; 0 .. v.length)
-                res[i] = _func(v[i]);
+            foreach(i; 0 .. _v.length)
+                res[i] = _func(_v[i]);
             return res;
         };
     }
 
     // Create an element-wise function that apply a provided
     // function to a vector. FUNCTION
-    this(T delegate(T) pure _func)
+    this(T function(T) _func)
     {
         this(toDelegate(_func));
+    }
+
+    this(in S size)
+    {
+        this(delegate(in Vector!(S,T) _v) {
+                if (_v.length != size)
+                    throw new Exception("Size mismatch in FunctionalLayer:\n"
+                                       ~"Size of the FunctionalLayer: "
+                                       ~to!string(size)~"\n"
+                                       ~"Size of the Vector: "
+                                       ~to!string(_v.length)~"\n");
+                auto res = _v.dup;
+                return res;
+            }
+        );
     }
 
     override
@@ -238,8 +247,33 @@ unittest {
     write("Unittest FunctionalLayer ... ");
 
     uint len = 1024;
-    auto v = new Vector!(uint, Complex!real)(len, 1.0);
-    auto f = new FunctionalLayer!(uint, Complex!real)(len);
+    alias Vec = Vector!(uint, Complex!real);
+    alias Fl = FunctionalLayer!(uint, Complex!real);
+
+    Vec blue(Vec _v) pure {
+        auto res = _v.dup;
+        res *= complex(4);
+        return res;
+    }
+
+    auto v = new Vec(len, 1.0);
+    auto f1 = new Fl(len);
+    auto f2 = new Fl(&std.complex.cos);
+    auto f3 = new Fl(&blue);
+
+    auto v1 = f1.compute(v);
+    auto v2 = f2.compute(v);
+    auto v3 = f3.compute(v);
+    writeln(v1.v);
+    writeln(v2.v);
+    writeln(v3.v);
+
+    v1 -= v;
+    v3 /= complex(4);
+    v3 -= v;
+
+    assert(v1.norm!"L2" <= 0.001);
+    assert(v3.norm!"L2" <= 0.001);
 
     write("Done.\n");
 }

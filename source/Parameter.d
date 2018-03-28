@@ -23,15 +23,17 @@ abstract class Parameter {
     static private bool init = true;
     static protected auto rnd = Random(0);
 
-    /+
-    this()
+    pure
+    this() {}
+
+    this(bool random=true)
     {
         if (init) {
             rnd = Random(cast(uint) ((Clock.currTime()
                          - SysTime(unixTimeToStdTime(0))).total!"msecs"));
             init = false;
         }
-    }+/
+    }
 }
 
 /+  Vector class.
@@ -62,7 +64,8 @@ class Vector(S, T) : Parameter {
     /// Random constructor.
     this(S length, Tc randomBound)
     {
-        this(length);
+        super(true);
+        v = new T[length];
 
         static if (T.stringof.startsWith("Complex")) {
             foreach(i;0 .. v.length)
@@ -97,6 +100,7 @@ class Vector(S, T) : Parameter {
     S length() {return cast(S) v.length;}
 
     /// Assign value by index.
+    pure @nogc @safe
     void opIndexAssign(T value, S i)
     {
         v[i] = value;
@@ -246,7 +250,6 @@ class Vector(S, T) : Parameter {
         this += tmp;
     }
 
-    pure
     void opOpAssign(string op)(in FourierMatrix!(S,T) F)
     {
         static if (!T.stringof.startsWith("Complex"))
@@ -258,7 +261,6 @@ class Vector(S, T) : Parameter {
         else static assert(0, "Operator "~op~" not implemented.");
     }
 
-    pure
     void opOpAssign(string op)(in MatrixAbstract!(S,T) M)
     {
         /+ This should only be used to handle Matrix that
@@ -311,7 +313,6 @@ class Vector(S, T) : Parameter {
         }
     }
 
-    pure
     void opOpAssign(string op)(in BlockMatrix!(S,T) M)
     {
         static if (op == "*") {

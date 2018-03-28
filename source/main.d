@@ -12,14 +12,10 @@ import source.Layer;
 import source.Parameter;
 import source.Matrix;
 
-// source ~/dlang/ldc-1.7.0/activate
-//ldc2 -O3 -ffast-math *.d
-
-
 void main()
 {
-    /+
-    if (false)
+    
+    if (true)
     {
         auto v = new Vector!(uint, float)(5);
         auto c = new Vector!(size_t, Complex!double)(5);
@@ -29,7 +25,7 @@ void main()
         auto b = new BlockMatrix!(uint, Complex!double)(10u, 5u, [p, d], true);
         auto r = new ReflectionMatrix!(long, Complex!float)(10);
         auto f = new FourierMatrix!(ushort, Complex!real)(cast(ushort) 65536u);
-    }+/
+    }
 
     class A {
         real delegate(in real[], in bool[]) pure func;
@@ -86,4 +82,5 @@ void main()
     assert(isSomething([1]));
     assert(!isSomething());
     assert(!isSomething(null));
+
 }

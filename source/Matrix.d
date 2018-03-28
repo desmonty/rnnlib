@@ -301,9 +301,10 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
             4 0 0
             0 5 0
      +/
-
+    pure
     this(){}
 
+    pure
     this(in S size_in, in S size_out, in S size_blocks)
     {
         typeId = "BlockMatrix";
@@ -497,6 +498,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
        parameters.
      +/
 
+    pure
     this() {}
 
     this(in S size)
@@ -508,7 +510,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
         rows = size;
         cols = size;
 
-        perm = new PermutationMatrix!(S,T)(size, 1.0);
+        perm = new PermutationMatrix!(S,T)(size ,1.0);
         fourier = new FourierMatrix!(S,T)(size);
         params = new Tc[7*size];
     }
@@ -520,7 +522,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
         foreach(i;0 .. params.length)
             params[i] = uniform(-randomBound, randomBound, rnd);
     }
-
+    
     this(in UnitaryMatrix M)
     {
         auto res = new UnitaryMatrix!(S,T)();
@@ -538,7 +540,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
 
 
     /// Apply the "num"th diagonal matrix on the given vector.
-    const
+    const pure
     void applyDiagonal(ref T[] v, in int num)
     {
         // we use expi to convert each value to a complex number
@@ -548,7 +550,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
             v[i] *= cast(T) std.complex.expi(params[start_index + i]);
     }    /// Apply the "num"th diagonal matrix on the given vector.
     
-    const
+    const pure
     void applyDiagonalInv(ref T[] v, in int num)
     {
         // we use expi to convert each value to a complex number
@@ -559,7 +561,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
     }
 
     /// Apply the "num"th reflection matrix on the given vector.
-    const
+    const pure
     auto applyReflection(ref T[] v, in int num)
     {
         // The '+3' is because the diagonal matrices are first
@@ -668,7 +670,7 @@ class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
         cols = size;
         objFFT = new Fft(size);
     };
-
+    
     this(in FourierMatrix M)
     {
         this(M.rows);
@@ -744,6 +746,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     T[] mat;
     
     /// Constructor
+    pure
     this(in S size)
     {
         typeId = "DiagonalMatrix";
@@ -767,6 +770,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Copy-constructor
+    pure
     this(in DiagonalMatrix M)
     {
         this(M.rows);
@@ -775,6 +779,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Constructor from list
+    pure
     this(in T[] valarr)
     {
         this(cast(S) valarr.length);
@@ -782,34 +787,38 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
 
-    const @property
+    const @property pure
     auto dup()
     {
         return new DiagonalMatrix(this);
     }
 
-    @property const
+    @property const pure
     S length()
     {
         return cast(S) rows;
     }
 
     /// Assign Value to indices.
+    pure
     void opIndexAssign(T value, in S i, in S j)
     {if (i == j) mat[i] = value;}
     /// Assign Value to index.
+    pure
     void opIndexAssign(T value, in S i)
     {mat[i] = value;}
 
     /// Return value by indices.
+    pure
     ref T opIndex(in S i, in S j)
     {return mat[i];}
     /// Return value by index.
+    pure
     ref T opIndex(in S i)
     {return mat[i];}
 
     /// Operation +-*/ between Diagonal Matrix.
-    const
+    const pure
     auto opBinary(string op)(in DiagonalMatrix other)
     if (op=="+" || op=="-" || op=="*" || op=="/")
     {
@@ -820,6 +829,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Operation-Assign +-*/ between Diagonal Matrix.
+    pure
     void opOpAssign(string op)(in DiagonalMatrix other)
     if (op=="+" || op=="-" || op=="*" || op=="/")
     {
@@ -828,7 +838,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     ///  Vector multiplication.
-    const
+    const pure
     Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
@@ -838,7 +848,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const
+    const pure
     auto opBinary(string op)(in T[] other)
     if (op=="*")
     {
@@ -848,14 +858,14 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         return res;
     }
 
-    const
+    const pure
     Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
     if (op=="/")
     {
         return new Vector!(S,T)(v.v / this);
     }
 
-    const
+    const pure
     auto opBinaryRight(string op)(in T[] other)
     if (op=="/")
     {
@@ -866,7 +876,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Operation +-*/ on Matrix.
-    const
+    const pure
     Matrix!(S,T) opBinary(string op)(in Matrix!(S,T) M)
     {
         static if (op=="+" || op=="-") {
@@ -885,7 +895,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         else static assert(0, "Binary operation '"~op~"' is not implemented.");
     }
 
-    const
+    const pure
     Matrix!(S,T) opBinary(string op)(in Matrix!(S,T) M)
     if (op=="*" || op=="/")
     {
@@ -970,6 +980,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
      +/
 
     /// Constructor
+    pure
     this(in S size)
     {
         typeId = "ReflectionMatrix";
@@ -1004,6 +1015,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Constructor from list.
+    pure
     this(in T[] valarr)
     {
         rows = cast(S) valarr.length;
@@ -1012,25 +1024,27 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         compute_invSqNormVec2();
     }
     /// Constructor from Vector.
+    pure
     this(in Vector!(S,T) valarr)
     {
         this(valarr.v);
     }
 
 
-    const @property
+    const @property pure
     auto dup()
     {
         return new ReflectionMatrix(this);
     }
 
     /// Compute the norm (n) of the reflection vector and store -2n^-2
+    pure
     void compute_invSqNormVec2()
     {
         invSqNormVec2 = -2*pow(vec.norm!"L2",-2);
     }
 
-    @property const
+    @property const pure
     S length()
     {
         return cast(S) rows;
@@ -1040,14 +1054,14 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
      + As we only store the vector that define the reflection
      + We can comme up with a linear-time matrix-vector multiplication.
      +/
-    const
+    const pure
     Vector!(S,T) opBinary(string op)(in Vector!(S, T) v)
     if (op=="*")
     {
         return this * v.v;
     }
 
-    const
+    const pure
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
@@ -1061,14 +1075,14 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const
+    const pure
     Vector!(S,T) opBinaryRight(string op)(in Vector!(S, T) v)
     if (op=="/")
     {
         return v.v / this;
     }
 
-    const
+    const pure
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
@@ -1084,7 +1098,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const
+    const pure
     Matrix!(S,T) toMatrix()
     {
         auto res = new Matrix!(S,T)(rows, cols);
@@ -1156,6 +1170,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
     S[] perm;
 
     /// Constructor
+    pure
     this(in S size)
     {
         typeId = "PermutationMatrix";
@@ -1174,6 +1189,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
 
 
     /// Copy-constructor
+    pure
     this(in PermutationMatrix dupl)
     {
         this(dupl.cols);
@@ -1181,6 +1197,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Constructor from list (trusted to be a permutation)
+    pure
     this(in S[] valarr)
     {
         this(cast(S) valarr.length);
@@ -1188,20 +1205,21 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
 
-    const @property
+    const @property pure
     auto dup()
     {
         return new PermutationMatrix(this);
     }
 
     @property @nogc
-    const
+    const pure
     S length()
     {
         return cast(S) rows;
     }
 
     const
+    pure @safe  @nogc
     auto permute(size_t i)
     {
         return perm[i];
@@ -1209,7 +1227,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
 
 
     ///  Vector multiplication.
-    const
+    const pure
     Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
@@ -1219,7 +1237,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const
+    const pure
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
@@ -1229,14 +1247,14 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const
+    const pure
     Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
     if (op=="/")
     {
         return new Vector!(S,T)(v.v / this);
     }
 
-    const
+    const pure
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
@@ -1268,6 +1286,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     T[] mat;
 
     /// Simple constructor
+    pure
     this(in S rows, in S cols)
     {
         typeId = "Matrix";
@@ -1276,6 +1295,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         this.cols = cols;
     }
     
+    pure
     this(in S rows)
     {
         this(rows, rows);
@@ -1302,6 +1322,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Copy-constructor
+    pure
     this(in Matrix dupl)
     {
         this(dupl.rows, dupl.cols);
@@ -1310,26 +1331,29 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         }
     }
 
-    const @property
+    const @property pure
     auto dup()
     {
         return new Matrix(this);
     }
 
-    @property const
+    @property const pure
     S length()
     {
         return cast(S) rows;
     }
 
+    pure
     void opIndexAssign(T value, in S i, in S j)
     {mat[i*cols + j] = value;}
 
     /// Return value by index.
-    const T opIndex(in S i, in S j)
+    pure const
+    T opIndex(in S i, in S j)
     {return mat[i*cols + j];}
    
     /// Simple math operation without memory allocation.
+    pure
     void opOpAssign(string op)(in Matrix other)
     {
              static if (op == "+") { mat[] += other.mat[]; }
@@ -1338,7 +1362,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         else static assert(0, "Operator "~op~" not implemented.");
     }
 
-    const
+    const pure
     auto opBinary(string op)(in Matrix other)
     if (op == "+" || op == "-")
     {
@@ -1348,7 +1372,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         return res;
     }
 
-    const
+    const pure
     auto opBinary(string op)(in Matrix other)
     if (op == "*")
     {
@@ -1367,14 +1391,14 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         return res;
     }
 
-    const
+    const pure
     auto opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
         return new Vector!(S,T)(this * v.v);
     }
 
-    const
+    const pure
     auto opBinary(string op)(in T[] v)
     if (op=="*")
     {
