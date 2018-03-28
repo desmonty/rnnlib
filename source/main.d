@@ -8,9 +8,9 @@ import std.math;
 import std.random;
 import std.stdio : writeln;
 
-//import source.Layers;
-//import source.Parameters;
-//import source.Matrix;
+import source.Layer;
+import source.Parameter;
+import source.Matrix;
 
 // source ~/dlang/ldc-1.7.0/activate
 //ldc2 -O3 -ffast-math *.d

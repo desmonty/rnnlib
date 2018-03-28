@@ -9,12 +9,12 @@ import std.random;
 import std.range : iota, array;
 import std.string;
 
-import source.Parameters;
+import source.Parameter;
 
 version(unittest)
 {
     import std.stdio : writeln, write;
-    import source.Parameters;
+    import source.Parameter;
     import std.datetime;
     import core.exception;
 }
