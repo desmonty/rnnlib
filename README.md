@@ -11,6 +11,11 @@ a rnn like vanishing/exploding gradients (e.g. see _[On the difficulty of traini
 One of the auxiliary goal of this project is to cut any dependencies between the evolutionary algorithms
 and the recurrent neural netwroks to enable anyone to use it independently.
 
+## Daily Todo
+* Use const, pure, @safe, @nogc, nothrow, etc..
+* Test Fucntional Layers
+* Start Matrix layers
+
 # TODO
 * RNN
   * _Matrices_
@@ -54,8 +59,3 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * [Gym](https://gym.openai.com/)
     * [Universe](https://github.com/openai/universe)
     * Zbaghul
-
-## Daily Todo
-* Use const, pure, @safe, @nogc, nothrow, etc..
-* Test Fucntional Layers
-* Start Matrix layers
