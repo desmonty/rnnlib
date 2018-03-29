@@ -12,11 +12,6 @@ One of the auxiliary goal of this project is to cut any dependencies between the
 and the recurrent neural netwroks to enable anyone to use it independently.
 
 ## Daily Todo
-* CodeCov
-* Travis CI ?
-* [Command Line git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) (+ .gitignore)
-* dub
-* [For most of these](https://github.com/libmir/mir-algorithm)
 * Use const, pure, @safe, @nogc, nothrow, etc..
 * Test Fucntional Layers
 * Start Matrix layers
@@ -64,3 +59,9 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * [Gym](https://gym.openai.com/)
     * [Universe](https://github.com/openai/universe)
     * Zbaghul
+* Format
+  * CodeCov
+  * Travis CI ?
+  * [Command Line git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) (+ .gitignore)
+  * dub
+  * [For most of these](https://github.com/libmir/mir-algorithm)
