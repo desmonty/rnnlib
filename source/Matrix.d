@@ -39,11 +39,30 @@ unittest
                [-5.0, -1.0, -6.0])) < 0.001);
 }
 
+bool isComplexType(T)()
+{
+    return T.stringof.startsWith("Complex");
+}
+unittest
+{
+    assert(isComplexType!(Complex!float));
+    assert(isComplexType!(Complex!double));
+    assert(isComplexType!(Complex!real));
+    assert(!isComplexType!float);
+    assert(!isComplexType!double);
+    assert(!isComplexType!real);
+    assert(!isComplexType!uint);
+    assert(!isComplexType!int);
+    assert(!isComplexType!long);
+    assert(!isComplexType!size_t);
+    assert(!isComplexType!short);
+}
+
 class MatrixAbstract(S, T) : Parameter {
     S rows, cols;
     string typeId;
 
-    static if (T.stringof.startsWith("Complex"))
+    static if (isComplexType!T)
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
     else alias Tc = T;
 
@@ -104,7 +123,7 @@ class MatrixAbstract(S, T) : Parameter {
             case "BlockMatrix":
                 return cast(BlockMatrix!(S,T)) this * v;
             case "UnitaryMatrix":
-                static if (T.stringof.startsWith("Complex")) {
+                static if (isComplexType!T) {
                     return cast(UnitaryMatrix!(S,T)) this * v;
                 }
                 else assert(0, "Unitary matrices must be of complex type.");
@@ -115,7 +134,7 @@ class MatrixAbstract(S, T) : Parameter {
             case "PermutationMatrix":
                 return cast(PermutationMatrix!(S,T)) this * v;
             case "FourierMatrix":
-                static if (T.stringof.startsWith("Complex")) {
+                static if (isComplexType!T) {
                     return cast(FourierMatrix!(S,T)) this * v;
                 }
                 else assert(0, "Fourier matrices must be of complex type.");
@@ -146,7 +165,7 @@ class MatrixAbstract(S, T) : Parameter {
             case "BlockMatrix":
                 return v / cast(BlockMatrix!(S,T)) this;
             case "UnitaryMatrix":
-                static if (T.stringof.startsWith("Complex")) {
+                static if (isComplexType!T) {
                     return v / cast(UnitaryMatrix!(S,T)) this;
                 }
                 else assert(0, "Unitary matrices must be of complex type.");
@@ -157,7 +176,7 @@ class MatrixAbstract(S, T) : Parameter {
             case "PermutationMatrix":
                 return v / cast(PermutationMatrix!(S,T)) this;
             case "FourierMatrix":
-                static if (T.stringof.startsWith("Complex")) {
+                static if (isComplexType!T) {
                     return v / cast(FourierMatrix!(S,T)) this;
                 }
                 else assert(0, "Fourier matrices must be of complex type.");
@@ -436,6 +455,7 @@ unittest
     write("Unittest Block Matrix ... ");
 
     auto len = 1024;
+    auto m0 = new BlockMatrix!(uint, float)();
     auto m1 = new PermutationMatrix!(ulong, Complex!float)(len/4, 1.0);
     auto m2 = new DiagonalMatrix!(ulong, Complex!float)(len/4, 1.0);
     auto m3 = new ReflectionMatrix!(ulong, Complex!float)(len/4, 1.0);
@@ -485,10 +505,13 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
               P is a permutation matrix.
      +/
 
+    static assert(isComplexType!T,
+               "UnitaryMatrix must be complex-valued.");
 
     PermutationMatrix!(S,T) perm;
     FourierMatrix!(S,T) fourier;
     Tc[] params;
+
 
     /+ The params vector include in the following order:
        + 3 diagonal unitary complex matrices.
@@ -502,7 +525,8 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
     this() {}
 
     this(in S size)
-    {
+    {   
+        this();
         assert(std.math.isPowerOf2(size), "Size of Unitary Matrix
                                            must be a power of 2.");
         typeId = "UnitaryMatrix";
@@ -541,7 +565,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
 
     /// Apply the "num"th diagonal matrix on the given vector.
     const pure
-    void applyDiagonal(ref T[] v, in int num)
+    void applyDiagonal(ref T[] v, in S num)
     {
         // we use expi to convert each value to a complex number
         // the value is the angle of the complex number with radius 1.
@@ -551,7 +575,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
     }    /// Apply the "num"th diagonal matrix on the given vector.
     
     const pure
-    void applyDiagonalInv(ref T[] v, in int num)
+    void applyDiagonalInv(ref T[] v, in S num)
     {
         // we use expi to convert each value to a complex number
         // the value is the angle of the complex number with radius 1.
@@ -562,7 +586,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
 
     /// Apply the "num"th reflection matrix on the given vector.
     const pure
-    auto applyReflection(ref T[] v, in int num)
+    auto applyReflection(ref T[] v, in S num)
     {
         // The '+3' is because the diagonal matrices are first
         // in the params array.
@@ -644,25 +668,45 @@ unittest
 {
     write("Unittest Unitary Matrix ... ");
     {
+        auto m0 = new UnitaryMatrix!(uint, Complex!float)();
         auto m = new UnitaryMatrix!(uint, Complex!double)(1024, 9.0);
+        auto n= m.dup;
         auto v = new Vector!(uint, Complex!double)(1024, 1.2);
 
         auto k = v.dup;
+        auto l = k.dup;
 
         auto r = m * v;
         v = r / m;
 
+        auto s = m * l;
+        l = s / m;
+
         k -= v;
+        l -= v;
 
         assert(k.norm!"L2" < 0.00001);
+        assert(l.norm!"L2" < 0.00001);
+
+        bool error =  false;
+        try {
+            auto err = new UnitaryMatrix!(uint, float)(); 
+        }
+        catch (AssertError e) {
+            error = true;
+        }
+        assert(error);
     }
 
     write("Done.\n");
 }
 
 class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
+    static assert(isComplexType!T,
+               "FourierMatrix must be complex-valued.");
+
     Fft objFFT;
-    
+
     this(S size)
     {
         typeId = "FourierMatrix";
@@ -717,6 +761,7 @@ unittest
     {
         alias Fourier = FourierMatrix!(uint, Complex!double);
         auto f = new Fourier(1024);
+        auto g =  f.dup;
         auto v = new Complex!double[2048];
         auto vc = v[15 .. 1039];
 
@@ -730,13 +775,22 @@ unittest
                             uniform(-1.0, 1.0, rnd_tmp));
 
         auto r1 = f * (vc / f);
-        auto r2 = (f * vc) / f;
+        auto r2 = (g * vc) / g;
 
         foreach(i;0 .. 1024){
             assert(std.complex.abs(r1[i] - vc[i]) <= 0.0001);
             assert(std.complex.abs(r2[i] - vc[i]) <= 0.0001);
             assert(std.complex.abs(r1[i] - r1[i]) <= 0.0001);
         }
+
+        bool error =  false;
+        try {
+            auto err = new FourierMatrix!(uint, float)(); 
+        }
+        catch (AssertError e) {
+            error = true;
+        }
+        assert(error);
     }
 
     write("Done.\n");
@@ -758,7 +812,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     this(in S size, in Tc randomBound)
     {
         this(size);
-        static if (T.stringof.startsWith("Complex")) {
+        static if (isComplexType!T) {
             foreach(i;0 .. size)
                 mat[i] = complex(uniform(-randomBound, randomBound, rnd),
                                  uniform(-randomBound, randomBound, rnd));
@@ -993,7 +1047,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     {
         this(size);
 
-        static if (T.stringof.startsWith("Complex")) {
+        static if (isComplexType!T) {
             foreach(S i;0 .. size)
                 vec[i] = complex(uniform(-randomBound, randomBound, rnd),
                                  uniform(-randomBound, randomBound, rnd));
@@ -1106,12 +1160,12 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         foreach(S i; 0 .. rows) {
             s = vec[i]*invSqNormVec2;
             foreach(S j; 0 .. cols){
-                static if (T.stringof.startsWith("Complex"))
+                static if (isComplexType!T)
                     res[i,j] = s*vec[j].conj;
                 else
                     res[i,j] = s*vec[j];
             }
-            static if (T.stringof.startsWith("Complex"))
+            static if (isComplexType!T)
                 res[i,i] = res[i,i] + cast(T) complex(1);
             else
                 res[i,i] = res[i,i] + cast(T) 1;
@@ -1310,7 +1364,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     this(in S rows, in S cols, in Tc randomBound)
     {
         this(rows, cols);
-        static if (T.stringof.startsWith("Complex")) {
+        static if (isComplexType!T) {
             foreach(i;0 .. mat.length)
                 mat[i] = complex(uniform(-randomBound, randomBound, rnd),
                                  uniform(-randomBound, randomBound, rnd));

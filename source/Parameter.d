@@ -250,17 +250,6 @@ class Vector(S, T) : Parameter {
         this += tmp;
     }
 
-    void opOpAssign(string op)(in FourierMatrix!(S,T) F)
-    {
-        static if (!T.stringof.startsWith("Complex"))
-            assert(0, "Fourier transform can only be applied to complex"
-                      ~"vector as this is what it'll return.");
-        
-        static if (op=="*") v = F.objFFT.fft!(Tc)(v);
-        else static if (op=="/") v = F.objFFT.inverseFft!(Tc)(v);
-        else static assert(0, "Operator "~op~" not implemented.");
-    }
-
     void opOpAssign(string op)(in MatrixAbstract!(S,T) M)
     {
         /+ This should only be used to handle Matrix that
@@ -311,6 +300,27 @@ class Vector(S, T) : Parameter {
                   ~"vector as this is what it'll return.");
             }
         }
+        else if (tmptypeId == "FourierMatrix") {
+            static if (T.stringof.startsWith("Complex")) {
+                static if (!T.stringof.startsWith("Complex"))
+                    assert(0, "Fourier transform can only be applied to complex"
+                             ~"vector as this is what it'll return.");
+        
+                static if (op=="*")
+                    v = (cast (FourierMatrix!(S,T)) M).objFFT.fft!(Tc)(v);
+                else static if (op=="/")
+                    v = (cast (FourierMatrix!(S,T)) M).objFFT.inverseFft!(Tc)(v);
+                else static
+                    assert(0, "Operator "~op~" not implemented.");
+            }
+            else {
+                assert(0, "Fourier transform can only be applied to complex"
+                  ~"vector as this is what it'll return.");
+            }
+        }
+
+
+        
     }
 
     void opOpAssign(string op)(in BlockMatrix!(S,T) M)

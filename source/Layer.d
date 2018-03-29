@@ -2,7 +2,9 @@ module source.Layer;
 
 import std.complex;
 import std.conv: to;
+import std.exception: assertThrown;
 import std.functional: toDelegate;
+import std.math;
 import std.string : startsWith;
 
 import source.Matrix;
@@ -11,6 +13,7 @@ import source.Parameter;
 version(unittest)
 {
     import std.stdio : writeln, write;
+    import core.exception;
 }
 
 /+  The layers of the Neural Networks.
@@ -67,7 +70,7 @@ abstract class Layer(S,T)
     Parameter[] params = null;
 
     /// function applied to the vector.
-    Vector!(S,T) delegate(in Vector!(S,T), in Parameter[]) func;
+    Vector!(S,T) delegate(Vector!(S,T), Parameter[]) func;
 
     /// Used by the optimizer to know if it must optimize the layer.
     bool isLearnable = false;
@@ -79,7 +82,7 @@ abstract class Layer(S,T)
             name = _name;
     }
 
-    abstract Vector!(S,T) compute(in Vector!(S,T));
+    abstract Vector!(S,T) compute(Vector!(S,T));
 }
 
 /+ This layer implement a simple linear matrix transformation
@@ -116,13 +119,13 @@ class FunctionalLayer(S,T) : Layer!(S,T)
         {
             case "relu":
                 static if (!T.stringof.startsWith("Complex")) {
-                    this(
-                        delegate(T val) {
-                            if (val > 0)
-                                return val;
-                            return 0;
-                        }
-                    );
+                    func =
+                        delegate(Vector!(S,T) _v, Parameter[] _p) {
+                            auto res = _v.dup;
+                            foreach(i; 0 .. _v.length)
+                                if (res[i] < 0) res[i] = 0;
+                            return res;
+                        };
                     break;
                 }
                 // else with use modRelu by default.
@@ -135,8 +138,8 @@ class FunctionalLayer(S,T) : Layer!(S,T)
                     params = new Parameter[1];
                     params[0] = new Vector!(S,Tc)(size_in, 1.0);
                     
-                    func = 
-                        delegate(in Vector!(S,T) _v, in Parameter[] _p) {
+                    func =
+                        delegate(Vector!(S,T) _v, Parameter[] _p) {
                             auto absv = _v[0].abs;
                             auto tmp = absv;
                             auto res = _v.dup;
@@ -159,19 +162,18 @@ class FunctionalLayer(S,T) : Layer!(S,T)
                 break;
             case "softmax":
                 static if (!T.stringof.startsWith("Complex"))
-                    this(
-                        delegate(in Vector!(S,T) _v) {
+                    func =
+                        delegate(Vector!(S,T) _v, Parameter[] _p) {
                             T s = 0;
                             auto res = _v.dup;
                             foreach(i; 0 .. _v.length) {
-                                res[i] = exp(v[i]);
+                                res.v[i] = exp(_v[i]);
                                 s += res[i];
                             }
                             foreach(i; 0 .. _v.length)
-                                res[i] /= s;
+                                res.v[i] /= s;
                             return res;
-                        }
-                    );
+                        };
                 else
                     throw new Exception("You will have to define your own
                                          complex-valued softmax.");
@@ -186,17 +188,15 @@ class FunctionalLayer(S,T) : Layer!(S,T)
     }
 
     // The function to apply to the vector. Can be anything. DELEGATE
-    this(Vector!(S,T) delegate(in Vector!(S,T)) _func)
+    this(Vector!(S,T) delegate(Vector!(S,T)) _func)
     {
-        func = delegate(in Vector!(S,T) _v, in Parameter[] _p=null) {
-            if (_p !is null)
-                throw new Exception("Parameter not allowed for 'func'.");
+        func = delegate(Vector!(S,T) _v, Parameter[] _p) {
             return _func(_v);
         };
     }
 
     // The function to apply to the vector. Can be anything. FUNCTION
-    this(Vector!(S,T) function(in Vector!(S,T)) _func)
+    this(Vector!(S,T) function(Vector!(S,T)) _func)
     {
         this(toDelegate(_func));
     }
@@ -205,9 +205,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
     // function to a vector. DELEGATE
     this(T delegate(T) _func)
     {
-        func = delegate(in Vector!(S,T) _v, in Parameter[] _p=null) {
-            if (_p !is null)
-                throw new Exception("Parameter not allowed for 'func'.");
+        func = delegate(Vector!(S,T) _v, Parameter[] _p) {
             auto res = _v.dup;
             foreach(i; 0 .. _v.length)
                 res[i] = _func(_v[i]);
@@ -224,7 +222,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
 
     this(in S size)
     {
-        this(delegate(in Vector!(S,T) _v) {
+        this(delegate(Vector!(S,T) _v) {
                 if (_v.length != size)
                     throw new Exception("Size mismatch in FunctionalLayer:\n"
                                        ~"Size of the FunctionalLayer: "
@@ -238,7 +236,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
     }
 
     override
-    Vector!(S,T) compute(in Vector!(S,T) _v)
+    Vector!(S,T) compute(Vector!(S,T) _v)
     {
         return func(_v, params);
     }
@@ -246,34 +244,82 @@ class FunctionalLayer(S,T) : Layer!(S,T)
 unittest {
     write("Unittest FunctionalLayer ... ");
 
-    uint len = 1024;
-    alias Vec = Vector!(uint, Complex!real);
-    alias Fl = FunctionalLayer!(uint, Complex!real);
+    alias Vec = Vector!(uint, Complex!double);
+    alias Fl = FunctionalLayer!(uint, Complex!double);
 
-    Vec blue(Vec _v) pure {
+    Vec blue(in Vec _v) pure {
         auto res = _v.dup;
-        res *= complex(4);
+        res.v[] *= complex(4.0);
         return res;
     }
 
-    auto v = new Vec(len, 1.0);
+    auto ff = function(in Vec _v) pure {
+        auto res = _v.dup;
+        res.v[] *= complex(4.0);
+        return res;
+    };
+
+    uint len = 4;
+    double pi = 3.1415923565;
+
+    auto v = new Vec([complex(0.0), complex(1.0), complex(pi), complex(-1.0)]);
+    auto e = new Vec([complex(0.0)]);
+
     auto f1 = new Fl(len);
-    auto f2 = new Fl(&std.complex.cos);
+    auto f2 = new Fl(&cos!double);
     auto f3 = new Fl(&blue);
+    auto f4 = new Fl(ff);
+    auto f5 = new Fl("modRelu", 4);
+
+    (cast(Vector!(uint, double)) f5.params[0])[0] = 0.0;
+    (cast(Vector!(uint, double)) f5.params[0])[1] = 0.0;
+    (cast(Vector!(uint, double)) f5.params[0])[2] = 0.0;
+    (cast(Vector!(uint, double)) f5.params[0])[3] = 0.0;
 
     auto v1 = f1.compute(v);
     auto v2 = f2.compute(v);
     auto v3 = f3.compute(v);
-    writeln(v1.v);
-    writeln(v2.v);
-    writeln(v3.v);
+    auto v4 = f4.compute(v);
+    auto v5 = f5.compute(v);
 
     v1 -= v;
-    v3 /= complex(4);
+    v4 -= v3;
+    v3.v[] /= complex(4.0);
     v3 -= v;
 
     assert(v1.norm!"L2" <= 0.001);
     assert(v3.norm!"L2" <= 0.001);
+    assert(v4.norm!"L2" <= 0.001);
+
+    assertThrown(f1.compute(e));
+    assertThrown(new Fl("modRelu"));
+    assertThrown(new FunctionalLayer!(uint, Complex!double)("relu"));
+    assertThrown(new FunctionalLayer!(uint, Complex!double)("softmax"));
+    assertThrown(new FunctionalLayer!(uint, double)("modRelu"));
+
+    auto vr = new Vector!(size_t, double)([0.0, 1.0, pi, -1.0]);
+
+    auto f6 = new FunctionalLayer!(size_t, double)("relu");
+    auto f7 = new FunctionalLayer!(size_t, double)("softmax");
+
+    auto vr6 = f6.compute(vr);
+    auto vr7 = f7.compute(vr);
+
+    assert(abs(vr6.sum - 1.0 - pi) <= 0.01);
+    assert(abs(vr7.sum - 1.0) <= 0.001);
+
+    f1.set_name("f1");
+    assert(f1.name == "f1");
+
+
+    bool error =  false;
+    try {
+        auto err = new FunctionalLayer!(uint, real)("this is incorrect.");
+    }
+    catch (AssertError e) {
+        error = true;
+    }
+    assert(error);
 
     write("Done.\n");
 }
