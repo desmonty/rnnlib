@@ -39,32 +39,21 @@ unittest
                [-5.0, -1.0, -6.0])) < 0.001);
 }
 
-bool isComplexType(T)()
-{
-    return T.stringof.startsWith("Complex");
-}
-unittest
-{
-    assert(isComplexType!(Complex!float));
-    assert(isComplexType!(Complex!double));
-    assert(isComplexType!(Complex!real));
-    assert(!isComplexType!float);
-    assert(!isComplexType!double);
-    assert(!isComplexType!real);
-    assert(!isComplexType!uint);
-    assert(!isComplexType!int);
-    assert(!isComplexType!long);
-    assert(!isComplexType!size_t);
-    assert(!isComplexType!short);
-}
-
 class MatrixAbstract(S, T) : Parameter {
     S rows, cols;
     string typeId;
 
-    static if (isComplexType!T)
+    static if (is(Complex!T : T))
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
     else alias Tc = T;
+
+    pure @safe
+    this(){}
+
+    @safe
+    this(bool _b){
+        super(true);
+    }
 
     const
     Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
@@ -72,45 +61,6 @@ class MatrixAbstract(S, T) : Parameter {
     {
         return new Vector!(S,T)(this * v.v);
     }
-
-/+
-    const @property
-    MatrixAbstract dup()
-    {
-        if (typeId.stringof.startsWith("BlockMatrix"))
-            return new BlockMatrix!(S,T)(cast(BlockMatrix!(S,T)) this);
-        else if (typeId.stringof.startsWith("UnitaryMatrix"))
-            return new UnitaryMatrix!(S,T)(cast(UnitaryMatrix!(S,T)) this);
-        else if (typeId.stringof.startsWith("DiagonalMatrix"))
-            return new DiagonalMatrix!(S,T)(cast(DiagonalMatrix!(S,T)) this);
-        else if (typeId.stringof.startsWith("ReflectionMatrix"))
-            return new ReflectionMatrix!(S,T)(cast(ReflectionMatrix!(S,T)) this);
-        else if (typeId.stringof.startsWith("PermutationMatrix"))
-            return new PermutationMatrix!(S,T)(cast(PermutationMatrix!(S,T)) this);
-        else if (typeId.stringof.startsWith("FourierMatrix"))
-            return new FourierMatrix!(S,T)(cast(FourierMatrix!(S,T)) this);
-        else if (typeId.stringof.startsWith("Matrix"))
-            return new Matrix!(S,T)(cast(Matrix!(S,T)) this);
-        else if (typeId.stringof.startsWith("PermutationMatrix"))
-            return new PermutationMatrix!(S,T)(cast(PermutationMatrix!(S,T)) this);
-    }
-
-    BlockMatrix!(S,T) opCast()
-    { return cast(BlockMatrix!(S,T)) this; }
-    UnitaryMatrix!(S,T) opCast()
-    { return cast(UnitaryMatrix!(S,T)) this; }
-    DiagonalMatrix!(S,T) opCast()
-    { return cast(DiagonalMatrix!(S,T)) this; }
-    ReflectionMatrix!(S,T) opCast()
-    { return cast(ReflectionMatrix!(S,T)) this; }
-    PermutationMatrix!(S,T) opCast()
-    { return cast(PermutationMatrix!(S,T)) this; }
-    FourierMatrix!(S,T) opCast()
-    { return cast(FourierMatrix!(S,T)) this; }
-    Matrix!(S,T) opCast()
-    { return cast(Matrix!(S,T)) this; }
-    PermutationMatrix!(S,T) opCast()
-    { return cast(PermutationMatrix!(S,T)) this; }+/
 
     const
     T[] opBinary(string op)(in T[] v)
@@ -123,7 +73,7 @@ class MatrixAbstract(S, T) : Parameter {
             case "BlockMatrix":
                 return cast(BlockMatrix!(S,T)) this * v;
             case "UnitaryMatrix":
-                static if (isComplexType!T) {
+                static if (is(Complex!T : T)) {
                     return cast(UnitaryMatrix!(S,T)) this * v;
                 }
                 else assert(0, "Unitary matrices must be of complex type.");
@@ -134,7 +84,7 @@ class MatrixAbstract(S, T) : Parameter {
             case "PermutationMatrix":
                 return cast(PermutationMatrix!(S,T)) this * v;
             case "FourierMatrix":
-                static if (isComplexType!T) {
+                static if (is(Complex!T : T)) {
                     return cast(FourierMatrix!(S,T)) this * v;
                 }
                 else assert(0, "Fourier matrices must be of complex type.");
@@ -165,7 +115,7 @@ class MatrixAbstract(S, T) : Parameter {
             case "BlockMatrix":
                 return v / cast(BlockMatrix!(S,T)) this;
             case "UnitaryMatrix":
-                static if (isComplexType!T) {
+                static if (is(Complex!T : T)) {
                     return v / cast(UnitaryMatrix!(S,T)) this;
                 }
                 else assert(0, "Unitary matrices must be of complex type.");
@@ -176,7 +126,7 @@ class MatrixAbstract(S, T) : Parameter {
             case "PermutationMatrix":
                 return v / cast(PermutationMatrix!(S,T)) this;
             case "FourierMatrix":
-                static if (isComplexType!T) {
+                static if (is(Complex!T : T)) {
                     return v / cast(FourierMatrix!(S,T)) this;
                 }
                 else assert(0, "Fourier matrices must be of complex type.");
@@ -320,10 +270,10 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
             4 0 0
             0 5 0
      +/
-    pure
+    pure @safe
     this(){}
 
-    pure
+    pure @safe
     this(in S size_in, in S size_out, in S size_blocks)
     {
         typeId = "BlockMatrix";
@@ -341,6 +291,7 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
         this.size_in = size_in;
     }
 
+    @safe
     this(in S size_in, in S size_out, in S size_blocks,
          MatrixAbstract!(S,T)[] blocks, bool randperm=false)
     {
@@ -357,26 +308,12 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
         }
     }
 
+    @safe
     this(in S size_in, in S size_blocks,
          MatrixAbstract!(S,T)[] blocks, bool randperm=false)
     {
         this(size_in, size_in, size_blocks, blocks, randperm);
     }
-    /+
-    this(in BlockMatrix M)
-    {
-        this.size_blocks = M.size_blocks;
-        this.num_blocks = M.num_blocks;
-        this.size_out = M.size_out;
-        this.size_in = M.size_in;
-
-        this.P = M.P.dup;
-        this.Q = M.Q.dup;
-        auto tmp_blocks = new MatrixAbstract!(S,T)[M.num_blocks];
-        foreach(i; 0 .. M.num_blocks)
-            tmp_blocks[i] = M.blocks[i].dup;
-        this.blocks = tmp_blocks;
-    }+/
 
     const
     auto opBinary(string op)(in Vector!(S,T) v)
@@ -484,6 +421,7 @@ unittest
 }
 
 class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
+if (is(Complex!T : T))
 {
     /+
         This matrix is defined in 
@@ -505,7 +443,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
               P is a permutation matrix.
      +/
 
-    static assert(isComplexType!T,
+    static assert(is(Complex!T : T),
                "UnitaryMatrix must be complex-valued.");
 
     PermutationMatrix!(S,T) perm;
@@ -521,7 +459,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
        parameters.
      +/
 
-    pure
+    pure @safe
     this() {}
 
     this(in S size)
@@ -556,7 +494,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
         res.params = M.params.dup;
     }
 
-    const @property
+    const @property 
     auto dup()
     {
         return new UnitaryMatrix(this);
@@ -564,7 +502,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
 
 
     /// Apply the "num"th diagonal matrix on the given vector.
-    const pure
+    const pure @safe
     void applyDiagonal(ref T[] v, in S num)
     {
         // we use expi to convert each value to a complex number
@@ -574,7 +512,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
             v[i] *= cast(T) std.complex.expi(params[start_index + i]);
     }    /// Apply the "num"th diagonal matrix on the given vector.
     
-    const pure
+    const pure @safe
     void applyDiagonalInv(ref T[] v, in S num)
     {
         // we use expi to convert each value to a complex number
@@ -585,7 +523,7 @@ class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
     }
 
     /// Apply the "num"th reflection matrix on the given vector.
-    const pure
+    const pure @safe
     auto applyReflection(ref T[] v, in S num)
     {
         // The '+3' is because the diagonal matrices are first
@@ -687,26 +625,16 @@ unittest
 
         assert(k.norm!"L2" < 0.00001);
         assert(l.norm!"L2" < 0.00001);
-
-        bool error =  false;
-        try {
-            auto err = new UnitaryMatrix!(uint, float)(); 
-        }
-        catch (AssertError e) {
-            error = true;
-        }
-        assert(error);
     }
 
     write("Done.\n");
 }
 
-class FourierMatrix(S,T) : MatrixAbstract!(S,T) {
-    static assert(isComplexType!T,
-               "FourierMatrix must be complex-valued.");
-
+class FourierMatrix(S,T) : MatrixAbstract!(S,T)
+if (is(Complex!T : T))
+{
     Fft objFFT;
-
+    
     this(S size)
     {
         typeId = "FourierMatrix";
@@ -782,15 +710,6 @@ unittest
             assert(std.complex.abs(r2[i] - vc[i]) <= 0.0001);
             assert(std.complex.abs(r1[i] - r1[i]) <= 0.0001);
         }
-
-        bool error =  false;
-        try {
-            auto err = new FourierMatrix!(uint, float)(); 
-        }
-        catch (AssertError e) {
-            error = true;
-        }
-        assert(error);
     }
 
     write("Done.\n");
@@ -800,7 +719,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     T[] mat;
     
     /// Constructor
-    pure
+    pure @safe
     this(in S size)
     {
         typeId = "DiagonalMatrix";
@@ -809,10 +728,11 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Simple constructor with random initialization
+    @safe
     this(in S size, in Tc randomBound)
     {
         this(size);
-        static if (isComplexType!T) {
+        static if (is(Complex!T : T)) {
             foreach(i;0 .. size)
                 mat[i] = complex(uniform(-randomBound, randomBound, rnd),
                                  uniform(-randomBound, randomBound, rnd));
@@ -824,7 +744,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Copy-constructor
-    pure
+    pure @safe
     this(in DiagonalMatrix M)
     {
         this(M.rows);
@@ -833,7 +753,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Constructor from list
-    pure
+    pure @safe
     this(in T[] valarr)
     {
         this(cast(S) valarr.length);
@@ -841,38 +761,38 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
 
-    const @property pure
+    const @property pure @safe
     auto dup()
     {
         return new DiagonalMatrix(this);
     }
 
-    @property const pure
+    @property const pure @safe
     S length()
     {
-        return cast(S) rows;
+        return rows;
     }
 
     /// Assign Value to indices.
-    pure
+    pure @safe
     void opIndexAssign(T value, in S i, in S j)
     {if (i == j) mat[i] = value;}
     /// Assign Value to index.
-    pure
+    pure @safe
     void opIndexAssign(T value, in S i)
     {mat[i] = value;}
 
     /// Return value by indices.
-    pure
+    pure @safe
     ref T opIndex(in S i, in S j)
     {return mat[i];}
     /// Return value by index.
-    pure
+    pure @safe
     ref T opIndex(in S i)
     {return mat[i];}
 
     /// Operation +-*/ between Diagonal Matrix.
-    const pure
+    const pure @safe
     auto opBinary(string op)(in DiagonalMatrix other)
     if (op=="+" || op=="-" || op=="*" || op=="/")
     {
@@ -883,7 +803,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Operation-Assign +-*/ between Diagonal Matrix.
-    pure
+    pure @safe
     void opOpAssign(string op)(in DiagonalMatrix other)
     if (op=="+" || op=="-" || op=="*" || op=="/")
     {
@@ -892,7 +812,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     ///  Vector multiplication.
-    const pure
+    const pure @safe
     Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
@@ -902,7 +822,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const pure
+    const pure @safe
     auto opBinary(string op)(in T[] other)
     if (op=="*")
     {
@@ -912,14 +832,14 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         return res;
     }
 
-    const pure
+    const pure @safe
     Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
     if (op=="/")
     {
         return new Vector!(S,T)(v.v / this);
     }
 
-    const pure
+    const pure @safe
     auto opBinaryRight(string op)(in T[] other)
     if (op=="/")
     {
@@ -930,7 +850,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Operation +-*/ on Matrix.
-    const pure
+    const pure @safe
     Matrix!(S,T) opBinary(string op)(in Matrix!(S,T) M)
     {
         static if (op=="+" || op=="-") {
@@ -949,7 +869,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         else static assert(0, "Binary operation '"~op~"' is not implemented.");
     }
 
-    const pure
+    const pure @safe
     Matrix!(S,T) opBinary(string op)(in Matrix!(S,T) M)
     if (op=="*" || op=="/")
     {
@@ -959,7 +879,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
         return res;
     }
 
-    @property const
+    @property const @safe
     T sum()
     {return mat.sum;}
 }
@@ -1034,7 +954,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
      +/
 
     /// Constructor
-    pure
+    pure @safe
     this(in S size)
     {
         typeId = "ReflectionMatrix";
@@ -1043,11 +963,12 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Simple constructor with random initialization
+    @safe
     this(in S size, in Tc randomBound)
     {
         this(size);
 
-        static if (isComplexType!T) {
+        static if (is(Complex!T : T)) {
             foreach(S i;0 .. size)
                 vec[i] = complex(uniform(-randomBound, randomBound, rnd),
                                  uniform(-randomBound, randomBound, rnd));
@@ -1061,6 +982,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
 
 
     /// Copy-constructor
+    @safe
     this(in ReflectionMatrix dupl)
     {
         rows = dupl.vec.length; cols = dupl.vec.length;
@@ -1069,7 +991,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Constructor from list.
-    pure
+    pure @safe
     this(in T[] valarr)
     {
         rows = cast(S) valarr.length;
@@ -1078,44 +1000,44 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         compute_invSqNormVec2();
     }
     /// Constructor from Vector.
-    pure
+    pure @safe
     this(in Vector!(S,T) valarr)
     {
         this(valarr.v);
     }
 
 
-    const @property pure
+    const @property pure @safe
     auto dup()
     {
         return new ReflectionMatrix(this);
     }
 
     /// Compute the norm (n) of the reflection vector and store -2n^-2
-    pure
+    pure @safe
     void compute_invSqNormVec2()
     {
         invSqNormVec2 = -2*pow(vec.norm!"L2",-2);
     }
 
-    @property const pure
+    @property const pure @safe
     S length()
     {
-        return cast(S) rows;
+        return rows;
     }
 
     /+ Vector multiplication.
      + As we only store the vector that define the reflection
      + We can comme up with a linear-time matrix-vector multiplication.
      +/
-    const pure
+    const pure @safe
     Vector!(S,T) opBinary(string op)(in Vector!(S, T) v)
     if (op=="*")
     {
         return this * v.v;
     }
 
-    const pure
+    const pure @safe
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
@@ -1129,14 +1051,14 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const pure
+    const pure @safe
     Vector!(S,T) opBinaryRight(string op)(in Vector!(S, T) v)
     if (op=="/")
     {
         return v.v / this;
     }
 
-    const pure
+    const pure @safe
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
@@ -1152,7 +1074,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const pure
+    const pure @safe
     Matrix!(S,T) toMatrix()
     {
         auto res = new Matrix!(S,T)(rows, cols);
@@ -1160,12 +1082,12 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
         foreach(S i; 0 .. rows) {
             s = vec[i]*invSqNormVec2;
             foreach(S j; 0 .. cols){
-                static if (isComplexType!T)
+                static if (is(Complex!T : T))
                     res[i,j] = s*vec[j].conj;
                 else
                     res[i,j] = s*vec[j];
             }
-            static if (isComplexType!T)
+            static if (is(Complex!T : T))
                 res[i,i] = res[i,i] + cast(T) complex(1);
             else
                 res[i,i] = res[i,i] + cast(T) 1;
@@ -1224,7 +1146,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
     S[] perm;
 
     /// Constructor
-    pure
+    pure @safe
     this(in S size)
     {
         typeId = "PermutationMatrix";
@@ -1235,6 +1157,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
     /// Simple constructor with random initialization
     /// Here the randomBound is not used and a simple
     /// random permutation is returned.
+    @safe
     this(in S size, in float randomBound)
     {
         this(size.iota.array);
@@ -1243,7 +1166,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
 
 
     /// Copy-constructor
-    pure
+    pure @safe
     this(in PermutationMatrix dupl)
     {
         this(dupl.cols);
@@ -1251,7 +1174,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Constructor from list (trusted to be a permutation)
-    pure
+    pure @safe
     this(in S[] valarr)
     {
         this(cast(S) valarr.length);
@@ -1259,14 +1182,14 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
 
-    const @property pure
+    const @property pure @safe
     auto dup()
     {
         return new PermutationMatrix(this);
     }
 
     @property @nogc
-    const pure
+    const pure @safe
     S length()
     {
         return cast(S) rows;
@@ -1281,7 +1204,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
 
 
     ///  Vector multiplication.
-    const pure
+    const pure @safe
     Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
@@ -1291,7 +1214,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const pure
+    const pure @safe
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
@@ -1301,14 +1224,14 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
         return vres;
     }
 
-    const pure
+    const pure @safe
     Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
     if (op=="/")
     {
         return new Vector!(S,T)(v.v / this);
     }
 
-    const pure
+    const pure @safe
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
@@ -1340,31 +1263,38 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     T[] mat;
 
     /// Simple constructor
-    pure
+    pure @safe
     this(in S rows, in S cols)
     {
+        super();
         typeId = "Matrix";
         mat = new T[rows*cols];
         this.rows = rows;
         this.cols = cols;
     }
     
-    pure
+    pure @safe
     this(in S rows)
     {
         this(rows, rows);
     }
 
+    @safe
     this(in S rows, in Tc randomBound)
     {
         this(rows, rows, randomBound);
     }
 
     /// Simple constructor with random initialization
+    @safe
     this(in S rows, in S cols, in Tc randomBound)
     {
-        this(rows, cols);
-        static if (isComplexType!T) {
+        super(true);
+        typeId = "Matrix";
+        mat = new T[rows*cols];
+        this.rows = rows;
+        this.cols = cols;
+        static if (is(Complex!T : T)) {
             foreach(i;0 .. mat.length)
                 mat[i] = complex(uniform(-randomBound, randomBound, rnd),
                                  uniform(-randomBound, randomBound, rnd));
@@ -1376,7 +1306,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     /// Copy-constructor
-    pure
+    pure @safe
     this(in Matrix dupl)
     {
         this(dupl.rows, dupl.cols);
@@ -1385,29 +1315,29 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         }
     }
 
-    const @property pure
+    const @property pure @safe
     auto dup()
     {
         return new Matrix(this);
     }
 
-    @property const pure
+    @property const pure @safe
     S length()
     {
         return cast(S) rows;
     }
 
-    pure
+    pure @safe
     void opIndexAssign(T value, in S i, in S j)
     {mat[i*cols + j] = value;}
 
     /// Return value by index.
-    pure const
+    pure const @safe
     T opIndex(in S i, in S j)
     {return mat[i*cols + j];}
    
     /// Simple math operation without memory allocation.
-    pure
+    pure @safe
     void opOpAssign(string op)(in Matrix other)
     {
              static if (op == "+") { mat[] += other.mat[]; }
@@ -1416,7 +1346,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         else static assert(0, "Operator "~op~" not implemented.");
     }
 
-    const pure
+    const pure @safe
     auto opBinary(string op)(in Matrix other)
     if (op == "+" || op == "-")
     {
@@ -1426,7 +1356,7 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         return res;
     }
 
-    const pure
+    const pure @safe
     auto opBinary(string op)(in Matrix other)
     if (op == "*")
     {
@@ -1445,14 +1375,14 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
         return res;
     }
 
-    const pure
+    const pure @safe
     auto opBinary(string op)(in Vector!(S,T) v)
     if (op=="*")
     {
         return new Vector!(S,T)(this * v.v);
     }
 
-    const pure
+    const pure @safe
     auto opBinary(string op)(in T[] v)
     if (op=="*")
     {

@@ -23,9 +23,10 @@ abstract class Parameter {
     static private bool init = true;
     static protected auto rnd = Random(0);
 
-    pure
+    pure  @safe
     this() {}
 
+    @safe
     this(bool random=true)
     {
         if (init) {
@@ -50,24 +51,25 @@ abstract class Parameter {
 class Vector(S, T) : Parameter {
     T[] v;
 
-    static if (T.stringof.startsWith("Complex"))
+    static if (is(Complex!T : T))
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
     else alias Tc = T;
 
     /// Simple constructor.
-    pure
+    pure @safe
     this(S length)
     {
         v = new T[length];
     }
  
     /// Random constructor.
+    @safe
     this(S length, Tc randomBound)
     {
         super(true);
         v = new T[length];
 
-        static if (T.stringof.startsWith("Complex")) {
+        static if (is(Complex!T : T)) {
             foreach(i;0 .. v.length)
                 v[i] = complex(uniform(-randomBound, randomBound, rnd),
                                uniform(-randomBound, randomBound, rnd));
@@ -79,7 +81,7 @@ class Vector(S, T) : Parameter {
     }
 
     /// Copy-constructor
-    pure
+    pure @safe
     this(in Vector dupl)
     {
         this(dupl.length);
@@ -87,7 +89,7 @@ class Vector(S, T) : Parameter {
     }
 
     /// Constructor from list
-    pure
+    pure @safe
     this(in T[] valarr)
     {
         this(cast(S) valarr.length);
@@ -107,14 +109,14 @@ class Vector(S, T) : Parameter {
     }
 
     /// Return value by index.
-    const pure @nogc
+    const pure @nogc @safe
     T opIndex(S i)
     {
         return v[i];
     }
    
     /// Simple math operation without memory allocation.
-    pure
+    pure @safe
     void opOpAssign(string op)(in Vector u)
     {
         static if (op == "+") { v[] += u.v[]; }
@@ -125,11 +127,11 @@ class Vector(S, T) : Parameter {
     }
 
     /// Return the sum of all the elements in the vector.
-    @property const pure
+    @property const pure @safe
     T sum() {return v.sum;}
 
     /// Return a duplicate of the vector.
-    @property const pure
+    @property const pure @safe
     auto dup()
     {
         auto res = new Vector(length);
@@ -140,13 +142,13 @@ class Vector(S, T) : Parameter {
     }
 
     /// Return the dot product of the vector with u.
-    const pure
+    const pure @safe
     T dot(in Vector u)
     {return this.dot(u.v);}
     
     // TODO intel intrinsics ?
     // std.math.fma
-    const pure
+    const pure @safe
     T dot(in T[] u)
     {
         T s = 0;
@@ -158,7 +160,7 @@ class Vector(S, T) : Parameter {
     /+ Return the norm of the vector using a specific
      + method in [L0, L1, L2, Linf, min].
      +/
-    @property const @nogc pure
+    @property const @nogc pure @safe
     auto norm(string method)()
     {
         Tc s = v[0].re*0.0f;
@@ -200,14 +202,14 @@ class Vector(S, T) : Parameter {
         else static assert(0, "Method '"~method~"' is not implemented.");
     }
 
-    pure
+    pure @safe
     void opOpAssign(string op)(in Matrix!(S,T) M)
     if (op == "*")
     {
         this.v = M * this.v;
     }
 
-    pure
+    pure @safe
     void opOpAssign(string op)(in DiagonalMatrix!(S,T) M)
     { 
         static if (op == "*")
@@ -221,7 +223,7 @@ class Vector(S, T) : Parameter {
         else static assert(0, "Operator "~op~" not implemented.");
     }
 
-    pure
+    pure @safe
     void opOpAssign(string op)(in PermutationMatrix!(S,T) M)
     {
         static if (op == "*")
@@ -239,7 +241,7 @@ class Vector(S, T) : Parameter {
         else static assert(0, "Operator "~op~" not implemented.");
     }
 
-    pure
+    pure @safe
     void opOpAssign(string op)(in ReflectionMatrix!(S,T) M)
     {
         static if (op != "*" && op != "/")
@@ -249,7 +251,7 @@ class Vector(S, T) : Parameter {
         tmp *= M.invSqNormVec2*s;
         this += tmp;
     }
-
+    
     void opOpAssign(string op)(in MatrixAbstract!(S,T) M)
     {
         /+ This should only be used to handle Matrix that
@@ -260,7 +262,7 @@ class Vector(S, T) : Parameter {
          +/
         auto tmptypeId = split(M.typeId, "!")[0];
         if (tmptypeId == "UnitaryMatrix") {
-            static if (T.stringof.startsWith("Complex")) {
+            static if (is(Complex!T : T)) {
                 auto mat = cast(UnitaryMatrix!(S,T)) M;
                 static if (op == "*") 
                 {
@@ -301,8 +303,8 @@ class Vector(S, T) : Parameter {
             }
         }
         else if (tmptypeId == "FourierMatrix") {
-            static if (T.stringof.startsWith("Complex")) {
-                static if (!T.stringof.startsWith("Complex"))
+            static if (is(Complex!T : T)) {
+                static if (!is(Complex!T : T))
                     assert(0, "Fourier transform can only be applied to complex"
                              ~"vector as this is what it'll return.");
         
@@ -317,12 +319,9 @@ class Vector(S, T) : Parameter {
                 assert(0, "Fourier transform can only be applied to complex"
                   ~"vector as this is what it'll return.");
             }
-        }
-
-
-        
+        } 
     }
-
+ 
     void opOpAssign(string op)(in BlockMatrix!(S,T) M)
     {
         static if (op == "*") {
@@ -376,20 +375,20 @@ class Vector(S, T) : Parameter {
         else static assert(0, "Operator "~op~" not implemented.");
     }
 
-    pure
+    pure @safe
     void opOpAssign(string op)(in T scalar)
     {
         mixin("v[] "~op~"= scalar;");
     }
 
-    const pure
+    const pure @safe
     T conjdot(in Vector u)
     {return this.conjdot(u.v);}
 
-    const pure
+    const pure @safe
     T conjdot(in T[] u)
     {
-        static if (T.stringof.startsWith("Complex")) {
+        static if (is(Complex!T : T)) {
             T s = complex(0);
             foreach(i; 0 .. length)
                 s += v[i]*u[i].conj;
@@ -402,10 +401,10 @@ class Vector(S, T) : Parameter {
 
     // This fonction allow us to compute the conjugate dot
     // with a simple array. 
-    const pure
+    const pure @safe
     T conjdot(in T[] u, in Vector vtmp)
     {
-        static if (T.stringof.startsWith("Complex")) {
+        static if (is(Complex!T : T)) {
             T s = complex(0);
             foreach(i; 0 .. length)
                 s += u[i]*vtmp[i].conj;
@@ -416,14 +415,14 @@ class Vector(S, T) : Parameter {
         }
     }
 
-    pure
+    pure @safe
     void conjmult(in Vector u)
     {return this.conjmult(u.v);}
 
-    pure
+    pure @safe
     void conjmult(in T[] u)
     {
-        static if (T.stringof.startsWith("Complex")) {
+        static if (is(Complex!T : T)) {
             foreach(i; 0 .. u.length)
                 v[i] *= u[i].conj;
         }

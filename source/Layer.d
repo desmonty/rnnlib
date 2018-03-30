@@ -1,8 +1,9 @@
 module source.Layer;
 
+import std.algorithm: isSorted, minElement, maxElement;
 import std.complex;
 import std.conv: to;
-import std.exception: assertThrown;
+import std.exception: assertThrown, enforce;
 import std.functional: toDelegate;
 import std.math;
 import std.string : startsWith;
@@ -42,7 +43,8 @@ version(unittest)
 
 
     TODO:
-        - Shared parameter = convnet
+        - Matrix Layer
+        - convnet
         - share_parameter in NeuralNet between layer
 
         - REFACTOR: idea
@@ -55,7 +57,7 @@ version(unittest)
 
 abstract class Layer(S,T)
 {
-    static if (T.stringof.startsWith("Complex"))
+    static if (is(Complex!T : T))
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
     else alias Tc = T;
 
@@ -104,21 +106,18 @@ unittest {
  +/
 class FunctionalLayer(S,T) : Layer!(S,T)
 {
-    /+ This implements common functions most will want to use
-       like:
-            -SoftMax/SoftPlus
-            -relu/modRelu
-    TODO:
-        softmax
-        softplus
-        add parameter in delegate
+    /+ This implements common functions that are not implemented already.
+       It includes the following:
+            -SoftMax
+            -relu
+            -modRelu
      +/
     this(string easyfunc, in S size_in=0)
     {
         switch (easyfunc)
         {
             case "relu":
-                static if (!T.stringof.startsWith("Complex")) {
+                static if (!is(Complex!T : T)) {
                     func =
                         delegate(Vector!(S,T) _v, Parameter[] _p) {
                             auto res = _v.dup;
@@ -130,10 +129,9 @@ class FunctionalLayer(S,T) : Layer!(S,T)
                 }
                 // else with use modRelu by default.
             case "modRelu":
-                static if (T.stringof.startsWith("Complex")) {
-                    if (size_in == 0)
-                        throw new Exception("'size_in' must be greater than zero
-                                             when using 'modRelu'.");
+                static if (is(Complex!T : T)) {
+                    enforce(size_in != 0, "'size_in' must be greater than zero
+                                            when using 'modRelu'.");
                     isLearnable = true;
                     params = new Parameter[1];
                     params[0] = new Vector!(S,Tc)(size_in, 1.0);
@@ -161,7 +159,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
                                          be used with complex number.");
                 break;
             case "softmax":
-                static if (!T.stringof.startsWith("Complex"))
+                static if (!is(Complex!T : T))
                     func =
                         delegate(Vector!(S,T) _v, Parameter[] _p) {
                             T s = 0;
@@ -179,7 +177,8 @@ class FunctionalLayer(S,T) : Layer!(S,T)
                                          complex-valued softmax.");
                 break;
             default:
-                assert(0, easyfunc ~ ": Unknown keyword. You can use one of the"
+                throw new Exception(easyfunc
+                                   ~ ": Unknown keyword. You can use one of the"
                                    ~ " following:\n"
                                    ~ " - 'relu' (for real-valued vectors)\n"
                                    ~ " - 'modRelu' (for complex-valued vectors)\n"
@@ -223,12 +222,11 @@ class FunctionalLayer(S,T) : Layer!(S,T)
     this(in S size)
     {
         this(delegate(Vector!(S,T) _v) {
-                if (_v.length != size)
-                    throw new Exception("Size mismatch in FunctionalLayer:\n"
-                                       ~"Size of the FunctionalLayer: "
-                                       ~to!string(size)~"\n"
-                                       ~"Size of the Vector: "
-                                       ~to!string(_v.length)~"\n");
+                enforce(_v.length == size, "Size mismatch in FunctionalLayer:\n"
+                                          ~"Size of the FunctionalLayer: "
+                                          ~to!string(size)~"\n"
+                                          ~"Size of the Vector: "
+                                          ~to!string(_v.length)~"\n");
                 auto res = _v.dup;
                 return res;
             }
@@ -265,61 +263,137 @@ unittest {
     auto v = new Vec([complex(0.0), complex(1.0), complex(pi), complex(-1.0)]);
     auto e = new Vec([complex(0.0)]);
 
+    // Length initialization.
     auto f1 = new Fl(len);
-    auto f2 = new Fl(&cos!double);
-    auto f3 = new Fl(&blue);
-    auto f4 = new Fl(ff);
-    auto f5 = new Fl("modRelu", 4);
-
-    (cast(Vector!(uint, double)) f5.params[0])[0] = 0.0;
-    (cast(Vector!(uint, double)) f5.params[0])[1] = 0.0;
-    (cast(Vector!(uint, double)) f5.params[0])[2] = 0.0;
-    (cast(Vector!(uint, double)) f5.params[0])[3] = 0.0;
-
     auto v1 = f1.compute(v);
-    auto v2 = f2.compute(v);
-    auto v3 = f3.compute(v);
-    auto v4 = f4.compute(v);
-    auto v5 = f5.compute(v);
-
     v1 -= v;
-    v4 -= v3;
-    v3.v[] /= complex(4.0);
-    v3 -= v;
-
     assert(v1.norm!"L2" <= 0.001);
+
+    // Test how to use template function.
+    // Must compile;
+    auto f2 = new Fl(&cos!double);
+    auto v2 = f2.compute(v);
+
+    // Parameter-less function&delegate initialization.
+    auto f3 = new Fl(ff);
+    auto v3 = f3.compute(v);
+    auto f4 = new Fl(&blue);
+    auto v4 = f4.compute(v);
+
+    v3 -= v4;
     assert(v3.norm!"L2" <= 0.001);
+
+    v4.v[] /= complex(4.0);
+    v4 -= v;
     assert(v4.norm!"L2" <= 0.001);
 
+
+    // modRelu function.
+    auto w = v.dup;
+    w[2] = complex(0.5);
+    auto f5 = new Fl("modRelu", 4);
+    (cast(Vector!(uint, double)) f5.params[0])[0] = -0.9;
+    (cast(Vector!(uint, double)) f5.params[0])[1] = -0.9;
+    (cast(Vector!(uint, double)) f5.params[0])[2] = -0.9;
+    (cast(Vector!(uint, double)) f5.params[0])[3] = -0.9;
+    auto v5 = f5.compute(w);
+    assert(abs(v5.sum) < 0.0001);
+
+    // vector 'e' doesn't have the right length.
     assertThrown(f1.compute(e));
+    // modRelu must be given the vector's size to create parameters.
     assertThrown(new Fl("modRelu"));
+    // relu takes only real-valued vectors.
     assertThrown(new FunctionalLayer!(uint, Complex!double)("relu"));
+    // softmax takes only real-valued vectors.
     assertThrown(new FunctionalLayer!(uint, Complex!double)("softmax"));
+    // modRelu takes only complex-valued vectors.
     assertThrown(new FunctionalLayer!(uint, double)("modRelu"));
+    // Incorrect function name.
+    assertThrown(new FunctionalLayer!(uint, real)("this is incorrect."));
 
     auto vr = new Vector!(size_t, double)([0.0, 1.0, pi, -1.0]);
 
+    // relu function.
     auto f6 = new FunctionalLayer!(size_t, double)("relu");
-    auto f7 = new FunctionalLayer!(size_t, double)("softmax");
-
     auto vr6 = f6.compute(vr);
-    auto vr7 = f7.compute(vr);
-
     assert(abs(vr6.sum - 1.0 - pi) <= 0.01);
+
+    // softmax function.
+    auto f7 = new FunctionalLayer!(size_t, double)("softmax");
+    auto vr7 = f7.compute(vr);
     assert(abs(vr7.sum - 1.0) <= 0.001);
 
+    // set the name of a layer.
     f1.set_name("f1");
     assert(f1.name == "f1");
 
 
-    bool error =  false;
-    try {
-        auto err = new FunctionalLayer!(uint, real)("this is incorrect.");
+    /+  Function that create a general pooling function
+        See https://en.wikipedia.org/wiki/Convolutional_neural_network#Pooling_layer
+        for description.
+    
+        Template Args:
+            Sx: type of the indices.
+            Tx: type 
+     +/
+    Vector!(Sx, Tx) delegate(in Vector!(Sx,Tx))
+    createPoolingfunction(Sx, Tx)(in S height, in S width,
+                                  in S stride_height, in S stride_width,
+                                  in S frame_height, in S frame_width,
+                                  in S[] cut_height, in S[] cut_width,
+                                  Tx delegate(R)(R) reducer)
+    if(stride_width && stride_height &&
+       (stride_width < width) && (stride_height < height) &&
+       frame_width && frame_height &&
+       (frame_width < width) && (frame_height < height) &&
+       cut_width.len && cut_height.len &&
+       (cut_width.len < width) && (cut_height.len < height))
+    {
+        /+  This function create a delegate.
+            That delegate take as input a vector and apply
+            a pooling of specified form to it.
+            The first element of the vector is assumed to be the Top Left "pixel"
+            and the rest are seen in a "Left-Right/Top-Left" fashion.
+
+            E.g. with:
+                height=10
+                width=10
+                stride_height=2
+                stride_width=2
+                frame_height=2
+                frame_width=5
+                cut_height=[1]
+                cut_width=[2,3]
+
+            you will have a delegate that take a vector of size 10*10 = 100
+            and which return a vector of size:
+                (cut_height.length + 1) * (cut_width.length + 1)
+               *(1 + floor( (height - frame_height + 1)) / stride_height) )
+               *(1 + floor( (width - frame_width + 1)) / stride_width) )
+               = 120.
+
+            Args:
+
+         +/
+        enforce(minElement(cut_width), "cut_width cannot contains '0'");
+        enforce(minElement(cut_height), "cut_height cannot contains '0'");
+        enforce(maxElement(cut_width) < width-1, "max(cut_width) must be < width-1");
+        enforce(maxElement(cut_height) < height-1, "max(cut_height) must be < height-1");
+        enforce(isSorted(cut_width), "cut_width must be sorted");
+        enforce(isSorted(cut_height), "cut_height must be sorted");
+
+        S lenRetVec = (cut_height.length + 1) * (cut_width.length + 1)
+               *(1 + floor( (height - frame_height + 1) / stride_height) )
+               *(1 + floor( (width - frame_width + 1) / stride_width) );
+
+        return delegate(in Vector!(Sx, Tx) _v) {
+            auto res = new Vector!(Sx, Tx)(lenRetVec);
+
+            return res;
+        };
     }
-    catch (AssertError e) {
-        error = true;
-    }
-    assert(error);
+
 
     write("Done.\n");
 }
