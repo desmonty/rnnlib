@@ -437,7 +437,7 @@ unittest {
                                                         return s;
                                                    });+/
 
-    Tx lena(Tx)(InputRange!Tx _range)
+    Tx len_range(Tx)(InputRange!Tx _range)
     {
         Tx s = 0;
         foreach(e; _range)
@@ -445,61 +445,63 @@ unittest {
         return s;
     }
 
-    class FrameRange(S,T): InputRange!T {
+    struct FrameRange(S) {
 
+      private
+      {
         S pos_x, pos_y,
           cur_pos,
           frame_w, frame_h,
           width, height;
 
+        bool is_empty = false;
+      }
+
         this(in S _pos_x, in S _pos_y, in S _frame_w,
              in S _frame_h, in S _width, in S _height)
         {
-            cur_pos = pos_y * _width + pos_x;
+            cur_pos = _pos_y * _width + _pos_x;
             pos_x = 0;
             pos_y = 0;
             width = _width;
             height = _height;
-            frame_h = _frame_h;
-            frame_w = _frame_w;
+            frame_h = _frame_h - 1;
+            frame_w = _frame_w - 1;
         }
 
         @property
-        T front()
+        const
+        S front()
         {
             return cur_pos;
         }
 
-        T moveFront()
-        {
-            
-        }
-
         void popFront()
         {
-            if (pos_y == frame_h) {
-                cur_pos = 0;
-                return;
-            }
-            else if (pos_x == frame_w) {
+            if (pos_x == frame_w) {
+                if (++pos_y > frame_h) {
+                    is_empty = true;
+                    return;
+                }
                 pos_x = 0;
-                pos_y += 1;
-                cur_pos += width - frame_w;
-                return;
+                cur_pos += width;
+                cur_pos -= frame_w;
             }
-            cur_pos += 1;
+            else {
+                ++cur_pos;
+                ++pos_x;
+            }
         }
 
         @property
+        const
         bool empty()
         {
-
+            return is_empty;
         }
     }
 
-
-    //writeln(typeof(&lena!InputRange).stringof);
-    //writeln(typeof(&len!InputRange).stringof);
+    auto ll = FrameRange!uint(8, 6, 3, 5, 10, 10);
 
     write("Done.\n");
 }
