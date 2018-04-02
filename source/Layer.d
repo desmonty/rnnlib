@@ -1,11 +1,12 @@
 module source.Layer;
 
-import std.algorithm: isSorted, minElement, maxElement;
+import std.algorithm;
 import std.complex;
 import std.conv: to;
 import std.exception: assertThrown, enforce;
 import std.functional: toDelegate;
 import std.math;
+import std.range;
 import std.string : startsWith;
 
 import source.Matrix;
@@ -245,13 +246,13 @@ unittest {
     alias Vec = Vector!(uint, Complex!double);
     alias Fl = FunctionalLayer!(uint, Complex!double);
 
-    Vec blue(in Vec _v) pure {
+    Vec blue(Vec _v) pure {
         auto res = _v.dup;
         res.v[] *= complex(4.0);
         return res;
     }
 
-    auto ff = function(in Vec _v) pure {
+    auto ff = function(Vec _v) pure {
         auto res = _v.dup;
         res.v[] *= complex(4.0);
         return res;
@@ -274,7 +275,7 @@ unittest {
     auto f2 = new Fl(&cos!double);
     auto v2 = f2.compute(v);
 
-    // Parameter-less function&delegate initialization.
+    // Parameter-less function & delegate initialization.
     auto f3 = new Fl(ff);
     auto v3 = f3.compute(v);
     auto f4 = new Fl(&blue);
@@ -336,19 +337,12 @@ unittest {
         Template Args:
             Sx: type of the indices.
             Tx: type 
-     +/
-    Vector!(Sx, Tx) delegate(in Vector!(Sx,Tx))
-    createPoolingfunction(Sx, Tx)(in S height, in S width,
-                                  in S stride_height, in S stride_width,
-                                  in S frame_height, in S frame_width,
-                                  in S[] cut_height, in S[] cut_width,
-                                  Tx delegate(R)(R) reducer)
-    if(stride_width && stride_height &&
-       (stride_width < width) && (stride_height < height) &&
-       frame_width && frame_height &&
-       (frame_width < width) && (frame_height < height) &&
-       cut_width.len && cut_height.len &&
-       (cut_width.len < width) && (cut_height.len < height))
+     +//+
+    auto createPoolingfunction(Sx, Tx)(in Sx height, in Sx width,
+                                  in Sx stride_height, in Sx stride_width,
+                                  in Sx frame_height, in Sx frame_width,
+                                  in Sx[] cut_height, in Sx[] cut_width,
+                                  Tx delegate(Sx) reducer)
     {
         /+  This function create a delegate.
             That delegate take as input a vector and apply
@@ -356,15 +350,29 @@ unittest {
             The first element of the vector is assumed to be the Top Left "pixel"
             and the rest are seen in a "Left-Right/Top-Left" fashion.
 
-            E.g. with:
-                height=10
-                width=10
-                stride_height=2
-                stride_width=2
-                frame_height=2
-                frame_width=5
-                cut_height=[1]
-                cut_width=[2,3]
+            Args:
+                height (Sx): height of the picture (let's assume it's a pic). 
+                width (Sx): width of the picture (let's assume it's a pic). 
+                stride_height (Sx): number of pixel to move to take the next frame
+                stride_width (Sx): number of pixel to move to take the next frame
+                frame_height (Sx): height of the frame to look at
+                frame_width (Sx): width of the frame to look at
+                cut_height (Sx[]): List of indices to cut the frame (see below).
+                cut_width (Sx[]): List of indices to cut the frame (see below).
+                reducer (Tx delegate(InputRange)): Function that takes an InputRange
+                    and return a value. This is used to define how you want to
+                    reduce each cut of the frame (max pooling, average pooling, ...)
+
+            Example:
+                height = 10
+                width = 10
+                stride_height = 2
+                stride_width = 2
+                frame_height = 2
+                frame_width = 5
+                cut_height = [1]
+                cut_width = [2,3]
+                reducer = max
 
             you will have a delegate that take a vector of size 10*10 = 100
             and which return a vector of size:
@@ -373,8 +381,34 @@ unittest {
                *(1 + floor( (width - frame_width + 1)) / stride_width) )
                = 120.
 
-            Args:
+               The first frame will be in the top left as shown below.
 
+               + - - - - -+- - - - - +
+               | a A|b|c C|          |
+               +----------|          |
+               | d D|e|f F|          |
+               +----------+          |
+               |                     |
+               |                     |
+               |                     |
+               |                     |
+               |                     |
+               |                     |
+               |                     |
+               |                     |
+               + - - - - - - - - - - +
+
+               This frame consist of 6 different part (the six letters) which
+               will all be reduced to one value by the reducer.
+               Hence, this frame will give 6 of the 120 values of the final vector,
+               max(a, A), max(b), max(c, C), max(d, D), max(e) and max(f, F).
+               The frame will then be moved 'stride_width' pixels to the right
+               and the processus will be iterated until the frame cannot move
+               to te right. At this point, we move the frame 'stride_height'
+               to the bottom and replace it at the left and continue the pooling.
+               We continue until the frame cannot move to the right nor the bottom.
+               The values computed during this process are added iteratively
+               in a vector in a "Left-Right/Top-Left" fashion.
          +/
         enforce(minElement(cut_width), "cut_width cannot contains '0'");
         enforce(minElement(cut_height), "cut_height cannot contains '0'");
@@ -389,11 +423,83 @@ unittest {
 
         return delegate(in Vector!(Sx, Tx) _v) {
             auto res = new Vector!(Sx, Tx)(lenRetVec);
-
+            // Todo
             return res;
         };
     }
 
+    auto tmp = createPoolingfunction!(int, double)(10, 10, 1, 1, 2, 2, [1], [1],
+                                                   delegate(InputRange _range) {
+                                                        double s = _range.front;
+                                                        _range.popFront();
+                                                        foreach(e; _range)
+                                                            s = max(s, e);
+                                                        return s;
+                                                   });+/
+
+    Tx lena(Tx)(InputRange!Tx _range)
+    {
+        Tx s = 0;
+        foreach(e; _range)
+            s += 1;
+        return s;
+    }
+
+    class FrameRange(S,T): InputRange!T {
+
+        S pos_x, pos_y,
+          cur_pos,
+          frame_w, frame_h,
+          width, height;
+
+        this(in S _pos_x, in S _pos_y, in S _frame_w,
+             in S _frame_h, in S _width, in S _height)
+        {
+            cur_pos = pos_y * _width + pos_x;
+            pos_x = 0;
+            pos_y = 0;
+            width = _width;
+            height = _height;
+            frame_h = _frame_h;
+            frame_w = _frame_w;
+        }
+
+        @property
+        T front()
+        {
+            return cur_pos;
+        }
+
+        T moveFront()
+        {
+            
+        }
+
+        void popFront()
+        {
+            if (pos_y == frame_h) {
+                cur_pos = 0;
+                return;
+            }
+            else if (pos_x == frame_w) {
+                pos_x = 0;
+                pos_y += 1;
+                cur_pos += width - frame_w;
+                return;
+            }
+            cur_pos += 1;
+        }
+
+        @property
+        bool empty()
+        {
+
+        }
+    }
+
+
+    //writeln(typeof(&lena!InputRange).stringof);
+    //writeln(typeof(&len!InputRange).stringof);
 
     write("Done.\n");
 }
