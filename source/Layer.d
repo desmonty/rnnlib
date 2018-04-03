@@ -337,12 +337,12 @@ unittest {
         Template Args:
             Sx: type of the indices.
             Tx: type 
-     +//+
+     +/
     auto createPoolingfunction(Sx, Tx)(in Sx height, in Sx width,
                                   in Sx stride_height, in Sx stride_width,
                                   in Sx frame_height, in Sx frame_width,
                                   in Sx[] cut_height, in Sx[] cut_width,
-                                  Tx delegate(Sx) reducer)
+                                  Tx delegate(InputRange!Tx) reducer)
     {
         /+  This function create a delegate.
             That delegate take as input a vector and apply
@@ -417,91 +417,135 @@ unittest {
         enforce(isSorted(cut_width), "cut_width must be sorted");
         enforce(isSorted(cut_height), "cut_height must be sorted");
 
-        S lenRetVec = (cut_height.length + 1) * (cut_width.length + 1)
-               *(1 + floor( (height - frame_height + 1) / stride_height) )
-               *(1 + floor( (width - frame_width + 1) / stride_width) );
+        Sx lenRetVec = (cast(Sx) cut_height.length + 1) * (cast(Sx) cut_width.length + 1)
+               *(1 + (height - frame_height + 1) / stride_height)
+               *(1 + (width - frame_width + 1) / stride_width);
 
         return delegate(in Vector!(Sx, Tx) _v) {
             auto res = new Vector!(Sx, Tx)(lenRetVec);
-            // Todo
+
+            static class FrameRange(S, T): InputRange!T{
+              private
+              {
+                S pos_x, pos_y,
+                  cur_pos,
+                  frame_w, frame_h,
+                  shift, width;
+
+                Vector!(S,T)* vec;
+
+                bool is_empty = false;
+              }
+
+                this(in S _pos_x, in S _pos_y, in S _frame_w,
+                     in S _frame_h, in S _width,
+                     Vector!(S,T)* _v)
+                {
+                    cur_pos = _pos_y * _width + _pos_x;
+                    pos_x = 0;
+                    pos_y = 0;
+                    width = _width;
+                    frame_h = _frame_h - 1;
+                    frame_w = _frame_w - 1;
+                    vec = _v;
+
+                    shift = width - frame_w;
+                }
+
+                @property
+                const
+                T front()
+                {
+                    return (*vec)[cur_pos];
+                }
+
+                T moveFront()
+                {
+                    T res = this.front;
+                    this.popFront();
+                    return res;
+                }
+
+                void popFront()
+                {
+                    if (pos_x == frame_w) {
+                        if (++pos_y > frame_h) {
+                            is_empty = true;
+                            return;
+                        }
+                        pos_x = 0;
+                        cur_pos += shift;
+                    }
+                    else {
+                        ++cur_pos;
+                        ++pos_x;
+                    }
+                }
+
+                @property
+                const
+                bool empty()
+                {
+                    return is_empty;
+                }
+
+                int opApply(scope int delegate(T) dg)
+                {
+                    int result;
+
+                    S tmp = cur_pos;
+                    T tmp_val;
+                    outer: for (pos_y = 0; pos_y <= frame_h; ++pos_y) {
+                        for (pos_x = 0; pos_x <= frame_w; ++pos_x) {
+                            tmp_val = vec.opIndex(tmp);
+                            result = dg(tmp_val);
+                            tmp += 1;
+
+                            if (result)
+                                break outer;
+                        }
+                        tmp += shift;
+                    }
+                    return result;
+                }
+
+                int opApply(scope int delegate(size_t, T) dg)
+                {
+                    int result;
+
+                    S tmp = cur_pos;
+                    T tmp_val;
+                    auto shiftm1 = shift - 1;
+
+                    outer: for (pos_y = 0; pos_y <= frame_h; ++pos_y) {
+                        for (pos_x = 0; pos_x <= frame_w; ++pos_x) {
+                            tmp_val = vec.opIndex(tmp);
+                            result = dg(tmp, tmp_val);
+                            tmp += 1;
+
+                            if (result)
+                                break outer;
+                        }
+                        tmp += shiftm1;
+                    }
+                    return result;
+                }
+            }
+
             return res;
         };
     }
 
     auto tmp = createPoolingfunction!(int, double)(10, 10, 1, 1, 2, 2, [1], [1],
-                                                   delegate(InputRange _range) {
+                                                   delegate(InputRange!double _range) {
                                                         double s = _range.front;
                                                         _range.popFront();
                                                         foreach(e; _range)
                                                             s = max(s, e);
                                                         return s;
-                                                   });+/
+                                                   });
 
-    Tx len_range(Tx)(InputRange!Tx _range)
-    {
-        Tx s = 0;
-        foreach(e; _range)
-            s += 1;
-        return s;
-    }
-
-    struct FrameRange(S) {
-
-      private
-      {
-        S pos_x, pos_y,
-          cur_pos,
-          frame_w, frame_h,
-          width, height;
-
-        bool is_empty = false;
-      }
-
-        this(in S _pos_x, in S _pos_y, in S _frame_w,
-             in S _frame_h, in S _width, in S _height)
-        {
-            cur_pos = _pos_y * _width + _pos_x;
-            pos_x = 0;
-            pos_y = 0;
-            width = _width;
-            height = _height;
-            frame_h = _frame_h - 1;
-            frame_w = _frame_w - 1;
-        }
-
-        @property
-        const
-        S front()
-        {
-            return cur_pos;
-        }
-
-        void popFront()
-        {
-            if (pos_x == frame_w) {
-                if (++pos_y > frame_h) {
-                    is_empty = true;
-                    return;
-                }
-                pos_x = 0;
-                cur_pos += width;
-                cur_pos -= frame_w;
-            }
-            else {
-                ++cur_pos;
-                ++pos_x;
-            }
-        }
-
-        @property
-        const
-        bool empty()
-        {
-            return is_empty;
-        }
-    }
-
-    auto ll = FrameRange!uint(8, 6, 3, 5, 10, 10);
+    auto vv = new Vector!(int, double)(100, 0.2);
 
     write("Done.\n");
 }
