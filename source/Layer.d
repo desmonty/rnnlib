@@ -412,19 +412,33 @@ unittest {
          +/
         enforce(minElement(cut_width), "cut_width cannot contains '0'");
         enforce(minElement(cut_height), "cut_height cannot contains '0'");
-        enforce(maxElement(cut_width) < width-1, "max(cut_width) must be < width-1");
-        enforce(maxElement(cut_height) < height-1, "max(cut_height) must be < height-1");
+        enforce(maxElement(cut_width) < width, "max(cut_width) must be < width-1");
+        enforce(maxElement(cut_height) < height, "max(cut_height) must be < height-1");
         enforce(isSorted(cut_width), "cut_width must be sorted");
         enforce(isSorted(cut_height), "cut_height must be sorted");
 
-        Sx lenRetVec = (cast(Sx) cut_height.length + 1) * (cast(Sx) cut_width.length + 1)
-               *(1 + (height - frame_height + 1) / stride_height)
-               *(1 + (width - frame_width + 1) / stride_width);
+        for (Sx tmp = 0; tmp < cut_width.length-1;)
+            enforce(cut_width[tmp] < cut_width[++tmp],
+                   "cut_width cannot contains doublons");
+        for (Sx tmp = 0; tmp < cut_height.length-1;)
+            enforce(cut_height[tmp] < cut_height[++tmp],
+                   "cut_height cannot contains doublons");
+
+        // TODO: test the magic formula
+        Sx lenRetVec = (cast(Sx) cut_height.length + 1)
+                      *(cast(Sx) cut_width.length  + 1)
+                      *(1 + (height - frame_height + 1) / stride_height)
+                      *(1 + (width  - frame_width  + 1) / stride_width);
 
         return delegate(in Vector!(Sx, Tx) _v) {
             auto res = new Vector!(Sx, Tx)(lenRetVec);
 
-            static class FrameRange(S, T): InputRange!T{
+            /++ CellRange is used to get all the values inside a cell that
+             +  will be reduced together.
+             +  It allows us to let the user defines its own reducer in a very
+             +  simple way.
+             +/ 
+            static class CellRange(S,T): InputRange!T{
               private
               {
                 S pos_x, pos_y,
@@ -531,6 +545,53 @@ unittest {
                     return result;
                 }
             }
+
+            /++ -FrameRange is used to enhanced clean up the following code.
+             +  -By adding complexity ..?
+             +  -Yes ! It is worth it because it will allow us to do a simple
+             +    "foreach" and get both...
+             +
+            static struct FrameRange(S) {
+                private {
+                    S[] arr;
+                    S width;
+                }
+
+                this(ref S[] _arr, S _width) {
+                    arr = _arr;
+                    width = _width;
+                }
+                
+                int opApply(scope int delegate(S) dg)
+                {
+                    int result;
+
+                    S tmp = 0;
+
+                    for () {
+                        result = dg(tmp);
+                        if (result)
+                            break outer;
+                        }
+                    }
+                    return result;
+                }
+
+            }+/
+
+/+
+            // we move the starting point of the frame using the first two "for"
+            for (tmp_y = 0; tmp_y < height; tmp_y += stride_height) {
+                for (tmp_x = 0; tmp_x < width; tmp_x += stride_width) {
+                    // We iterate over the frame's cells using the last two "for"
+                    tmp_fr_x = 0;
+                    tmp_fr_y = 0;
+                    cell_h = cut_height[0];
+                    cell_w = cut_width[0];
+
+                }
+            }+/
+
 
             return res;
         };
