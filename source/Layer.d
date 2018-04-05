@@ -101,19 +101,25 @@ auto createPoolingfunction(S, T)(in S height, in S width,
            The values computed during this process are added iteratively
            in a vector in a "Left-Right/Top-Left" fashion.
      +/
-    enforce(minElement(cut_width), "cut_width cannot contains '0'");
-    enforce(minElement(cut_height), "cut_height cannot contains '0'");
-    enforce(maxElement(cut_width) < width, "max(cut_width) must be < width-1");
-    enforce(maxElement(cut_height) < height, "max(cut_height) must be < height-1");
-    enforce(isSorted(cut_width), "cut_width must be sorted");
-    enforce(isSorted(cut_height), "cut_height must be sorted");
+    if (cut_width) {
+        enforce(minElement(cut_width), "cut_width cannot contains '0'");
+        enforce(maxElement(cut_width) < width, "max(cut_width) must be < width-1");
+        enforce(isSorted(cut_width), "cut_width must be sorted");
 
-    for (S tmp = 0; tmp < cut_width.length-1;)
-        enforce(cut_width[tmp] < cut_width[++tmp],
-               "cut_width cannot contains doublons");
-    for (S tmp = 0; tmp < cut_height.length-1;)
-        enforce(cut_height[tmp] < cut_height[++tmp],
-               "cut_height cannot contains doublons");
+        for (S tmp = 0; tmp < cut_width.length-1;)
+            enforce(cut_width[tmp] < cut_width[++tmp],
+                   "cut_width cannot contains doublons");
+    }
+    if (cut_height) {
+        enforce(minElement(cut_height), "cut_height cannot contains '0'");
+        enforce(maxElement(cut_height) < height, "max(cut_height) must be < height-1");
+        enforce(isSorted(cut_height), "cut_height must be sorted");
+
+        for (S tmp = 0; tmp < cut_height.length-1;)
+            enforce(cut_height[tmp] < cut_height[++tmp],
+                   "cut_height cannot contains doublons");
+    }
+
 
     // TODO: test the magic formula
     S lenRetVec = (cast(S) cut_height.length + 1)
@@ -259,6 +265,11 @@ auto createPoolingfunction(S, T)(in S height, in S width,
             int opApply(scope int delegate(S, S) dg)
             {
                 int result;
+
+                // if the cut_frame is empty, we do not cut the frame
+                // and so we just return the first position with the width.
+                if (!arr)
+                    return dg(width, 0);
 
                 S frame_len = arr[0];
 
@@ -700,7 +711,8 @@ unittest {
     f1.set_name("f1");
     assert(f1.name == "f1");
 
-    auto tmp = createPoolingfunction!(int, double)(10, 10, 2, 2, 4, 4, [2], [2],
+    // max pooling, stride 2, square frame, cut
+    auto tmp1 = createPoolingfunction!(int, double)(10, 10, 2, 2, 4, 4, [2], [2],
                                                    delegate(InputRange!double _range) {
                                                         double s = _range.front;
                                                         _range.popFront();
@@ -709,7 +721,31 @@ unittest {
                                                         return s;
                                                    });
 
-    auto layer1 = new FunctionalLayer!(int, double)(tmp);
+    // max pooling, stride 2, square frame, no cut
+    auto tmp2 = createPoolingfunction!(int, double)(10, 10, 2, 2, 4, 4, [], [],
+                                                   delegate(InputRange!double _range) {
+                                                        double s = _range.front;
+                                                        _range.popFront();
+                                                        foreach(a,e; _range)
+                                                            s = max(s, e);
+                                                        return s;
+                                                   });
+
+    // average pooling, rectangular stride, rectangular frame, no cut
+    /+auto tmp3 = createPoolingfunction!(int, double)(10, 10, 3, 2, 2, 4, [], [],
+                                                   delegate(InputRange!double _range) {
+                                                        double s = 0;
+                                                        size_t len_range = 0;
+                                                        foreach(e; _range){
+                                                            s += e;
+                                                            ++len_range;
+                                                        }
+                                                        return s / len_range;
+                                                   });+/
+
+    auto layer1 = new FunctionalLayer!(int, double)(tmp1);
+    auto layer2 = new FunctionalLayer!(int, double)(tmp2);
+    //auto layer3 = new FunctionalLayer!(int, double)(tmp3);
 
     auto vec = new Vector!(int, double)([1.,0.,  0.,1.,  1.,0.,  0.,0.,  0.,5.,
                                          0.,0.,  0.,2.,  2.,3.,  4.,4.,  1.,2.,
@@ -729,6 +765,27 @@ unittest {
 
 
     auto res = layer1.compute(vec);
+    auto re2 = layer2.compute(vec);
+
+
+    auto s = [ 1, 2, 6, 7, 2, 3, 7, 8,
+               3, 4, 8, 9, 4, 5, 9, 0,
+               6, 7, 1.5, 2.5, 7, 8, 2.5, 3.5,
+               8, 9, 3.5, 4.5, 9, 0, 4.5, 5.5,
+               1.5, 2.5, 6, 7, 2.5, 3.5, 7, 8,
+               3.5, 4.5, 8, 9, 4.5, 5.5, 9, 0,
+               6, 7, 1, 2, 7, 8, 2, 3,
+               8, 9, 3, 4, 9, 0, 4, 5];
+
+    double[] s2 = [7, 8, 9, 9,
+                   7, 8, 9, 9,
+                   7, 8, 9, 9,
+                   7, 8, 9, 9];
+
+    s[] -= res.v[];
+    assert(abs(s.sum) <= 0.001);
+    s2[] -= re2.v[];
+    assert(abs(s2.sum) <= 0.001);
 
     auto vv = new Vector!(int, double)(100, 0.2);
 
