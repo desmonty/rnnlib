@@ -160,7 +160,7 @@ auto createPoolingfunction(S, T)(in S height, in S width,
                 cell_w = _cell_w - 1;
                 vec = _v;
 
-                shift = width - cell_w;
+                shift = width - cell_w - 1;
             }
 
             @property
@@ -212,7 +212,6 @@ auto createPoolingfunction(S, T)(in S height, in S width,
 
                 S tmp = cur_pos;
                 T tmp_val;
-                auto shiftm1 = shift - 1;
 
                 outer: for (pos_y = 0; pos_y <= cell_h; ++pos_y) {
                     for (pos_x = 0; pos_x <= cell_w; ++pos_x) {
@@ -223,7 +222,7 @@ auto createPoolingfunction(S, T)(in S height, in S width,
                         if (result)
                             break outer;
                     }
-                    tmp += shiftm1;
+                    tmp += shift;
                 }
                 return result;
             }
@@ -731,8 +730,18 @@ unittest {
                                                         return s;
                                                    });
 
-    // average pooling, rectangular stride, rectangular frame, no cut
-    /+auto tmp3 = createPoolingfunction!(int, double)(10, 10, 3, 2, 2, 4, [], [],
+    // min pooling, rectangular stride, rectangular frame, no cut
+    auto tmp3 = createPoolingfunction!(int, double)(10, 10, 3, 2, 2, 4, [], [],
+                                                   delegate(InputRange!double _range) {
+                                                        double s = _range.front;
+                                                        _range.popFront();
+                                                        foreach(a,e; _range)
+                                                            s = min(s, e);
+                                                        return s;
+                                                   });
+
+    // average pooling, no stride, sqared frame, no cut
+    auto tmp4 = createPoolingfunction!(int, double)(10, 10, 2, 2, 2, 2, [], [],
                                                    delegate(InputRange!double _range) {
                                                         double s = 0;
                                                         size_t len_range = 0;
@@ -741,11 +750,12 @@ unittest {
                                                             ++len_range;
                                                         }
                                                         return s / len_range;
-                                                   });+/
+                                                   });
 
     auto layer1 = new FunctionalLayer!(int, double)(tmp1);
     auto layer2 = new FunctionalLayer!(int, double)(tmp2);
-    //auto layer3 = new FunctionalLayer!(int, double)(tmp3);
+    auto layer3 = new FunctionalLayer!(int, double)(tmp3);
+    auto layer4 = new FunctionalLayer!(int, double)(tmp4);
 
     auto vec = new Vector!(int, double)([1.,0.,  0.,1.,  1.,0.,  0.,0.,  0.,5.,
                                          0.,0.,  0.,2.,  2.,3.,  4.,4.,  1.,2.,
@@ -766,7 +776,8 @@ unittest {
 
     auto res = layer1.compute(vec);
     auto re2 = layer2.compute(vec);
-
+    auto re3 = layer3.compute(vec);
+    auto re4 = layer4.compute(vec);
 
     auto s = [ 1, 2, 6, 7, 2, 3, 7, 8,
                3, 4, 8, 9, 4, 5, 9, 0,
@@ -782,10 +793,26 @@ unittest {
                    7, 8, 9, 9,
                    7, 8, 9, 9];
 
+    double[] s3 = [0, 0, 0, 0, 0, 0, 0.1, 0, -12311,
+                  -30, 0, -9, 0.0620573, 0.0197741,
+                  -0.0273011, -0.00971647];
+
+    double[] s4 = [0.25, 0.75, 1.5, 2, 2, 2.75,
+                   2.5, 3.5, 4, 0, 0.85, 1,
+                   1.875, 2.4, 2.425, -3076,
+                   -4.5, 3.25, 4.25, -2.5, 1,
+                   2, -2.25, 2, 2.75];
+
     s[] -= res.v[];
     assert(abs(s.sum) <= 0.001);
     s2[] -= re2.v[];
     assert(abs(s2.sum) <= 0.001);
+    //s3[] -= re3.v[];
+    //writeln(s3);
+    //writeln(re3.v);
+    //assert(abs(s3.sum) <= 0.001);
+    s4[] -= re4.v[];
+    assert(abs(s4.sum) <= 0.001);
 
     auto vv = new Vector!(int, double)(100, 0.2);
 
