@@ -39,23 +39,15 @@ version(unittest)
     interesting to know the gradient of the NeuralNet and could be investigated
     in this project.
 
-    In practice, each layers must implement two methods:
-        - apply
+    In practice, each layers must implement one method:
         - compute
-    Both apply the function implemented by the layer 
+    which apply the layer to the vector and return the result.
 
 
     TODO:
-        - Matrix Layer
         - convnet
         - share_parameter in NeuralNet between layer
 
-        - REFACTOR: idea
-            .The "layer" object should hold an array of parameters and a delegate
-            of the following form: {Vector delegate(Vector, Parameter)}
-            .Matrix/function layer should be easy to implement in this context
-            .It should provide every one with a "general" enough object to create
-             convnet (shared parameters), 
  +/
 
 abstract class Layer(S,T)
@@ -74,12 +66,6 @@ abstract class Layer(S,T)
     /// Parameter, Layer-specific
     Parameter[] params = null;
 
-    /// function applied to the vector.
-    Vector!(S,T) delegate(Vector!(S,T), Parameter[]) func;
-
-    /// Used by the optimizer to know if it must optimize the layer.
-    bool isLearnable = false;
-
     /// Used
     void set_name(string _name)
     {
@@ -91,15 +77,69 @@ abstract class Layer(S,T)
 }
 
 /+ This layer implement a simple linear matrix transformation
-   applied to the vector followed by adding a bias vector
-   (which can be turner off). 
+   applied to the vector.
  +/
 class MatrixLayer(S,T) : Layer!(S,T)
 {
+    this(MatrixAbstract!(S,T) _M)
+    {
+        params = new Parameter[1];
+        params[0] = _M;
+    }
+    
+    override
+    Vector!(S,T) compute(Vector!(S,T) _v)
+    {
+        return to!(MatrixAbstract!(S,T))(params[0]) * _v;
+    }
+}
+unittest {
+    write("Unittest: Layer: Matrix ... ");
+
+    auto v = new Vector!(size_t, real)(4, 1.0);
+
+    auto r = new ReflectionMatrix!(size_t,real)(2, 1.0);
+    auto d = new DiagonalMatrix!(size_t,real)(2, 2.0);
+    auto m = new BlockMatrix!(size_t,real)(4, 4, 2, [r, d], true);
+
+    auto l = new MatrixLayer!(size_t,real)(m);
+
+    auto w = v.dup;
+
+    auto r1 = l.compute(v);
+    auto r2 = m * v;
+
+    r2 -= r1;
+    v -= w;
+
+    assert(r2.norm!"L2" <= 0.00001);
+    assert(v.norm!"L2" <= 0.00001);
+
+    write("Done.\n");
+}
+
+/+ This layer implement a simple linear matrix transformation
+   applied to the vector.
+ +/
+class BiasLayer(S,T) : Layer!(S,T)
+{
+    this(const S size_in, const Tc randomBound)
+    {
+        params = new Parameter[1];
+        params[0] = new Vector!(S,T)(size_in, randomBound);
+    }
+    
+    override
+    Vector!(S,T) compute(Vector!(S,T) _v)
+    {
+        auto res = _v.dup;
+        res += to!(Vector!(S,T))(params[0]);
+        return res;
+    }
 
 }
 unittest {
-    write("Unittest MatrixLayers ... ");
+    write("                 Bias ... ");
 
     write("Done.\n");
 }
@@ -109,12 +149,18 @@ unittest {
  +/
 class FunctionalLayer(S,T) : Layer!(S,T)
 {
-    /+ This implements common functions that are not implemented already.
-       It includes the following:
-            -SoftMax
-            -relu
-            -modRelu
+    /++This implements common functions that are not implemented already.
+     + It includes the following:
+     +      -SoftMax
+     +      -relu
+     +      -modRelu
      +/
+
+    private {
+        /// function applied to the vector.
+        Vector!(S,T) delegate(Vector!(S,T), Parameter[]) func;
+    }
+
     this(string easyfunc, in S size_in=0)
     {
         switch (easyfunc)
@@ -135,7 +181,6 @@ class FunctionalLayer(S,T) : Layer!(S,T)
                 static if (is(Complex!T : T)) {
                     enforce(size_in != 0, "'size_in' must be greater than zero
                                             when using 'modRelu'.");
-                    isLearnable = true;
                     params = new Parameter[1];
                     params[0] = new Vector!(S,Tc)(size_in, 1.0);
                     
@@ -243,7 +288,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
     }
 }
 unittest {
-    write("Unittest FunctionalLayer ... ");
+    write("                 Functional ... ");
 
     alias Vec = Vector!(uint, Complex!double);
     alias Fl = FunctionalLayer!(uint, Complex!double);
@@ -333,7 +378,7 @@ unittest {
 
     auto vv = new Vector!(int, double)(100, 0.2);
 
-    write("Done.\n");
+    write(" Done.\n");
 }
 
 
@@ -345,7 +390,7 @@ unittest {
         S: type of the indices.
         T: type of the vector's elements.
  +/
-auto createPoolingfunction(S, T)(in S height, in S width,
+auto createPoolingFunction(S, T)(in S height, in S width,
                                  in S stride_height, in S stride_width,
                                  in S frame_height, in S frame_width,
                                  in S[] cut_height, in S[] cut_width,
@@ -640,6 +685,8 @@ auto createPoolingfunction(S, T)(in S height, in S width,
     };
 }
 unittest {
+    write("Unittest: Utils: createPoolingFunction ...");
+
     alias S = int;
     static struct FrameRange {
         private {
@@ -714,7 +761,7 @@ unittest {
 
 
         // max pooling, stride 2, square frame, cut
-    auto tmp1 = createPoolingfunction!(int, double)(10, 10, 2, 2, 4, 4, [2], [2],
+    auto tmp1 = createPoolingFunction!(int, double)(10, 10, 2, 2, 4, 4, [2], [2],
                                                    delegate(InputRange!double _range) {
                                                         double s = _range.front;
                                                         _range.popFront();
@@ -724,7 +771,7 @@ unittest {
                                                    });
 
     // max pooling, stride 2, square frame, no cut
-    auto tmp2 = createPoolingfunction!(int, double)(10, 10, 2, 2, 4, 4, [], [],
+    auto tmp2 = createPoolingFunction!(int, double)(10, 10, 2, 2, 4, 4, [], [],
                                                    delegate(InputRange!double _range) {
                                                         double s = _range.front;
                                                         _range.popFront();
@@ -734,7 +781,7 @@ unittest {
                                                    });
 
     // min pooling, rectangular stride, rectangular frame, no cut
-    auto tmp3 = createPoolingfunction!(int, double)(10, 10, 3, 2, 2, 4, [], [],
+    auto tmp3 = createPoolingFunction!(int, double)(10, 10, 3, 2, 2, 4, [], [],
                                                    delegate(InputRange!double _range) {
                                                         double s = _range.front;
                                                         _range.popFront();
@@ -744,7 +791,7 @@ unittest {
                                                    });
 
     // average pooling, no stride, sqared frame, no cut
-    auto tmp4 = createPoolingfunction!(int, double)(10, 10, 2, 2, 2, 2, [], [],
+    auto tmp4 = createPoolingFunction!(int, double)(10, 10, 2, 2, 2, 2, [], [],
                                                    delegate(InputRange!double _range) {
                                                         double s = 0;
                                                         size_t len_range = 0;
@@ -817,4 +864,6 @@ unittest {
 
     s4[] -= re4.v[];
     assert(abs(s4.sum) <= 0.001);
+
+    writeln(" Done.");
 }

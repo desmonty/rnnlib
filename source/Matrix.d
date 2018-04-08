@@ -141,7 +141,7 @@ class MatrixAbstract(S, T) : Parameter {
 }
 unittest
 {
-    write("Unittest Matrix Abstract ... ");
+    write("Unittest: Matrix: Abstract ... ");
 
 
     class ErrorMatrix(S,T) : MatrixAbstract!(S,T) {
@@ -389,7 +389,7 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    write("Unittest Block Matrix ... ");
+    write("                  Block ... ");
 
     auto len = 1024;
     auto m0 = new BlockMatrix!(uint, float)();
@@ -604,7 +604,7 @@ if (is(Complex!T : T))
 }
 unittest
 {
-    write("Unittest Unitary Matrix ... ");
+    write("                  Unitary ... ");
     {
         auto m0 = new UnitaryMatrix!(uint, Complex!float)();
         auto m = new UnitaryMatrix!(uint, Complex!double)(1024, 9.0);
@@ -685,7 +685,7 @@ if (is(Complex!T : T))
 }
 unittest
 {
-    write("Unittest Fourrier Matrix ... ");
+    write("                  Fourrier ... ");
     {
         alias Fourier = FourierMatrix!(uint, Complex!double);
         auto f = new Fourier(1024);
@@ -885,7 +885,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    write("Unittest DiagonalMatrix ... ");
+    write("                  Diagonal ... ");
     {
         alias Diag = DiagonalMatrix!(uint, double);
         auto m1 = new Diag(4);
@@ -1097,7 +1097,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    write("Unittest Reflection ... ");
+    write("                  Reflection ... ");
     {
         // Verification of the multiplication algorithm.
         alias Reflection = ReflectionMatrix!(uint, Complex!real);
@@ -1243,7 +1243,7 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    write("Unittest Permutation ... ");
+    write("                  Permutation ... ");
     
     alias Perm = PermutationMatrix!(uint, float);
     

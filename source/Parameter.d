@@ -6,6 +6,7 @@ import std.exception: assertThrown;
 import std.math;
 import std.datetime;
 import std.random;
+import std.range: iota;
 import std.string: split;
 
 
@@ -69,14 +70,24 @@ class Vector(S, T) : Parameter {
         super(true);
         v = new T[length];
 
-        static if (is(Complex!T : T)) {
-            foreach(i;0 .. v.length)
-                v[i] = complex(uniform(-randomBound, randomBound, rnd),
-                               uniform(-randomBound, randomBound, rnd));
+        if (randomBound.abs == 0) {
+            static if (is(Complex!T : T)) {
+                foreach(i; length.iota) v[i] = complex(0,0);
+            }
+            else {
+                foreach(i; length.iota) v[i] = 0;
+            }
         }
         else {
-            foreach(i;0 .. v.length)
-               v[i] = uniform(-randomBound, randomBound, rnd);
+            static if (is(Complex!T : T)) {
+                foreach(i; length.iota)
+                    v[i] = complex(uniform(-randomBound, randomBound, rnd),
+                                   uniform(-randomBound, randomBound, rnd));
+            }
+            else {
+                foreach(i; length.iota)
+                   v[i] = uniform(-randomBound, randomBound, rnd);
+            }
         }
     }
 
@@ -433,7 +444,7 @@ class Vector(S, T) : Parameter {
 }
 unittest
 {
-  write("Unittest Vector ... ");
+  write("Unittest: Vector ... ");
 
   foreach(____;0 .. 10){
 

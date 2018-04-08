@@ -12,9 +12,10 @@ One of the auxiliary goal of this project is to cut any dependencies between the
 and the recurrent neural netwroks to enable anyone to use it independently.
 
 ## Daily Todo
-* Use const, pure, @safe, @nogc, nothrow, etc..
-* Test Fucntional Layers
-* Start Matrix layers
+* test MatrixLayer
+* write BiasLayer
+* Remove S generalization (only useful for permutation matrix for really small networks).
+
 
 # TODO
 * RNN
