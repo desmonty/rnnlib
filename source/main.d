@@ -9,8 +9,9 @@ import std.random;
 import std.stdio : writeln;
 
 import source.Layer;
-import source.Parameter;
 import source.Matrix;
+import source.NeuralNetwork;
+import source.Parameter;
 
 void main()
 {

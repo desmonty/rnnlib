@@ -39,8 +39,8 @@ unittest
                [-5.0, -1.0, -6.0])) < 0.001);
 }
 
-class MatrixAbstract(S, T) : Parameter {
-    S rows, cols;
+class MatrixAbstract(T) : Parameter {
+    size_t rows, cols;
     string typeId;
 
     static if (is(Complex!T : T))
@@ -56,10 +56,10 @@ class MatrixAbstract(S, T) : Parameter {
     }
 
     const
-    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
+    Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
-        return new Vector!(S,T)(this * v.v);
+        return new Vector!T(this * v.v);
     }
 
     const
@@ -71,25 +71,25 @@ class MatrixAbstract(S, T) : Parameter {
         switch (tmptypeId)
         {
             case "BlockMatrix":
-                return cast(BlockMatrix!(S,T)) this * v;
+                return cast(BlockMatrix!T) this * v;
             case "UnitaryMatrix":
                 static if (is(Complex!T : T)) {
-                    return cast(UnitaryMatrix!(S,T)) this * v;
+                    return cast(UnitaryMatrix!T) this * v;
                 }
                 else assert(0, "Unitary matrices must be of complex type.");
             case "DiagonalMatrix":
-                return cast(DiagonalMatrix!(S,T)) this * v;
+                return cast(DiagonalMatrix!T) this * v;
             case "ReflectionMatrix":
-                return cast(ReflectionMatrix!(S,T)) this * v;
+                return cast(ReflectionMatrix!T) this * v;
             case "PermutationMatrix":
-                return cast(PermutationMatrix!(S,T)) this * v;
+                return cast(PermutationMatrix!T) this * v;
             case "FourierMatrix":
                 static if (is(Complex!T : T)) {
-                    return cast(FourierMatrix!(S,T)) this * v;
+                    return cast(FourierMatrix!T) this * v;
                 }
                 else assert(0, "Fourier matrices must be of complex type.");
             case "Matrix":
-                return cast(Matrix!(S,T)) this * v;
+                return cast(Matrix!T) this * v;
             default:
                 assert(0, tmptypeId~" is not in the 'switch'
                                       clause of MatrixAbstract");
@@ -97,10 +97,10 @@ class MatrixAbstract(S, T) : Parameter {
     }
 
     const
-    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
+    Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
-        auto res = new Vector!(S,T)(v.v / this);
+        auto res = new Vector!T(v.v / this);
         return res;
     }
 
@@ -113,21 +113,21 @@ class MatrixAbstract(S, T) : Parameter {
         switch (tmptypeId)
         {
             case "BlockMatrix":
-                return v / cast(BlockMatrix!(S,T)) this;
+                return v / cast(BlockMatrix!T) this;
             case "UnitaryMatrix":
                 static if (is(Complex!T : T)) {
-                    return v / cast(UnitaryMatrix!(S,T)) this;
+                    return v / cast(UnitaryMatrix!T) this;
                 }
                 else assert(0, "Unitary matrices must be of complex type.");
             case "DiagonalMatrix":
-                return v / cast(DiagonalMatrix!(S,T)) this;
+                return v / cast(DiagonalMatrix!T) this;
             case "ReflectionMatrix":
-                return v / cast(ReflectionMatrix!(S,T)) this;
+                return v / cast(ReflectionMatrix!T) this;
             case "PermutationMatrix":
-                return v / cast(PermutationMatrix!(S,T)) this;
+                return v / cast(PermutationMatrix!T) this;
             case "FourierMatrix":
                 static if (is(Complex!T : T)) {
-                    return v / cast(FourierMatrix!(S,T)) this;
+                    return v / cast(FourierMatrix!T) this;
                 }
                 else assert(0, "Fourier matrices must be of complex type.");
             case "Matrix":
@@ -144,7 +144,7 @@ unittest
     write("Unittest: Matrix: Abstract ... ");
 
 
-    class ErrorMatrix(S,T) : MatrixAbstract!(S,T) {
+    class ErrorMatrixT : MatrixAbstract!T {
         this() {
             typeId = "ErrorMatrix";
             rows = 0;
@@ -153,15 +153,15 @@ unittest
     }
 
     auto len = 1024;
-    auto m1 = new PermutationMatrix!(ulong, Complex!real)(len/4, 1.0);
-    auto m2 = new DiagonalMatrix!(ulong, Complex!real)(len/4, 1.0);
-    auto m3 = new ReflectionMatrix!(ulong, Complex!real)(len/4, 1.0);
-    auto m4 = new FourierMatrix!(ulong, Complex!real)(len/4);
-    auto bm = new BlockMatrix!(ulong, Complex!real)(len, len/4, [m1,m2,m3,m4],
+    auto m1 = new PermutationMatrix!(Complex!real)(len/4, 1.0);
+    auto m2 = new DiagonalMatrix!(Complex!real)(len/4, 1.0);
+    auto m3 = new ReflectionMatrix!(Complex!real)(len/4, 1.0);
+    auto m4 = new FourierMatrix!(Complex!real)(len/4);
+    auto bm = new BlockMatrix!(Complex!real)(len, len/4, [m1,m2,m3,m4],
                                                     false);
-    auto um = new UnitaryMatrix!(ulong, Complex!real)(len, 3.14159265351313);
-    auto mm = new Matrix!(ulong, Complex!real)(len, 5.6);
-    auto em = new ErrorMatrix!(ulong, Complex!real)();
+    auto um = new UnitaryMatrix!(Complex!real)(len, 3.14159265351313);
+    auto mm = new Matrix!(Complex!real)(len, 5.6);
+    auto em = new ErrorMatrix!(Complex!real)();
 
     auto list_mat = [m1, m2, m3, m4, bm, um, mm, em];
     auto m1_hyde = list_mat[0];
@@ -174,8 +174,8 @@ unittest
     auto em_hyde = list_mat[7];
 
 
-    auto v = new Vector!(ulong, Complex!real)(len);
-    auto w = new Vector!(ulong, Complex!real)(len/4);
+    auto v = new Vector!(Complex!real)(len);
+    auto w = new Vector!(Complex!real)(len/4);
     foreach(i; 0 .. len)
         v[i] = complex(cast(real)(i*2 - len/2), cast(real)(len/3 - i/3.0));
 
@@ -227,14 +227,14 @@ unittest
     write("Done.\n");
 }
 
-class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
-    MatrixAbstract!(S,T)[] blocks;
-    PermutationMatrix!(S,T) P, Q;
+class BlockMatrixT : MatrixAbstract!T {
+    MatrixAbstract!T[] blocks;
+    PermutationMatrix!T P, Q;
 
-    S size_blocks;
-    S num_blocks;
-    S size_out;
-    S size_in;
+    size_t size_blocks;
+    size_t num_blocks;
+    size_t size_out;
+    size_t size_in;
 
     // The two permutations are needed here so that 
     // every nodes can be connected to any others.
@@ -274,7 +274,7 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
     this(){}
 
     pure @safe
-    this(in S size_in, in S size_out, in S size_blocks)
+    this(in size_t size_in, in size_t size_out, in size_t size_blocks)
     {
         typeId = "BlockMatrix";
         enforce(size_out%size_blocks == 0,
@@ -285,42 +285,42 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
         cols = size_in;
 
         this.size_blocks = size_blocks;
-        S maxsize = size_out; if (maxsize<size_in) maxsize=size_in;
+        size_t maxsize = size_out; if (maxsize<size_in) maxsize=size_in;
         this.num_blocks = maxsize/size_blocks;
         this.size_out = size_out;
         this.size_in = size_in;
     }
 
     @safe
-    this(in S size_in, in S size_out, in S size_blocks,
-         MatrixAbstract!(S,T)[] blocks, bool randperm=false)
+    this(in size_t size_in, in size_t size_out, in size_t size_blocks,
+         MatrixAbstract!T[] blocks, bool randperm=false)
     {
         this(size_in, size_out, size_blocks);
         this.blocks = blocks;
 
         if (randperm) {
-            P = new PermutationMatrix!(S,T)(size_in, 1.0);
-            Q = new PermutationMatrix!(S,T)(size_out, 1.0);
+            P = new PermutationMatrix!T(size_in, 1.0);
+            Q = new PermutationMatrix!T(size_out, 1.0);
         }
         else {
-            P = new PermutationMatrix!(S,T)(size_in.iota.array);
-            Q = new PermutationMatrix!(S,T)(size_out.iota.array);
+            P = new PermutationMatrix!T(size_in.iota.array);
+            Q = new PermutationMatrix!T(size_out.iota.array);
         }
     }
 
     @safe
-    this(in S size_in, in S size_blocks,
-         MatrixAbstract!(S,T)[] blocks, bool randperm=false)
+    this(in size_t size_in, in size_t size_blocks,
+         MatrixAbstract!T[] blocks, bool randperm=false)
     {
         this(size_in, size_in, size_blocks, blocks, randperm);
     }
 
     const
-    auto opBinary(string op)(in Vector!(S,T) v)
+    auto opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
         auto res = this * v.v;
-        return new Vector!(S,T)(res);
+        return new Vector!T(res);
     }
 
     const
@@ -329,14 +329,14 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
     {
         T[] vec = this.P * v;
 
-        S blocks_in = size_in / size_blocks;
-        S blocks_out = size_out / size_blocks;
+        size_t blocks_in = size_in / size_blocks;
+        size_t blocks_out = size_out / size_blocks;
 
         T[] res = new T[size_out];
         T[] s;
-        S index;
+        size_t index;
 
-        foreach(S b; 0 .. blocks_out) {
+        foreach(size_t b; 0 .. blocks_out) {
             // We take the first block matrix and multiply it with
             // the corresponding part of the vector.
             s = blocks[b] * vec[(b*size_blocks) .. ((b+1)*size_blocks)];
@@ -357,10 +357,10 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     const
-    auto opBinaryRight(string op)(in Vector!(S,T) v)
+    auto opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
-        return new Vector!(S,T)(v.v / this);
+        return new Vector!T(v.v / this);
     }
 
     const
@@ -371,12 +371,12 @@ class BlockMatrix(S,T) : MatrixAbstract!(S,T) {
                                       block matrix is not implemented");
         T[] vec = v / this.Q;
 
-        S blocks_in = size_in / size_blocks;
-        S blocks_out = size_out / size_blocks;
+        size_t blocks_in = size_in / size_blocks;
+        size_t blocks_out = size_out / size_blocks;
 
         T[] res = new T[size_out];
 
-        foreach(S b; 0 .. blocks_out) {
+        foreach(size_t b; 0 .. blocks_out) {
             // We take the first block matrix and multiply it with
             // the corresponding part of the vector.
             res[(b*size_blocks) .. ((b+1)*size_blocks)] =
@@ -392,15 +392,15 @@ unittest
     write("                  Block ... ");
 
     auto len = 1024;
-    auto m0 = new BlockMatrix!(uint, float)();
-    auto m1 = new PermutationMatrix!(ulong, Complex!float)(len/4, 1.0);
-    auto m2 = new DiagonalMatrix!(ulong, Complex!float)(len/4, 1.0);
-    auto m3 = new ReflectionMatrix!(ulong, Complex!float)(len/4, 1.0);
-    auto m4 = new FourierMatrix!(ulong, Complex!float)(len/4);
-    auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4, [m1,m2,m3,m4],
+    auto m0 = new BlockMatrix!float();
+    auto m1 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
+    auto m2 = new DiagonalMatrix!(Complex!float)(len/4, 1.0);
+    auto m3 = new ReflectionMatrix!(Complex!float)(len/4, 1.0);
+    auto m4 = new FourierMatrix!(Complex!float)(len/4);
+    auto bm = new BlockMatrix!(Complex!float)(len, len/4, [m1,m2,m3,m4],
                                                      false);
 
-    auto v = new Vector!(ulong, Complex!float)(len);
+    auto v = new Vector!(Complex!float)(len);
     foreach(i; 0 .. len)
         v[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
 
@@ -414,13 +414,13 @@ unittest
     v2 -= v;
     assert(v2.norm!"L2" > 1.0);
 
-    assertThrown(new BlockMatrix!(uint, real)(4u, 4u, 3u));
-    assertThrown(new BlockMatrix!(uint, real)(4u, 3u, 3u));
+    assertThrown(new BlockMatrix!real(4u, 4u, 3u));
+    assertThrown(new BlockMatrix!real(4u, 3u, 3u));
 
     write("Done.\n");
 }
 
-class UnitaryMatrix(S, T) : MatrixAbstract!(S,T)
+class UnitaryMatrix ) : MatrixAbstract!T
 if (is(Complex!T : T))
 {
     /+
@@ -446,8 +446,8 @@ if (is(Complex!T : T))
     static assert(is(Complex!T : T),
                "UnitaryMatrix must be complex-valued.");
 
-    PermutationMatrix!(S,T) perm;
-    FourierMatrix!(S,T) fourier;
+    PermutationMatrix!T perm;
+    FourierMatrix!T fourier;
     Tc[] params;
 
 
@@ -462,7 +462,7 @@ if (is(Complex!T : T))
     pure @safe
     this() {}
 
-    this(in S size)
+    this(in size_t size)
     {   
         this();
         assert(std.math.isPowerOf2(size), "Size of Unitary Matrix
@@ -472,12 +472,12 @@ if (is(Complex!T : T))
         rows = size;
         cols = size;
 
-        perm = new PermutationMatrix!(S,T)(size ,1.0);
-        fourier = new FourierMatrix!(S,T)(size);
+        perm = new PermutationMatrix!T(size ,1.0);
+        fourier = new FourierMatrix!T(size);
         params = new Tc[7*size];
     }
 
-    this(in S size, in Tc randomBound)
+    this(in size_t size, in Tc randomBound)
     {
         this(size);
 
@@ -487,7 +487,7 @@ if (is(Complex!T : T))
     
     this(in UnitaryMatrix M)
     {
-        auto res = new UnitaryMatrix!(S,T)();
+        auto res = new UnitaryMatrix!T();
         res.perm = M.perm.dup;
         res.fourier = M.fourier.dup;
         res.fourier = M.fourier.dup;
@@ -503,35 +503,35 @@ if (is(Complex!T : T))
 
     /// Apply the "num"th diagonal matrix on the given vector.
     const pure @safe
-    void applyDiagonal(ref T[] v, in S num)
+    void applyDiagonal(ref T[] v, in size_t num)
     {
         // we use expi to convert each value to a complex number
         // the value is the angle of the complex number with radius 1.
-        S start_index = num*rows;
+        size_t start_index = num*rows;
         foreach(i; 0 .. rows)
             v[i] *= cast(T) std.complex.expi(params[start_index + i]);
     }    /// Apply the "num"th diagonal matrix on the given vector.
     
     const pure @safe
-    void applyDiagonalInv(ref T[] v, in S num)
+    void applyDiagonalInv(ref T[] v, in size_t num)
     {
         // we use expi to convert each value to a complex number
         // the value is the angle of the complex number with radius 1.
-        S start_index = num*rows;
+        size_t start_index = num*rows;
         foreach(i; 0 .. rows)
             v[i] /= cast(T) std.complex.expi(params[start_index + i]);
     }
 
     /// Apply the "num"th reflection matrix on the given vector.
     const pure @safe
-    auto applyReflection(ref T[] v, in S num)
+    auto applyReflection(ref T[] v, in size_t num)
     {
         // The '+3' is because the diagonal matrices are first
         // in the params array.
         // The '*2' is because each reflection matrix need
         // 2 * rows parameters to be defined.
-        S start_index = (2*num + 3)*rows;
-        S start_indexPlRows = start_index + rows;
+        size_t start_index = (2*num + 3)*rows;
+        size_t start_indexPlRows = start_index + rows;
         auto a = params[start_index .. start_indexPlRows];
         auto b = params[start_indexPlRows .. start_indexPlRows + rows];
         T tmp_c = dot(v, a) - complex(0, 1) * dot(v, b);
@@ -545,10 +545,10 @@ if (is(Complex!T : T))
     }
 
     const
-    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
+    Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
-        return new Vector!(S,T)(this * v.v);
+        return new Vector!T(this * v.v);
     }
 
     const
@@ -574,10 +574,10 @@ if (is(Complex!T : T))
     }
 
     const
-    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
+    Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
-        return new Vector!(S,T)(v.v / this);
+        return new Vector!T(v.v / this);
     }
 
     const
@@ -606,10 +606,10 @@ unittest
 {
     write("                  Unitary ... ");
     {
-        auto m0 = new UnitaryMatrix!(uint, Complex!float)();
-        auto m = new UnitaryMatrix!(uint, Complex!double)(1024, 9.0);
+        auto m0 = new UnitaryMatrix!(Complex!float)();
+        auto m = new UnitaryMatrix!(Complex!double)(1024, 9.0);
         auto n= m.dup;
-        auto v = new Vector!(uint, Complex!double)(1024, 1.2);
+        auto v = new Vector!(Complex!double)(1024, 1.2);
 
         auto k = v.dup;
         auto l = k.dup;
@@ -630,12 +630,12 @@ unittest
     write("Done.\n");
 }
 
-class FourierMatrix(S,T) : MatrixAbstract!(S,T)
+class FourierMatrixT : MatrixAbstract!T
 if (is(Complex!T : T))
 {
     Fft objFFT;
     
-    this(S size)
+    this(size_t size)
     {
         typeId = "FourierMatrix";
         rows = size;
@@ -655,39 +655,39 @@ if (is(Complex!T : T))
     }
 
     const
-    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
+    Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
-        return new Vector!(S,T)(this * v.v);
+        return new Vector!T(this * v.v);
     }
 
     const
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        return objFFT.fft!(Tc)(v);
+        return objFFT.fft!Tc(v);
     }
 
 
     const
-    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
+    Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
-        return new Vector!(S,T)(v.v / this);
+        return new Vector!T(v.v / this);
     }
 
     const
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        return objFFT.inverseFft!(Tc)(v);
+        return objFFT.inverseFft!Tc(v);
     }
 }
 unittest
 {
     write("                  Fourrier ... ");
     {
-        alias Fourier = FourierMatrix!(uint, Complex!double);
+        alias Fourier = FourierMatrix!(Complex!double);
         auto f = new Fourier(1024);
         auto g =  f.dup;
         auto v = new Complex!double[2048];
@@ -715,12 +715,12 @@ unittest
     write("Done.\n");
 }
 
-class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
+class DiagonalMatrixT : MatrixAbstract!T {
     T[] mat;
     
     /// Constructor
     pure @safe
-    this(in S size)
+    this(in size_t size)
     {
         typeId = "DiagonalMatrix";
         rows = size; cols = size;
@@ -729,7 +729,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
 
     /// Simple constructor with random initialization
     @safe
-    this(in S size, in Tc randomBound)
+    this(in size_t size, in Tc randomBound)
     {
         this(size);
         static if (is(Complex!T : T)) {
@@ -756,7 +756,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     pure @safe
     this(in T[] valarr)
     {
-        this(cast(S) valarr.length);
+        this(valarr.length);
         mat = valarr.dup;
     }
 
@@ -768,27 +768,27 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     @property const pure @safe
-    S length()
+    size_t length()
     {
         return rows;
     }
 
     /// Assign Value to indices.
     pure @safe
-    void opIndexAssign(T value, in S i, in S j)
+    void opIndexAssign(T value, in size_t i, in size_t j)
     {if (i == j) mat[i] = value;}
     /// Assign Value to index.
     pure @safe
-    void opIndexAssign(T value, in S i)
+    void opIndexAssign(T value, in size_t i)
     {mat[i] = value;}
 
     /// Return value by indices.
     pure @safe
-    ref T opIndex(in S i, in S j)
+    ref T opIndex(in size_t i, in size_t j)
     {return mat[i];}
     /// Return value by index.
     pure @safe
-    ref T opIndex(in S i)
+    ref T opIndex(in size_t i)
     {return mat[i];}
 
     /// Operation +-*/ between Diagonal Matrix.
@@ -813,7 +813,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
 
     ///  Vector multiplication.
     const pure @safe
-    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
+    Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
         auto vres = v.dup;
@@ -833,10 +833,10 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     const pure @safe
-    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
+    Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
-        return new Vector!(S,T)(v.v / this);
+        return new Vector!T(v.v / this);
     }
 
     const pure @safe
@@ -851,7 +851,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
 
     /// Operation +-*/ on Matrix.
     const pure @safe
-    Matrix!(S,T) opBinary(string op)(in Matrix!(S,T) M)
+    Matrix!T opBinary(string op)(in Matrix!T M)
     {
         static if (op=="+" || op=="-") {
             auto res = M.dup;
@@ -870,7 +870,7 @@ class DiagonalMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     const pure @safe
-    Matrix!(S,T) opBinary(string op)(in Matrix!(S,T) M)
+    Matrix!T opBinary(string op)(in Matrix!T M)
     if (op=="*" || op=="/")
     {
         auto res = M.dup;
@@ -887,7 +887,7 @@ unittest
 {
     write("                  Diagonal ... ");
     {
-        alias Diag = DiagonalMatrix!(uint, double);
+        alias Diag = DiagonalMatrix!double;
         auto m1 = new Diag(4);
         auto m2 = new Diag([0, 1, 2, 3]);
         m1[0]=-0;m1[1]=-1;m1[2]=-2;m1[3]=-3;
@@ -911,7 +911,7 @@ unittest
         assert(w[1] == 3);
     }
     {
-        alias Diag = DiagonalMatrix!(uint, Complex!double);
+        alias Diag = DiagonalMatrix!(Complex!double);
         auto m1 = new Diag(4, 3.0);
         auto m2 = new Diag([complex(0), complex(1),
                             complex(2), complex(3)]);
@@ -940,8 +940,8 @@ unittest
     write("Done.\n");
 }
 
-class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
-    Vector!(S,T) vec;
+class ReflectionMatrixT : MatrixAbstract!T {
+    Vector!T vec;
     real invSqNormVec2 = 1.0;
     
     /+
@@ -955,26 +955,26 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
 
     /// Constructor
     pure @safe
-    this(in S size)
+    this(in size_t size)
     {
         typeId = "ReflectionMatrix";
         rows = size; cols = size;
-        vec = new Vector!(S,T)(size);
+        vec = new Vector!T(size);
     }
 
     /// Simple constructor with random initialization
     @safe
-    this(in S size, in Tc randomBound)
+    this(in size_t size, in Tc randomBound)
     {
         this(size);
 
         static if (is(Complex!T : T)) {
-            foreach(S i;0 .. size)
+            foreach(size_t i;0 .. size)
                 vec[i] = complex(uniform(-randomBound, randomBound, rnd),
                                  uniform(-randomBound, randomBound, rnd));
         }
         else {
-            foreach(S i;0 .. size)
+            foreach(size_t i;0 .. size)
                vec[i] = uniform(-randomBound, randomBound, rnd);
         }
         compute_invSqNormVec2();
@@ -994,14 +994,14 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     pure @safe
     this(in T[] valarr)
     {
-        rows = cast(S) valarr.length;
-        cols = cast(S) valarr.length;
-        vec = new Vector!(S,T)(valarr);
+        rows = valarr.length;
+        cols = valarr.length;
+        vec = new Vector!T(valarr);
         compute_invSqNormVec2();
     }
     /// Constructor from Vector.
     pure @safe
-    this(in Vector!(S,T) valarr)
+    this(in Vector!T valarr)
     {
         this(valarr.v);
     }
@@ -1021,7 +1021,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     @property const pure @safe
-    S length()
+    size_t length()
     {
         return rows;
     }
@@ -1031,7 +1031,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
      + We can comme up with a linear-time matrix-vector multiplication.
      +/
     const pure @safe
-    Vector!(S,T) opBinary(string op)(in Vector!(S, T) v)
+    Vector!T opBinary(string op)(in Vector! ) v)
     if (op=="*")
     {
         return this * v.v;
@@ -1052,7 +1052,7 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     const pure @safe
-    Vector!(S,T) opBinaryRight(string op)(in Vector!(S, T) v)
+    Vector!T opBinaryRight(string op)(in Vector! ) v)
     if (op=="/")
     {
         return v.v / this;
@@ -1075,13 +1075,13 @@ class ReflectionMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     const pure @safe
-    Matrix!(S,T) toMatrix()
+    Matrix!T toMatrix()
     {
-        auto res = new Matrix!(S,T)(rows, cols);
+        auto res = new Matrix!T(rows, cols);
         T s;
-        foreach(S i; 0 .. rows) {
+        foreach(size_t i; 0 .. rows) {
             s = vec[i]*invSqNormVec2;
-            foreach(S j; 0 .. cols){
+            foreach(size_t j; 0 .. cols){
                 static if (is(Complex!T : T))
                     res[i,j] = s*vec[j].conj;
                 else
@@ -1100,16 +1100,16 @@ unittest
     write("                  Reflection ... ");
     {
         // Verification of the multiplication algorithm.
-        alias Reflection = ReflectionMatrix!(uint, Complex!real);
-        ReflectionMatrix!(uint, Complex!real) r1 = new Reflection(100, 1.0);
-        ReflectionMatrix!(uint, Complex!real) r1bis = r1.dup;
-        Matrix!(uint, Complex!real) m1 = r1.toMatrix();
+        alias Reflection = ReflectionMatrix!(Complex!real);
+        ReflectionMatrix!(Complex!real) r1 = new Reflection(100, 1.0);
+        ReflectionMatrix!(Complex!real) r1bis = r1.dup;
+        Matrix!(Complex!real) m1 = r1.toMatrix();
 
         r1bis.vec -= r1.vec;
         assert(r1bis.vec.norm!"L2" <= 0.0001);
 
-        auto v = new Vector!(uint, Complex!real)(100, 1.0);
-        auto u = new Vector!(uint, Complex!real)(v);
+        auto v = new Vector!(Complex!real)(100, 1.0);
+        auto u = new Vector!(Complex!real)(v);
 
         v.opOpAssign!"*"(r1);
         u.opOpAssign!"*"(m1);
@@ -1118,17 +1118,17 @@ unittest
     }
     {
 
-        auto vref = new Vector!(uint, real)(100, 1.0);
+        auto vref = new Vector!real(100, 1.0);
 
-        auto r1 = new ReflectionMatrix!(uint, real)(vref);
-        auto r1bis = new ReflectionMatrix!(uint, real)(vref.v);
-        Matrix!(uint, real) m1 = r1.toMatrix();
+        auto r1 = new ReflectionMatrix!real(vref);
+        auto r1bis = new ReflectionMatrix!real(vref.v);
+        Matrix!real m1 = r1.toMatrix();
 
         r1bis.vec -= r1.vec;
         assert(r1bis.vec.norm!"L2" <= 0.0001);
 
-        auto v = new Vector!(uint, real)(100, 1.0);
-        auto u = new Vector!(uint, real)(v);
+        auto v = new Vector!real(100, 1.0);
+        auto u = new Vector!real(v);
 
         v.opOpAssign!"*"(r1);
         u.opOpAssign!"*"(m1);
@@ -1142,23 +1142,23 @@ unittest
 }
 
 
-class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
-    S[] perm;
+class PermutationMatrixT : MatrixAbstract!T {
+    size_t[] perm;
 
     /// Constructor
     pure @safe
-    this(in S size)
+    this(in size_t size)
     {
         typeId = "PermutationMatrix";
         rows = size; cols = size;
-        perm = new S[size];
+        perm = new size_t[size];
     }
 
     /// Simple constructor with random initialization
     /// Here the randomBound is not used and a simple
     /// random permutation is returned.
     @safe
-    this(in S size, in float randomBound)
+    this(in size_t size, in float randomBound)
     {
         this(size.iota.array);
         randomShuffle(perm);
@@ -1175,9 +1175,9 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
 
     /// Constructor from list (trusted to be a permutation)
     pure @safe
-    this(in S[] valarr)
+    this(in size_t[] valarr)
     {
-        this(cast(S) valarr.length);
+        this(valarr.length);
         perm = valarr.dup;
     }
 
@@ -1190,9 +1190,9 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
 
     @property @nogc
     const pure @safe
-    S length()
+    size_t length()
     {
-        return cast(S) rows;
+        return rows;
     }
 
     const
@@ -1205,10 +1205,10 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
 
     ///  Vector multiplication.
     const pure @safe
-    Vector!(S,T) opBinary(string op)(in Vector!(S,T) v)
+    Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
-        auto vres = new Vector!(S,T)(v.length);
+        auto vres = new Vector!T(v.length);
         foreach(i; 0 .. v.length)
             vres[i] = v[perm[i]];
         return vres;
@@ -1225,10 +1225,10 @@ class PermutationMatrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     const pure @safe
-    Vector!(S,T) opBinaryRight(string op)(in Vector!(S,T) v)
+    Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
-        return new Vector!(S,T)(v.v / this);
+        return new Vector!T(v.v / this);
     }
 
     const pure @safe
@@ -1245,7 +1245,7 @@ unittest
 {
     write("                  Permutation ... ");
     
-    alias Perm = PermutationMatrix!(uint, float);
+    alias Perm = PermutationMatrix!float;
     
     auto p = new Perm(1_000, 3);
     auto o = p.dup;
@@ -1259,12 +1259,12 @@ unittest
     write("Done.\n");
 }
 
-class Matrix(S,T) : MatrixAbstract!(S,T) {
+class MatrixT : MatrixAbstract!T {
     T[] mat;
 
     /// Simple constructor
     pure @safe
-    this(in S rows, in S cols)
+    this(in size_t rows, in size_t cols)
     {
         super();
         typeId = "Matrix";
@@ -1274,20 +1274,20 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     }
     
     pure @safe
-    this(in S rows)
+    this(in size_t rows)
     {
         this(rows, rows);
     }
 
     @safe
-    this(in S rows, in Tc randomBound)
+    this(in size_t rows, in Tc randomBound)
     {
         this(rows, rows, randomBound);
     }
 
     /// Simple constructor with random initialization
     @safe
-    this(in S rows, in S cols, in Tc randomBound)
+    this(in size_t rows, in size_t cols, in Tc randomBound)
     {
         super(true);
         typeId = "Matrix";
@@ -1322,18 +1322,18 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     @property const pure @safe
-    S length()
+    size_t length()
     {
-        return cast(S) rows;
+        return rows;
     }
 
     pure @safe
-    void opIndexAssign(T value, in S i, in S j)
+    void opIndexAssign(T value, in size_t i, in size_t j)
     {mat[i*cols + j] = value;}
 
     /// Return value by index.
     pure const @safe
-    T opIndex(in S i, in S j)
+    T opIndex(in size_t i, in size_t j)
     {return mat[i*cols + j];}
    
     /// Simple math operation without memory allocation.
@@ -1376,10 +1376,10 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     }
 
     const pure @safe
-    auto opBinary(string op)(in Vector!(S,T) v)
+    auto opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
-        return new Vector!(S,T)(this * v.v);
+        return new Vector!T(this * v.v);
     }
 
     const pure @safe
@@ -1387,9 +1387,9 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
     if (op=="*")
     {
         auto res = new T[v.length];
-        foreach(S i; 0 .. rows){
+        foreach(size_t i; 0 .. rows){
             T s = mat[i*cols]*v[0];
-            foreach(S j; 1 .. cols)
+            foreach(size_t j; 1 .. cols)
                 s += mat[i*cols + j]*v[j];
             res[i] = s;
         }
@@ -1398,11 +1398,11 @@ class Matrix(S,T) : MatrixAbstract!(S,T) {
 }
 unittest
 {
-    auto m1 = new Matrix!(uint, Complex!float)(10, 30, 5.0f);
+    auto m1 = new Matrix!(Complex!float)(10, 30, 5.0f);
     auto m2 = m1.dup;
-    auto m3 = new Matrix!(uint, Complex!float)(30, 5, 10.0f);
-    auto m4 = new Matrix!(size_t, real)(100, 1.0);
-    auto m5 = new Matrix!(size_t, real)(100);
+    auto m3 = new Matrix!(Complex!float)(30, 5, 10.0f);
+    auto m4 = new Matrix!real(100, 1.0);
+    auto m5 = new Matrix!real(100);
     m5.mat = m4.mat.dup;
 
     m2 -= m1;

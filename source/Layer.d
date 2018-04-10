@@ -50,7 +50,7 @@ version(unittest)
 
  +/
 
-abstract class Layer(S,T)
+abstract class Layer(T)
 {
     static if (is(Complex!T : T))
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
@@ -73,36 +73,36 @@ abstract class Layer(S,T)
             name = _name;
     }
 
-    abstract Vector!(S,T) compute(Vector!(S,T));
+    abstract Vector!T compute(Vector!T);
 }
 
 /+ This layer implement a simple linear matrix transformation
    applied to the vector.
  +/
-class MatrixLayer(S,T) : Layer!(S,T)
+class MatrixLayer(S,T) : Layer!T
 {
-    this(MatrixAbstract!(S,T) _M)
+    this(MatrixAbstract!T _M)
     {
         params = new Parameter[1];
         params[0] = _M;
     }
     
     override
-    Vector!(S,T) compute(Vector!(S,T) _v)
+    Vector!T compute(Vector!T _v)
     {
-        return to!(MatrixAbstract!(S,T))(params[0]) * _v;
+        return to!(MatrixAbstract!T)(params[0]) * _v;
     }
 }
 unittest {
     write("Unittest: Layer: Matrix ... ");
 
-    auto v = new Vector!(size_t, real)(4, 1.0);
+    auto v = new Vector!real(4, 1.0);
 
-    auto r = new ReflectionMatrix!(size_t,real)(2, 1.0);
-    auto d = new DiagonalMatrix!(size_t,real)(2, 2.0);
-    auto m = new BlockMatrix!(size_t,real)(4, 4, 2, [r, d], true);
+    auto r = new ReflectionMatrix!real(2, 1.0);
+    auto d = new DiagonalMatrix!real(2, 2.0);
+    auto m = new BlockMatrix!real(4, 4, 2, [r, d], true);
 
-    auto l = new MatrixLayer!(size_t,real)(m);
+    auto l = new MatrixLayer!real(m);
 
     auto w = v.dup;
 
@@ -121,19 +121,19 @@ unittest {
 /+ This layer implement a simple linear matrix transformation
    applied to the vector.
  +/
-class BiasLayer(S,T) : Layer!(S,T)
+class BiasLayer(S,T) : Layer!T
 {
     this(const S size_in, const Tc randomBound)
     {
         params = new Parameter[1];
-        params[0] = new Vector!(S,T)(size_in, randomBound);
+        params[0] = new Vector!T(size_in, randomBound);
     }
     
     override
-    Vector!(S,T) compute(Vector!(S,T) _v)
+    Vector!T compute(Vector!T _v)
     {
         auto res = _v.dup;
-        res += to!(Vector!(S,T))(params[0]);
+        res += to!(Vector!T)(params[0]);
         return res;
     }
 
@@ -141,13 +141,31 @@ class BiasLayer(S,T) : Layer!(S,T)
 unittest {
     write("                 Bias ... ");
 
+    auto v = new Vector!(Complex!real)(4, 0.5);
+
+    auto b1 = new BiasLayer!(Complex!real)(4, 0);
+    auto b2 = new BiasLayer!(Complex!real)(4, 1.0);
+
+    auto b = to!(Vector!(Complex!real))(b2.params[0]);
+
+    auto w = v.dup;
+    w += b;
+    auto k = b1.compute(v);
+    auto l = b2.compute(v);
+
+    l -= w;
+    k -= v;
+
+    assert(l.norm!"L2" <= 0.0001);
+    assert(k.norm!"L2" <= 0.0001);
+
     write("Done.\n");
 }
 
 /+ This layer can implement any function that take as input a
-   Vector!(S,T) and return another Vector!(S,T).
+   Vector!T and return another Vector!T.
  +/
-class FunctionalLayer(S,T) : Layer!(S,T)
+class FunctionalLayer(S,T) : Layer!T
 {
     /++This implements common functions that are not implemented already.
      + It includes the following:
@@ -158,7 +176,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
 
     private {
         /// function applied to the vector.
-        Vector!(S,T) delegate(Vector!(S,T), Parameter[]) func;
+        Vector!T delegate(Vector!T, Parameter[]) func;
     }
 
     this(string easyfunc, in S size_in=0)
@@ -168,7 +186,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
             case "relu":
                 static if (!is(Complex!T : T)) {
                     func =
-                        delegate(Vector!(S,T) _v, Parameter[] _p) {
+                        delegate(Vector!T _v, Parameter[] _p) {
                             auto res = _v.dup;
                             foreach(i; 0 .. _v.length)
                                 if (res[i] < 0) res[i] = 0;
@@ -182,16 +200,16 @@ class FunctionalLayer(S,T) : Layer!(S,T)
                     enforce(size_in != 0, "'size_in' must be greater than zero
                                             when using 'modRelu'.");
                     params = new Parameter[1];
-                    params[0] = new Vector!(S,Tc)(size_in, 1.0);
+                    params[0] = new Vector!Tc(size_in, 1.0);
                     
                     func =
-                        delegate(Vector!(S,T) _v, Parameter[] _p) {
+                        delegate(Vector!T _v, Parameter[] _p) {
                             auto absv = _v[0].abs;
                             auto tmp = absv;
                             auto res = _v.dup;
                             foreach(i; 0 .. _v.length) {
                                 absv = _v[i].abs;
-                                tmp = absv + (cast(Vector!(S,_v.Tc)) _p[0])[i];
+                                tmp = absv + (cast(Vector!_vTc)) _p[0])[i];
                                 if (tmp > 0) {
                                     res[i] = tmp*_v[i]/absv;
                                 }
@@ -209,7 +227,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
             case "softmax":
                 static if (!is(Complex!T : T))
                     func =
-                        delegate(Vector!(S,T) _v, Parameter[] _p) {
+                        delegate(Vector!T _v, Parameter[] _p) {
                             T s = 0;
                             auto res = _v.dup;
                             foreach(i; 0 .. _v.length) {
@@ -235,15 +253,15 @@ class FunctionalLayer(S,T) : Layer!(S,T)
     }
 
     // The function to apply to the vector. Can be anything. DELEGATE
-    this(Vector!(S,T) delegate(Vector!(S,T)) _func)
+    this(Vector!T delegate(Vector!T) _func)
     {
-        func = delegate(Vector!(S,T) _v, Parameter[] _p) {
+        func = delegate(Vector!T _v, Parameter[] _p) {
             return _func(_v);
         };
     }
 
     // The function to apply to the vector. Can be anything. FUNCTION
-    this(Vector!(S,T) function(Vector!(S,T)) _func)
+    this(Vector!T function(Vector!T) _func)
     {
         this(toDelegate(_func));
     }
@@ -252,7 +270,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
     // function to a vector. DELEGATE
     this(T delegate(T) _func)
     {
-        func = delegate(Vector!(S,T) _v, Parameter[] _p) {
+        func = delegate(Vector!T _v, Parameter[] _p) {
             auto res = _v.dup;
             foreach(i; 0 .. _v.length)
                 res[i] = _func(_v[i]);
@@ -269,7 +287,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
 
     this(in S size)
     {
-        this(delegate(Vector!(S,T) _v) {
+        this(delegate(Vector!T _v) {
                 enforce(_v.length == size, "Size mismatch in FunctionalLayer:\n"
                                           ~"Size of the FunctionalLayer: "
                                           ~to!string(size)~"\n"
@@ -282,7 +300,7 @@ class FunctionalLayer(S,T) : Layer!(S,T)
     }
 
     override
-    Vector!(S,T) compute(Vector!(S,T) _v)
+    Vector!T compute(Vector!T _v)
     {
         return func(_v, params);
     }
@@ -290,8 +308,8 @@ class FunctionalLayer(S,T) : Layer!(S,T)
 unittest {
     write("                 Functional ... ");
 
-    alias Vec = Vector!(uint, Complex!double);
-    alias Fl = FunctionalLayer!(uint, Complex!double);
+    alias Vec = Vector!(Complex!double);
+    alias Fl = FunctionalLayer!(Complex!double);
 
     Vec blue(Vec _v) pure {
         auto res = _v.dup;
@@ -340,10 +358,10 @@ unittest {
     auto w = v.dup;
     w[2] = complex(0.5);
     auto f5 = new Fl("modRelu", 4);
-    (cast(Vector!(uint, double)) f5.params[0])[0] = -0.9;
-    (cast(Vector!(uint, double)) f5.params[0])[1] = -0.9;
-    (cast(Vector!(uint, double)) f5.params[0])[2] = -0.9;
-    (cast(Vector!(uint, double)) f5.params[0])[3] = -0.9;
+    (cast(Vector!double) f5.params[0])[0] = -0.9;
+    (cast(Vector!double) f5.params[0])[1] = -0.9;
+    (cast(Vector!double) f5.params[0])[2] = -0.9;
+    (cast(Vector!double) f5.params[0])[3] = -0.9;
     auto v5 = f5.compute(w);
     assert(abs(v5.sum) < 0.0001);
 
@@ -352,23 +370,23 @@ unittest {
     // modRelu must be given the vector's size to create parameters.
     assertThrown(new Fl("modRelu"));
     // relu takes only real-valued vectors.
-    assertThrown(new FunctionalLayer!(uint, Complex!double)("relu"));
+    assertThrown(new FunctionalLayer!(Complex!double)("relu"));
     // softmax takes only real-valued vectors.
-    assertThrown(new FunctionalLayer!(uint, Complex!double)("softmax"));
+    assertThrown(new FunctionalLayer!(Complex!double)("softmax"));
     // modRelu takes only complex-valued vectors.
-    assertThrown(new FunctionalLayer!(uint, double)("modRelu"));
+    assertThrown(new FunctionalLayer!double("modRelu"));
     // Incorrect function name.
-    assertThrown(new FunctionalLayer!(uint, real)("this is incorrect."));
+    assertThrown(new FunctionalLayer!real("this is incorrect."));
 
-    auto vr = new Vector!(size_t, double)([0.0, 1.0, pi, -1.0]);
+    auto vr = new Vector!double([0.0, 1.0, pi, -1.0]);
 
     // relu function.
-    auto f6 = new FunctionalLayer!(size_t, double)("relu");
+    auto f6 = new FunctionalLayer!double("relu");
     auto vr6 = f6.compute(vr);
     assert(abs(vr6.sum - 1.0 - pi) <= 0.01);
 
     // softmax function.
-    auto f7 = new FunctionalLayer!(size_t, double)("softmax");
+    auto f7 = new FunctionalLayer!double("softmax");
     auto vr7 = f7.compute(vr);
     assert(abs(vr7.sum - 1.0) <= 0.001);
 
@@ -376,7 +394,7 @@ unittest {
     f1.set_name("f1");
     assert(f1.name == "f1");
 
-    auto vv = new Vector!(int, double)(100, 0.2);
+    auto vv = new Vector!double(100, 0.2);
 
     write(" Done.\n");
 }
@@ -488,8 +506,8 @@ auto createPoolingFunction(S, T)(in S height, in S width,
                   *(1 + (height - frame_height) / stride_height)
                   *(1 + (width  - frame_width)  / stride_width);
 
-    return delegate(in Vector!(S, T) _v) {
-        auto res = new Vector!(S, T)(lenRetVec, 0.1);
+    return delegate(in Vector! T _v) {
+        auto res = new Vector! T(lenRetVec, 0.1);
 
         /++ CellRange is used to get all the values inside a cell that
          +  will be reduced together.
@@ -504,14 +522,14 @@ auto createPoolingFunction(S, T)(in S height, in S width,
               cell_w, cell_h,
               shift, width;
 
-            const Vector!(S,T) vec;
+            const Vector!T vec;
 
             bool is_empty = false;
           }
 
             this(in S _pos_x, in S _pos_y, in S _cell_w,
                  in S _cell_h, in S _width,
-                 ref const Vector!(S,T) _v)
+                 ref const Vector!T _v)
             {
                 cur_pos = _pos_y * _width + _pos_x;
                 pos_x = 0;
@@ -761,7 +779,7 @@ unittest {
 
 
         // max pooling, stride 2, square frame, cut
-    auto tmp1 = createPoolingFunction!(int, double)(10, 10, 2, 2, 4, 4, [2], [2],
+    auto tmp1 = createPoolingFunction!double(10, 10, 2, 2, 4, 4, [2], [2],
                                                    delegate(InputRange!double _range) {
                                                         double s = _range.front;
                                                         _range.popFront();
@@ -771,7 +789,7 @@ unittest {
                                                    });
 
     // max pooling, stride 2, square frame, no cut
-    auto tmp2 = createPoolingFunction!(int, double)(10, 10, 2, 2, 4, 4, [], [],
+    auto tmp2 = createPoolingFunction!double(10, 10, 2, 2, 4, 4, [], [],
                                                    delegate(InputRange!double _range) {
                                                         double s = _range.front;
                                                         _range.popFront();
@@ -781,7 +799,7 @@ unittest {
                                                    });
 
     // min pooling, rectangular stride, rectangular frame, no cut
-    auto tmp3 = createPoolingFunction!(int, double)(10, 10, 3, 2, 2, 4, [], [],
+    auto tmp3 = createPoolingFunction!double(10, 10, 3, 2, 2, 4, [], [],
                                                    delegate(InputRange!double _range) {
                                                         double s = _range.front;
                                                         _range.popFront();
@@ -791,7 +809,7 @@ unittest {
                                                    });
 
     // average pooling, no stride, sqared frame, no cut
-    auto tmp4 = createPoolingFunction!(int, double)(10, 10, 2, 2, 2, 2, [], [],
+    auto tmp4 = createPoolingFunction!double(10, 10, 2, 2, 2, 2, [], [],
                                                    delegate(InputRange!double _range) {
                                                         double s = 0;
                                                         size_t len_range = 0;
@@ -802,12 +820,12 @@ unittest {
                                                         return s / len_range;
                                                    });
 
-    auto layer1 = new FunctionalLayer!(int, double)(tmp1);
-    auto layer2 = new FunctionalLayer!(int, double)(tmp2);
-    auto layer3 = new FunctionalLayer!(int, double)(tmp3);
-    auto layer4 = new FunctionalLayer!(int, double)(tmp4);
+    auto layer1 = new FunctionalLayer!double(tmp1);
+    auto layer2 = new FunctionalLayer!double(tmp2);
+    auto layer3 = new FunctionalLayer!double(tmp3);
+    auto layer4 = new FunctionalLayer!double(tmp4);
 
-    auto vec = new Vector!(int, double)([1.,0.,  0.,1.,  1.,0.,  0.,0.,  0.,5.,
+    auto vec = new Vector!double([1.,0.,  0.,1.,  1.,0.,  0.,0.,  0.,5.,
                                          0.,0.,  0.,2.,  2.,3.,  4.,4.,  1.,2.,
                                          
                                          1.,6.,  0.,1.,  1.,8.,  0.,3.,  0.,0.,

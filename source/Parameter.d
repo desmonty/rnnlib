@@ -49,7 +49,7 @@ abstract class Parameter {
            which will be useful for memory optmization in some matrix
            multiplication (e.g. permutation).
  +/
-class Vector(S, T) : Parameter {
+class Vector(T) : Parameter {
     T[] v;
 
     static if (is(Complex!T : T))
@@ -58,14 +58,14 @@ class Vector(S, T) : Parameter {
 
     /// Simple constructor.
     pure @safe
-    this(S length)
+    this(size_t length)
     {
         v = new T[length];
     }
  
     /// Random constructor.
     @safe
-    this(S length, Tc randomBound)
+    this(size_t length, Tc randomBound)
     {
         super(true);
         v = new T[length];
@@ -103,14 +103,14 @@ class Vector(S, T) : Parameter {
     pure @safe
     this(in T[] valarr)
     {
-        this(cast(S) valarr.length);
+        this(valarr.length);
         v = valarr.dup;
     }
 
 
     final const pure
     @property @safe @nogc 
-    S length() {return cast(S) v.length;}
+    size_t length() {return v.length;}
 
     /// Assign value by index.
     pure @nogc @safe
@@ -121,7 +121,7 @@ class Vector(S, T) : Parameter {
 
     /// Return value by index.
     const pure @nogc @safe
-    T opIndex(S i)
+    T opIndex(size_t i)
     {
         return v[i];
     }
@@ -214,14 +214,14 @@ class Vector(S, T) : Parameter {
     }
 
     pure @safe
-    void opOpAssign(string op)(in Matrix!(S,T) M)
+    void opOpAssign(string op)(in Matrix!T M)
     if (op == "*")
     {
         this.v = M * this.v;
     }
 
     pure @safe
-    void opOpAssign(string op)(in DiagonalMatrix!(S,T) M)
+    void opOpAssign(string op)(in DiagonalMatrix!T M)
     { 
         static if (op == "*")
         {
@@ -235,7 +235,7 @@ class Vector(S, T) : Parameter {
     }
 
     pure @safe
-    void opOpAssign(string op)(in PermutationMatrix!(S,T) M)
+    void opOpAssign(string op)(in PermutationMatrix!T M)
     {
         static if (op == "*")
         {
@@ -253,7 +253,7 @@ class Vector(S, T) : Parameter {
     }
 
     pure @safe
-    void opOpAssign(string op)(in ReflectionMatrix!(S,T) M)
+    void opOpAssign(string op)(in ReflectionMatrix!T M)
     {
         static if (op != "*" && op != "/")
             assert(0, "Operator "~op~" not implemented.");
@@ -263,7 +263,7 @@ class Vector(S, T) : Parameter {
         this += tmp;
     }
     
-    void opOpAssign(string op)(in MatrixAbstract!(S,T) M)
+    void opOpAssign(string op)(in MatrixAbstract!T M)
     {
         /+ This should only be used to handle Matrix that
            have a template definition which can only
@@ -274,7 +274,7 @@ class Vector(S, T) : Parameter {
         auto tmptypeId = split(M.typeId, "!")[0];
         if (tmptypeId == "UnitaryMatrix") {
             static if (is(Complex!T : T)) {
-                auto mat = cast(UnitaryMatrix!(S,T)) M;
+                auto mat = cast(UnitaryMatrix!T) M;
                 static if (op == "*") 
                 {
                     mat.applyDiagonal(v, 0);
@@ -320,9 +320,9 @@ class Vector(S, T) : Parameter {
                              ~"vector as this is what it'll return.");
         
                 static if (op=="*")
-                    v = (cast (FourierMatrix!(S,T)) M).objFFT.fft!(Tc)(v);
+                    v = (cast (FourierMatrix!T) M).objFFT.fft!(Tc)(v);
                 else static if (op=="/")
-                    v = (cast (FourierMatrix!(S,T)) M).objFFT.inverseFft!(Tc)(v);
+                    v = (cast (FourierMatrix!T) M).objFFT.inverseFft!(Tc)(v);
                 else static
                     assert(0, "Operator "~op~" not implemented.");
             }
@@ -333,19 +333,19 @@ class Vector(S, T) : Parameter {
         } 
     }
  
-    void opOpAssign(string op)(in BlockMatrix!(S,T) M)
+    void opOpAssign(string op)(in BlockMatrix!T M)
     {
         static if (op == "*") {
             T[] vec = M.P * v;
 
-            S blocks_in = M.size_in / M.size_blocks;
-            S blocks_out = M.size_out / M.size_blocks;
+            size_t blocks_in = M.size_in / M.size_blocks;
+            size_t blocks_out = M.size_out / M.size_blocks;
 
             T[] res = new T[M.size_out];
             T[] s;
-            S index;
+            size_t index;
 
-            foreach(S b; 0 .. blocks_out) {
+            foreach(size_t b; 0 .. blocks_out) {
                 // We take the first block matrix and multiply it with
                 // the corresponding part of the vector.
                 s = M.blocks[b] * vec[(b*M.size_blocks) .. ((b+1)*M.size_blocks)];
@@ -369,12 +369,12 @@ class Vector(S, T) : Parameter {
                                              block matrix is not implemented");
             T[] vec = v / M.Q;
 
-            S blocks_in = M.size_in / M.size_blocks;
-            S blocks_out = M.size_out / M.size_blocks;
+            size_t blocks_in = M.size_in / M.size_blocks;
+            size_t blocks_out = M.size_out / M.size_blocks;
 
             T[] res = new T[M.size_out];
 
-            foreach(S b; 0 .. blocks_out) {
+            foreach(size_t b; 0 .. blocks_out) {
                 // We take the first block matrix and multiply it with
                 // the corresponding part of the vector.
                 res[(b*M.size_blocks) .. ((b+1)*M.size_blocks)] =
@@ -448,7 +448,7 @@ unittest
 
   foreach(____;0 .. 10){
 
-    alias Vectoruf = Vector!(uint, float);
+    alias Vectoruf = Vector!float;
     {
         Vectoruf v = new Vectoruf([1.0f, 2.0f, 1000.0f]);
         v[2] = 3.75f;
@@ -501,10 +501,10 @@ unittest
         // The following test work every time if and only if
         // the period of the random number generator is odd.
         // It is the case with the one used here: Mersenne twister.
-        auto vc = new Vector!(uint, Complex!real)(3, 10.5f);
-        auto uc = new Vector!(uint, Complex!real)(3, 10.5f);
-        auto vc1 = new Vector!(uint, Complex!real)(vc);
-        auto uc1 = new Vector!(uint, Complex!real)(uc);
+        auto vc = new Vector!(Complex!real)(3, 10.5f);
+        auto uc = new Vector!(Complex!real)(3, 10.5f);
+        auto vc1 = new Vector!(Complex!real)(vc);
+        auto uc1 = new Vector!(Complex!real)(uc);
 
         vc -= uc;
         assert(vc.norm!"Linf" != complex(0));
@@ -519,10 +519,10 @@ unittest
                                uc1.conjdot(uc1.v, vc1)) < 0.0001);
     }
     {
-        auto vc = new Vector!(uint, real)(3, 10.5f);
-        auto uc = new Vector!(uint, real)(3, 10.5f);
-        auto vc1 = new Vector!(uint, real)(vc);
-        auto uc1 = new Vector!(uint, real)(uc);
+        auto vc = new Vector!real(3, 10.5f);
+        auto uc = new Vector!real(3, 10.5f);
+        auto vc1 = new Vector!real(vc);
+        auto uc1 = new Vector!real(uc);
 
         vc -= uc;
         assert(vc.norm!"Linf" != complex(0));
@@ -576,17 +576,17 @@ unittest
     {
         // Reflection are involution, so applying 2 times the matrix to a vector
         // should give that vector
-        auto matr = new ReflectionMatrix!(size_t, Complex!real)(1_000, 1.0f);
-        auto matu = new ReflectionMatrix!(size_t, Complex!real)(matr);
+        auto matr = new ReflectionMatrix!(Complex!real)(1_000, 1.0f);
+        auto matu = new ReflectionMatrix!(Complex!real)(matr);
         //
-        auto tmp = new Vector!(size_t, Complex!real)(matr.vec);
+        auto tmp = new Vector!(Complex!real)(matr.vec);
         tmp -= matu.vec;
         assert(tmp.norm!"L1" < 0.0001);
 
-        auto v1 = new Vector!(size_t, Complex!real)(1_000, 1000.0f);
-        auto w1 = new Vector!(size_t, Complex!real)(v1);
+        auto v1 = new Vector!(Complex!real)(1_000, 1000.0f);
+        auto w1 = new Vector!(Complex!real)(v1);
         //
-        tmp = new Vector!(size_t, Complex!real)(v1);
+        tmp = new Vector!(Complex!real)(v1);
         tmp -= w1;
         assert(tmp.norm!"L1" < 0.0001);
 
@@ -601,14 +601,14 @@ unittest
         auto matr = new ReflectionMatrix!(size_t, real)(1_000, 1.0f);
         auto matu = new ReflectionMatrix!(size_t, real)(matr);
         //
-        auto tmp = new Vector!(size_t, real)(matr.vec);
+        auto tmp = new Vector!real(matr.vec);
         tmp -= matu.vec;
         assert(tmp.norm!"L1" < 0.0001);
 
-        auto v1 = new Vector!(size_t, real)(1_000, 1000.0f);
-        auto w1 = new Vector!(size_t, real)(v1);
+        auto v1 = new Vector!real(1_000, 1000.0f);
+        auto w1 = new Vector!real(v1);
         //
-        tmp = new Vector!(size_t, real)(v1);
+        tmp = new Vector!real(v1);
         tmp -= w1;
         assert(tmp.norm!"L1" < 0.0001);
 
@@ -624,7 +624,7 @@ unittest
     {
         alias Fourier = FourierMatrix!(size_t, Complex!double);
         auto f = new Fourier(pow(2, 11));
-        auto v = new Vector!(size_t, Complex!double)(pow(2, 11), 1.0);
+        auto v = new Vector!(Complex!double)(pow(2, 11), 1.0);
 
         auto vtmp = v.dup;
         v *= f;
@@ -635,12 +635,12 @@ unittest
 
     // General matrix
     {
-        auto m = new Matrix!(ulong, float)(4, 4);
+        auto m = new Matrix!float(4, 4);
         m.mat = [1.0, 0.0, 0.0, 0.0,
                  0.0, 0.0, 2.0, 0.0,
                  0.0, 0.5, 0.0, 0.0,
                  0.0, 0.0, 0.0, 1.0];
-        auto v = new Vector!(ulong, float)(4);
+        auto v = new Vector!float(4);
         v[0] = 38.50;
         v[1] = 13.64;
         v[2] = 90.01;
@@ -652,8 +652,8 @@ unittest
 
     // Unitary matrix
     {
-        auto m = new UnitaryMatrix!(uint, Complex!double)(4, 9.0);
-        auto v = new Vector!(uint, Complex!double)(4, 1.2);
+        auto m = new UnitaryMatrix!(Complex!double)(4, 9.0);
+        auto v = new Vector!(Complex!double)(4, 1.2);
 
         auto k = v.dup;
         auto w = m * v;
@@ -670,14 +670,14 @@ unittest
     // Block matrix
     {
         auto len = 1024;
-        auto m1 = new PermutationMatrix!(ulong, Complex!float)(len/4, 1.0);
-        auto m2 = new DiagonalMatrix!(ulong, Complex!float)(len/4, 1.0);
-        auto m3 = new ReflectionMatrix!(ulong, Complex!float)(len/4, 1.0);
-        auto m4 = new FourierMatrix!(ulong, Complex!float)(len/4);
-        auto bm = new BlockMatrix!(ulong, Complex!float)(len, len/4,
+        auto m1 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
+        auto m2 = new DiagonalMatrix!(Complex!float)(len/4, 1.0);
+        auto m3 = new ReflectionMatrix!(Complex!float)(len/4, 1.0);
+        auto m4 = new FourierMatrix!(Complex!float)(len/4);
+        auto bm = new BlockMatrix!(Complex!float)(len, len/4,
                                                          [m1,m2,m3,m4], false);
 
-        auto v = new Vector!(ulong, Complex!float)(len);
+        auto v = new Vector!(Complex!float)(len);
         foreach(i; 0 .. len)
             v[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
 
@@ -697,9 +697,9 @@ unittest
         assert(v3.norm!"L2" < 0.1);
         assert(v.norm!"L2" < 0.1);
 
-        alias Block = BlockMatrix!(ulong, Complex!float);
+        alias Block = BlockMatrix!(Complex!float);
         auto bmrec = new Block(len, len/2, len/4, [m1,m2,m3,m4], true);
-        auto vv = new Vector!(ulong, Complex!float)(len);
+        auto vv = new Vector!(Complex!float)(len);
         foreach(i; 0 .. len)
             vv[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
 
