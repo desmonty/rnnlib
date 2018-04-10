@@ -144,7 +144,7 @@ unittest
     write("Unittest: Matrix: Abstract ... ");
 
 
-    class ErrorMatrixT : MatrixAbstract!T {
+    class ErrorMatrix(T) : MatrixAbstract!T {
         this() {
             typeId = "ErrorMatrix";
             rows = 0;
@@ -227,7 +227,7 @@ unittest
     write("Done.\n");
 }
 
-class BlockMatrixT : MatrixAbstract!T {
+class BlockMatrix(T) : MatrixAbstract!T {
     MatrixAbstract!T[] blocks;
     PermutationMatrix!T P, Q;
 
@@ -420,7 +420,7 @@ unittest
     write("Done.\n");
 }
 
-class UnitaryMatrix ) : MatrixAbstract!T
+class UnitaryMatrix(T) : MatrixAbstract!T
 if (is(Complex!T : T))
 {
     /+
@@ -630,7 +630,7 @@ unittest
     write("Done.\n");
 }
 
-class FourierMatrixT : MatrixAbstract!T
+class FourierMatrix(T) : MatrixAbstract!T
 if (is(Complex!T : T))
 {
     Fft objFFT;
@@ -715,7 +715,7 @@ unittest
     write("Done.\n");
 }
 
-class DiagonalMatrixT : MatrixAbstract!T {
+class DiagonalMatrix(T) : MatrixAbstract!T {
     T[] mat;
     
     /// Constructor
@@ -940,7 +940,7 @@ unittest
     write("Done.\n");
 }
 
-class ReflectionMatrixT : MatrixAbstract!T {
+class ReflectionMatrix(T) : MatrixAbstract!T {
     Vector!T vec;
     real invSqNormVec2 = 1.0;
     
@@ -1031,7 +1031,7 @@ class ReflectionMatrixT : MatrixAbstract!T {
      + We can comme up with a linear-time matrix-vector multiplication.
      +/
     const pure @safe
-    Vector!T opBinary(string op)(in Vector! ) v)
+    Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
         return this * v.v;
@@ -1052,7 +1052,7 @@ class ReflectionMatrixT : MatrixAbstract!T {
     }
 
     const pure @safe
-    Vector!T opBinaryRight(string op)(in Vector! ) v)
+    Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
         return v.v / this;
@@ -1142,7 +1142,7 @@ unittest
 }
 
 
-class PermutationMatrixT : MatrixAbstract!T {
+class PermutationMatrix(T) : MatrixAbstract!T {
     size_t[] perm;
 
     /// Constructor
@@ -1259,7 +1259,7 @@ unittest
     write("Done.\n");
 }
 
-class MatrixT : MatrixAbstract!T {
+class Matrix(T) : MatrixAbstract!T {
     T[] mat;
 
     /// Simple constructor

@@ -12,9 +12,13 @@ One of the auxiliary goal of this project is to cut any dependencies between the
 and the recurrent neural netwroks to enable anyone to use it independently.
 
 ## Daily Todo
-* test MatrixLayer
-* write BiasLayer
-* Remove S generalization (only useful for permutation matrix for really small networks).
+* cov: Layer, Matrix
+* to! to handle complex in initialization and alike
+* wip: Neural Networks
+  * addLayer meta-logic (from, to, name)
+  * compute logic
+* dropout
+* randclone weigths: serialized_data holds all weigths -> can be constructed using smaller array with random cloning.
 
 
 # TODO

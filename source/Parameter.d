@@ -2,6 +2,7 @@ module source.Parameter;
 
 import std.algorithm;
 import std.complex;
+import std.conv: to;
 import std.exception: assertThrown;
 import std.math;
 import std.datetime;
@@ -72,10 +73,7 @@ class Vector(T) : Parameter {
 
         if (randomBound.abs == 0) {
             static if (is(Complex!T : T)) {
-                foreach(i; length.iota) v[i] = complex(0,0);
-            }
-            else {
-                foreach(i; length.iota) v[i] = 0;
+                foreach(i; length.iota) v[i] = to!(T)(0);
             }
         }
         else {
@@ -114,7 +112,7 @@ class Vector(T) : Parameter {
 
     /// Assign value by index.
     pure @nogc @safe
-    void opIndexAssign(T value, S i)
+    void opIndexAssign(T value, size_t i)
     {
         v[i] = value;
     }
@@ -542,7 +540,7 @@ unittest
 
     // Diagonal.
     {
-        alias Diag = DiagonalMatrix!(uint, float);
+        alias Diag = DiagonalMatrix!float;
         auto m1 = new Diag(1_000, 1.0f);
         auto v2 = new Vectoruf(m1.mat);
         auto vr = new Vectoruf(1_000, 1000.0f);
@@ -559,7 +557,7 @@ unittest
 
     // Permutation
     {
-        alias Perm = PermutationMatrix!(uint, float);
+        alias Perm = PermutationMatrix!float;
         auto p = new Perm(1_000, 1);
         auto vp = new Vectoruf(1_000, 0.01f);
         auto vpcop = new Vectoruf(vp);
@@ -598,8 +596,8 @@ unittest
         assert(v1.norm!"L2" < 0.0001);
     }
     {
-        auto matr = new ReflectionMatrix!(size_t, real)(1_000, 1.0f);
-        auto matu = new ReflectionMatrix!(size_t, real)(matr);
+        auto matr = new ReflectionMatrix!real(1_000, 1.0f);
+        auto matu = new ReflectionMatrix!real(matr);
         //
         auto tmp = new Vector!real(matr.vec);
         tmp -= matu.vec;
@@ -622,7 +620,7 @@ unittest
 
     // Fourier
     {
-        alias Fourier = FourierMatrix!(size_t, Complex!double);
+        alias Fourier = FourierMatrix!(Complex!double);
         auto f = new Fourier(pow(2, 11));
         auto v = new Vector!(Complex!double)(pow(2, 11), 1.0);
 

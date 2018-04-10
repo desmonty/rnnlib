@@ -60,13 +60,14 @@ abstract class Layer(T)
     string name;
 
     /// Sizes
-    S size_in;
-    S size_out;
+    size_t size_in;
+    size_t size_out;
 
     /// Parameter, Layer-specific
     Parameter[] params = null;
 
     /// Used
+    @nogc @safe pure 
     void set_name(string _name)
     {
         if (_name !is null)
@@ -79,8 +80,9 @@ abstract class Layer(T)
 /+ This layer implement a simple linear matrix transformation
    applied to the vector.
  +/
-class MatrixLayer(S,T) : Layer!T
+class MatrixLayer(T) : Layer!T
 {
+    @safe pure
     this(MatrixAbstract!T _M)
     {
         params = new Parameter[1];
@@ -121,9 +123,10 @@ unittest {
 /+ This layer implement a simple linear matrix transformation
    applied to the vector.
  +/
-class BiasLayer(S,T) : Layer!T
+class BiasLayer(T) : Layer!T
 {
-    this(const S size_in, const Tc randomBound)
+    @safe
+    this(const size_t size_in, const Tc randomBound)
     {
         params = new Parameter[1];
         params[0] = new Vector!T(size_in, randomBound);
@@ -165,7 +168,7 @@ unittest {
 /+ This layer can implement any function that take as input a
    Vector!T and return another Vector!T.
  +/
-class FunctionalLayer(S,T) : Layer!T
+class FunctionalLayer(T) : Layer!T
 {
     /++This implements common functions that are not implemented already.
      + It includes the following:
@@ -179,7 +182,8 @@ class FunctionalLayer(S,T) : Layer!T
         Vector!T delegate(Vector!T, Parameter[]) func;
     }
 
-    this(string easyfunc, in S size_in=0)
+
+    this(string easyfunc, in size_t size_in=0)
     {
         switch (easyfunc)
         {
@@ -209,7 +213,7 @@ class FunctionalLayer(S,T) : Layer!T
                             auto res = _v.dup;
                             foreach(i; 0 .. _v.length) {
                                 absv = _v[i].abs;
-                                tmp = absv + (cast(Vector!_vTc)) _p[0])[i];
+                                tmp = absv + (cast(Vector!Tc) _p[0])[i];
                                 if (tmp > 0) {
                                     res[i] = tmp*_v[i]/absv;
                                 }
@@ -253,6 +257,7 @@ class FunctionalLayer(S,T) : Layer!T
     }
 
     // The function to apply to the vector. Can be anything. DELEGATE
+    @safe pure
     this(Vector!T delegate(Vector!T) _func)
     {
         func = delegate(Vector!T _v, Parameter[] _p) {
@@ -261,6 +266,7 @@ class FunctionalLayer(S,T) : Layer!T
     }
 
     // The function to apply to the vector. Can be anything. FUNCTION
+    pure
     this(Vector!T function(Vector!T) _func)
     {
         this(toDelegate(_func));
@@ -268,6 +274,7 @@ class FunctionalLayer(S,T) : Layer!T
 
     // Create an element-wise function that apply a provided
     // function to a vector. DELEGATE
+    @safe pure
     this(T delegate(T) _func)
     {
         func = delegate(Vector!T _v, Parameter[] _p) {
@@ -280,12 +287,14 @@ class FunctionalLayer(S,T) : Layer!T
 
     // Create an element-wise function that apply a provided
     // function to a vector. FUNCTION
+    pure
     this(T function(T) _func)
     {
         this(toDelegate(_func));
     }
 
-    this(in S size)
+    @safe pure
+    this(in size_t size)
     {
         this(delegate(Vector!T _v) {
                 enforce(_v.length == size, "Size mismatch in FunctionalLayer:\n"
@@ -405,14 +414,15 @@ unittest {
     for description.
 
     Template Args:
-        S: type of the indices.
         T: type of the vector's elements.
  +/
-auto createPoolingFunction(S, T)(in S height, in S width,
-                                 in S stride_height, in S stride_width,
-                                 in S frame_height, in S frame_width,
-                                 in S[] cut_height, in S[] cut_width,
-                                 T delegate(InputRange!T) reducer)
+
+@safe
+auto createPoolingFunction(T)(in size_t height, in size_t width,
+                              in size_t stride_height, in size_t stride_width,
+                              in size_t frame_height, in size_t frame_width,
+                              in size_t[] cut_height, in size_t[] cut_width,
+                              T delegate(InputRange!T) reducer)
 {
     /+  This function create a delegate.
         That delegate take as input a vector and apply
@@ -421,14 +431,14 @@ auto createPoolingFunction(S, T)(in S height, in S width,
         and the rest are seen in a "Left-Right/Top-Left" fashion.
 
         Args:
-            height (S): height of the picture (let's assume it's a pic). 
-            width (S): width of the picture (let's assume it's a pic). 
-            stride_height (S): number of pixel to move to take the next frame
-            stride_width (S): number of pixel to move to take the next frame
-            frame_height (S): height of the frame to look at
-            frame_width (S): width of the frame to look at
-            cut_height (S[]): List of indices to cut the frame (see below).
-            cut_width (S[]): List of indices to cut the frame (see below).
+            height (size_t): height of the picture (let's assume it's a pic). 
+            width (size_t): width of the picture (let's assume it's a pic). 
+            stride_height (size_t): number of pixel to move to take the next frame
+            stride_width (size_t): number of pixel to move to take the next frame
+            frame_height (size_t): height of the frame to look at
+            frame_width (size_t): width of the frame to look at
+            cut_height (size_t[]): List of indices to cut the frame (see below).
+            cut_width (size_t[]): List of indices to cut the frame (see below).
             reducer (T delegate(InputRange)): Function that takes an InputRange
                 and return a value. This is used to define how you want to
                 reduce each cut of the frame (max pooling, average pooling, ...)
@@ -485,7 +495,7 @@ auto createPoolingFunction(S, T)(in S height, in S width,
         enforce(maxElement(cut_width) < width, "max(cut_width) must be < width-1");
         enforce(isSorted(cut_width), "cut_width must be sorted");
 
-        for (S tmp = 0; tmp < cut_width.length-1;)
+        for (size_t tmp = 0; tmp < cut_width.length-1;)
             enforce(cut_width[tmp] < cut_width[++tmp],
                    "cut_width cannot contains doublons");
     }
@@ -494,17 +504,17 @@ auto createPoolingFunction(S, T)(in S height, in S width,
         enforce(maxElement(cut_height) < height, "max(cut_height) must be < height-1");
         enforce(isSorted(cut_height), "cut_height must be sorted");
 
-        for (S tmp = 0; tmp < cut_height.length-1;)
+        for (size_t tmp = 0; tmp < cut_height.length-1;)
             enforce(cut_height[tmp] < cut_height[++tmp],
                    "cut_height cannot contains doublons");
     }
 
 
     // TODO: test the magic formula
-    S lenRetVec = (cast(S) cut_height.length + 1)
-                  *(cast(S) cut_width.length  + 1)
-                  *(1 + (height - frame_height) / stride_height)
-                  *(1 + (width  - frame_width)  / stride_width);
+    size_t lenRetVec = (cut_height.length + 1)
+                      *(cut_width.length  + 1)
+                      *(1 + (height - frame_height) / stride_height)
+                      *(1 + (width  - frame_width)  / stride_width);
 
     return delegate(in Vector! T _v) {
         auto res = new Vector! T(lenRetVec, 0.1);
@@ -517,7 +527,7 @@ auto createPoolingFunction(S, T)(in S height, in S width,
         static class CellRange: InputRange!T{
           private
           {
-            S pos_x, pos_y,
+            size_t pos_x, pos_y,
               cur_pos,
               cell_w, cell_h,
               shift, width;
@@ -527,8 +537,9 @@ auto createPoolingFunction(S, T)(in S height, in S width,
             bool is_empty = false;
           }
 
-            this(in S _pos_x, in S _pos_y, in S _cell_w,
-                 in S _cell_h, in S _width,
+            @nogc @safe pure
+            this(in size_t _pos_x, in size_t _pos_y, in size_t _cell_w,
+                 in size_t _cell_h, in size_t _width,
                  ref const Vector!T _v)
             {
                 cur_pos = _pos_y * _width + _pos_x;
@@ -543,23 +554,25 @@ auto createPoolingFunction(S, T)(in S height, in S width,
             }
 
             @property
-            const
+            @nogc @safe pure const
             T front()
             {
                 return vec[cur_pos];
             }
 
+            @nogc @safe pure
             T moveFront()
             {
                 return vec[cur_pos];
             }
 
+            @nogc @safe pure
             void popFront()
             {
             }
 
             @property
-            const
+            @nogc @safe pure const
             bool empty()
             {
                 return is_empty;
@@ -569,7 +582,7 @@ auto createPoolingFunction(S, T)(in S height, in S width,
             {
                 int result;
 
-                S tmp = cur_pos;
+                size_t tmp = cur_pos;
                 T tmp_val;
                 outer: for (pos_y = 0; pos_y <= cell_h; ++pos_y) {
                     for (pos_x = 0; pos_x <= cell_w; ++pos_x) {
@@ -589,7 +602,7 @@ auto createPoolingFunction(S, T)(in S height, in S width,
             {
                 int result;
 
-                S tmp = cur_pos;
+                size_t tmp = cur_pos;
                 T tmp_val;
 
                 outer: for (pos_y = 0; pos_y <= cell_h; ++pos_y) {
@@ -614,16 +627,17 @@ auto createPoolingFunction(S, T)(in S height, in S width,
          +/
         static struct FrameRange {
             private {
-                const S[] arr;
-                const S width;
+                const size_t[] arr;
+                const size_t width;
             }
 
-            this(ref const S[] _arr, const S _width) {
+            @nogc @safe pure
+            this(ref const size_t[] _arr, const size_t _width) {
                 arr = _arr;
                 width = _width;
             }
             
-            int opApply(scope int delegate(S) dg)
+            int opApply(scope int delegate(size_t) dg)
             {
                 int result;
 
@@ -640,7 +654,7 @@ auto createPoolingFunction(S, T)(in S height, in S width,
                 return result;
             }
             
-            int opApply(scope int delegate(S, S) dg)
+            int opApply(scope int delegate(size_t, size_t) dg)
             {
                 int result;
 
@@ -649,7 +663,7 @@ auto createPoolingFunction(S, T)(in S height, in S width,
                 if (!arr)
                     return dg(width, 0);
 
-                S frame_len = arr[0];
+                size_t frame_len = arr[0];
 
                 result = dg(frame_len, 0);
                 if (result)
@@ -670,10 +684,10 @@ auto createPoolingFunction(S, T)(in S height, in S width,
             }
         }
 
-        S tmp_fr_x, tmp_fr_y,
-          cell_h, cell_w,
-          tmp_y, tmp_x,
-          index = 0;
+        size_t tmp_fr_x, tmp_fr_y,
+               cell_h, cell_w,
+               tmp_y, tmp_x,
+               index = 0;
 
         CellRange cell_range;
         auto f_range_width = FrameRange(cut_width, frame_width);
@@ -705,19 +719,18 @@ auto createPoolingFunction(S, T)(in S height, in S width,
 unittest {
     write("Unittest: Utils: createPoolingFunction ...");
 
-    alias S = int;
     static struct FrameRange {
         private {
-            const(S)[] arr;
-            const(S) width;
+            const(size_t)[] arr;
+            const(size_t) width;
         }
 
-        this(ref in S[] _arr, in S _width) {
+        this(ref in size_t[] _arr, in size_t _width) {
             arr = _arr;
             width = _width;
         }
         
-        int opApply(scope int delegate(S) dg)
+        int opApply(scope int delegate(size_t) dg)
         {
             int result;
 
@@ -734,11 +747,11 @@ unittest {
             return result;
         }
         
-        int opApply(scope int delegate(S, S) dg)
+        int opApply(scope int delegate(size_t, size_t) dg)
         {
             int result;
 
-            S frame_len = arr[0];
+            size_t frame_len = arr[0];
 
             result = dg(frame_len, 0);
             if (result)
@@ -759,14 +772,14 @@ unittest {
         }
     }
 
-    int[] av = [1, 3];
-    int[] lenav = [1, 2, 2];
-    int[] valav = [0, 1, 3];
-    int width = 5;
+    size_t[] av = [1, 3];
+    size_t[] lenav = [1, 2, 2];
+    size_t[] valav = [0, 1, 3];
+    size_t width = 5;
 
     auto fr = FrameRange(av, width);
 
-    int tmp_index = 0;
+    size_t tmp_index = 0;
     foreach(a, b; fr){
         assert((a == lenav[tmp_index]) && (b == valav[tmp_index]));
         tmp_index += 1;
