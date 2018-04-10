@@ -108,6 +108,7 @@ class MatrixAbstract(T) : Parameter {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
+        import std.stdio: writeln;
         // TODO: Refactor.
         auto tmptypeId = split(typeId, "!")[0];
         switch (tmptypeId)
@@ -174,6 +175,12 @@ unittest
     auto em_hyde = list_mat[7];
 
 
+    auto mr = new Matrix!real(len, 5.6);
+    auto dr = new DiagonalMatrix!real(len, 5.6);
+
+    auto list_mat2 = [mr, dr];
+    auto mr_hyde = list_mat[0];
+
     auto v = new Vector!(Complex!real)(len);
     auto w = new Vector!(Complex!real)(len/4);
     foreach(i; 0 .. len)
@@ -199,29 +206,28 @@ unittest
     v3 -= v2; assert(v3.norm!"L2" < 0.01);
     v2 -= v; assert(v2.norm!"L2" > 1.0);
 
+    // class ErrorMatrix is not handled by MatrixAbstract in multiplication.
     bool error = false;
     try {
         auto ver = em_hyde * v;
     }
-    catch (AssertError e) {
-        error = true;
-    }
+    catch (AssertError e) { error = true; }
     assert(error);
+
+    // Same as above, but with division.
     error = false;
     try {
         auto ver = v / em_hyde;
     }
-    catch (AssertError e) {
-        error = true;
-    }
+    catch (AssertError e) { error = true; }
     assert(error);
+
+    // Division by a Matrix is not implemented.
     error = false;
     try {
         auto ver = v / mm_hyde;
     }
-    catch (AssertError e) {
-        error = true;
-    }
+    catch (AssertError e) { error = true; }
     assert(error);
 
     write("Done.\n");

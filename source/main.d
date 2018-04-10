@@ -12,6 +12,7 @@ import source.Layer;
 import source.Matrix;
 import source.NeuralNetwork;
 import source.Parameter;
+import source.Utils;
 
 void main()
 {
