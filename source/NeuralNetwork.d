@@ -55,14 +55,26 @@ class NeuralNetwork(T) {
         Layer!T[string] layers;
         string[][string] input_layers;
         string[][string] output_layers;
+        T delegate(T,T)[] in_reducers;
 
         T[] serialized_data;
     }
 
     auto
-    addLinearLayer(in string[] _from=null, in string[] _to=null,
-                   in bool use_bias=false)
+    addLinearLayer(in size_t _size_out=0,
+                   in bool use_bias=false,
+                   in string _name="",
+                   in string[] _from=null,
+                   in string[] _to=null,
+                   T delegate(T,T) reducer=delegate(T lhs, T rhs) {
+                                                return lhs + rhs;
+                                            })
     {
+        if (!_size_out)
+            _size_out = 0; // TODO
+
+        if (_name && (_name in layers))
+            throw new Exception(_name~" is already used as a name.");
 
 
 

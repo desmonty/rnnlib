@@ -12,8 +12,6 @@ One of the auxiliary goal of this project is to cut any dependencies between the
 and the recurrent neural netwroks to enable anyone to use it independently.
 
 ## Daily Todo
-* cov: Layer, Matrix
-* to! to handle complex in initialization and alike
 * wip: Neural Networks
   * addLayer meta-logic (from, to, name)
   * compute logic
@@ -27,17 +25,16 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * Optimization
       * Use a single "dot" product and optimize it.
       * Matrix abstract multiplication: mult(auto override this T)
-    * Add Documentation
   * _Vectors_
     * Optimization
       * alias array for vector ?
       * use arrayfire ? 
-    * Add Documentation
   * _Layers_
-    * Linear
-    * Functional
-    * Recurrent
-    * Add Documentation
+    * ~Linear~
+    * ~Functional~
+    * ~Recurrent~
+  * _Neural Network_
+    * 
 * TRAINING
   * _Evolutionary Algorithms_
     * Evolution Strategy
@@ -64,9 +61,18 @@ and the recurrent neural netwroks to enable anyone to use it independently.
     * [Gym](https://gym.openai.com/)
     * [Universe](https://github.com/openai/universe)
     * Zbaghul
-* Format
+* DOCUMENTATION
+  * Vector
+  * Matrix
+  * Layer
+  * Neural Network
+  * Optimization Algorithms
+    * EA
+    * OGFO
+* FORMAT
   * CodeCov
   * Travis CI ?
   * [Command Line git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) (+ .gitignore)
   * dub
   * [For most of these](https://github.com/libmir/mir-algorithm)
+
