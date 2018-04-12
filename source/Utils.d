@@ -146,14 +146,13 @@ struct FrameRange
 }
 
 
-/+  Function that create a general pooling function
+/++ Function that create a general pooling function
  +  See https://en.wikipedia.org/wiki/Convolutional_neural_network#Pooling_layer
  +  for description.
  +
  +  Template Args:
  +      T: type of the vector's elements.
  +/
-
 @safe
 auto createPoolingFunction(T)(in size_t height, in size_t width,
                               in size_t stride_height, in size_t stride_width,
