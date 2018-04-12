@@ -83,16 +83,29 @@ abstract class Layer(T)
 class MatrixLayer(T) : Layer!T
 {
     @safe pure
-    this(MatrixAbstract!T _M)
+    this(MatrixAbstract!T _M, in size_t _size_bias=0)
     {
-        params = new Parameter[1];
+        size_t num_param = 1;
+        if (_size_bias)
+            num_param = 2;
+
+        params = new Parameter[num_param];
         params[0] = _M;
+
+        if (_size_bias){
+            auto vec = new Vector!T(_size_bias);
+            vec.v[] = to!T(0);
+            params[1] = vec;
+        }
     }
     
     override
     Vector!T compute(Vector!T _v)
     {
-        return to!(MatrixAbstract!T)(params[0]) * _v;
+        auto res = cast(MatrixAbstract!T) params[0] * _v;
+        if (params.length > 1)
+            res += cast(Vector!T) params[1];
+        return res;
     }
 }
 unittest {

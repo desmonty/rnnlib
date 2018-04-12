@@ -48,6 +48,7 @@ class NeuralNetwork(T) {
     private {
         Layer!T[] layers;
         Vector!T[] results;
+        Vector!T[] states;
         size_t[][] input_layers;
         size_t size;
         size_t[string] name_to_id;
@@ -57,8 +58,11 @@ class NeuralNetwork(T) {
 
     this(in size_t _dim_in)
     {
-        results = [null]; // Undefined, this will be the input.
-        input_layers = [null]; // Undefined, this is the input.
+        // We set the first elements of these arrays to null because
+        // the first layer is the "Input". 
+        states = [null];
+        results = [null];
+        input_layers = [null];
         size = 1;
     }
 
@@ -79,7 +83,7 @@ class NeuralNetwork(T) {
     addLinearLayer(in size_t _dim_out,
                    in bool _use_bias=false,
                    in string[] _in=null,
-                   in string[] _to=null
+                   in string[] _to=null,
                    in string _name=null,
                    in Vector!T _init_state=null,
                    T delegate(T,T) _reducer=null)
@@ -98,10 +102,11 @@ class NeuralNetwork(T) {
             _inputs = [size - 1];
         input_layers ~= _inputs;
 
+        // Linear Layers don't have any internal states vectors.
+        states ~= [null];
 
 
-
-
+        auto tmp_layer = new MatrixLayer!T();
 
 
 
