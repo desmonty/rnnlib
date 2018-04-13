@@ -105,9 +105,7 @@ class NeuralNetwork(T) {
         // Linear Layers don't have any internal states vectors.
         states ~= [null];
 
-
         auto tmp_layer = new MatrixLayer!T();
-
 
 
         return this;
@@ -121,7 +119,7 @@ class NeuralNetwork(T) {
     }
 }
 unittest {
-        write("Unittest: NeuralLayer ... ");
+        write("Unittest: NeuralNetwork ... ");
 
         writeln("Done");
 }

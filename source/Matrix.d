@@ -55,6 +55,38 @@ class MatrixAbstract(T) : Parameter {
         super(true);
     }
 
+    const @property
+    MatrixAbstract!T dup()
+    {
+        auto tmptypeId = split(typeId, "!")[0];
+        switch (tmptypeId)
+        {
+            case "BlockMatrix":
+                return cast(MatrixAbstract!T) (cast(BlockMatrix!T) this).dup();
+            case "UnitaryMatrix":
+                static if (is(Complex!T : T)) {
+                    return cast(MatrixAbstract!T) (cast(UnitaryMatrix!T) this).dup();
+                }
+                else assert(0, "Unitary matrices must be of complex type.");
+            case "DiagonalMatrix":
+                return cast(MatrixAbstract!T) (cast(DiagonalMatrix!T) this).dup();
+            case "ReflectionMatrix":
+                return cast(MatrixAbstract!T) (cast(ReflectionMatrix!T) this).dup();
+            case "PermutationMatrix":
+                return cast(MatrixAbstract!T) (cast(PermutationMatrix!T) this).dup();
+            case "FourierMatrix":
+                static if (is(Complex!T : T)) {
+                    return cast(MatrixAbstract!T) (cast(FourierMatrix!T) this).dup();
+                }
+                else assert(0, "Fourier matrices must be of complex type.");
+            case "Matrix":
+                return cast(MatrixAbstract!T) (cast(Matrix!T) this).dup();
+            default:
+                assert(0, tmptypeId~" is not in the 'switch'
+                                      clause of MatrixAbstract");
+        }
+    }
+
     const
     Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
@@ -500,8 +532,9 @@ if (is(Complex!T : T))
         res.params = M.params.dup;
     }
 
+    override
     const @property 
-    auto dup()
+    UnitaryMatrix!T dup()
     {
         return new UnitaryMatrix(this);
     }
@@ -654,8 +687,9 @@ if (is(Complex!T : T))
         this(M.rows);
     }
 
+    override
     const @property
-    auto dup()
+    FourierMatrix!T dup()
     {
         return new FourierMatrix(this);
     }
@@ -767,8 +801,9 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     }
 
 
-    const @property pure @safe
-    auto dup()
+    override
+    const @property
+    DiagonalMatrix!T dup()
     {
         return new DiagonalMatrix(this);
     }
@@ -1013,8 +1048,9 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     }
 
 
-    const @property pure @safe
-    auto dup()
+    override
+    const @property
+    ReflectionMatrix!T dup()
     {
         return new ReflectionMatrix(this);
     }
@@ -1188,8 +1224,9 @@ class PermutationMatrix(T) : MatrixAbstract!T {
     }
 
 
-    const @property pure @safe
-    auto dup()
+    override
+    const @property
+    PermutationMatrix!T dup()
     {
         return new PermutationMatrix(this);
     }
@@ -1321,8 +1358,9 @@ class Matrix(T) : MatrixAbstract!T {
         }
     }
 
-    const @property pure @safe
-    auto dup()
+    override
+    const @property
+    Matrix!T dup()
     {
         return new Matrix(this);
     }

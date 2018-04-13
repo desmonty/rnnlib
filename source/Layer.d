@@ -23,7 +23,7 @@ version(unittest)
 /+  The layers of the Neural Networks.
 
     Basically, each layer can be seen as a function, which take a vector and
-    return another vecotr of a possibly different length. Those functions have
+    return another vector of a possibly different length. Those functions have
     parameters (matrix, bias, ..) which are specific to each kind of layer
     (linear, recurrent, ..). All the logic of how these layers are assembled is
     in the NeuralNet object.
@@ -82,21 +82,86 @@ abstract class Layer(T)
  +/
 class MatrixLayer(T) : Layer!T
 {
-    @safe pure
-    this(MatrixAbstract!T _M, in size_t _size_bias=0)
+
+    this(MatrixAbstract!T _M)
+    {
+        params = new Parameter[1];
+        params[0] = _M.dup;
+    }
+
+    this(MatrixAbstract!T _M,
+         Vector!T _v)
     {
         size_t num_param = 1;
-        if (_size_bias)
+        if (_v){
             num_param = 2;
+            enforce(_M.rows == _v.length, "Matrix-Vector dimensions mismatch.");
+        }
 
         params = new Parameter[num_param];
-        params[0] = _M;
+        params[0] = _M.dup;
 
-        if (_size_bias){
-            auto vec = new Vector!T(_size_bias);
-            vec.v[] = to!T(0);
-            params[1] = vec;
+        if (_v)
+            params[1] = _v.dup;
+    }
+
+
+    this(immutable string _matrix_type,
+         in size_t[2] _dim,
+         in bool _bias=false,
+         in Tc _random_init=0)
+    {
+        if (_matrix_type == "Block")
+            throw new Exception("Block matrix need to be created by the user.");
+        
+        Vector!T v = null;
+        if (_bias)
+            v = new Vector!T(_dim[0], _random_init);
+
+        MatrixAbstract!T m;
+
+        if(_matrix_type == "Matrix") {
+            m = new Matrix!T(_dim[0], _random_init);
         }
+        else {
+            enforce(_dim[0]==_dim[1], _matrix_type~"Matrix must be a square.");
+            switch (_matrix_type)
+            {
+                case "Unitary":
+                    static if (is(Complex!T : T)) {
+                        m = new UnitaryMatrix!T(_dim[0], _random_init);
+                    }
+                    else assert(0, "Unitary matrices must be of complex type.");
+                    break;
+                case "Diagonal":
+                    m = new DiagonalMatrix!T(_dim[0], _random_init);
+                    break;
+                case "Reflection":
+                    m = new ReflectionMatrix!T(_dim[0], _random_init);
+                    break;
+                case "Permutation":
+                    m = new PermutationMatrix!T(_dim[0], _random_init);
+                    break;
+                case "Fourier":
+                    static if (is(Complex!T : T)) {
+                        m = new FourierMatrix!T(_dim[0]);
+                    }
+                    else assert(0, "Fourier matrices must be of complex type.");
+                    break;
+                default:
+                    assert(0, "Unrecognized matrix type: "~_matrix_type);
+            }
+        }
+
+        this(m, v);
+    }
+
+    this(immutable string _matrix_type,
+         in size_t _dim,
+         in bool _bias=false,
+         in Tc _random_init=0)
+    {
+        this(_matrix_type, [_dim, _dim], _bias, _random_init);
     }
     
     override
@@ -110,7 +175,7 @@ class MatrixLayer(T) : Layer!T
 }
 unittest {
     write("Unittest: Layer: Matrix ... ");
-
+/+
     auto v = new Vector!real(4, 1.0);
 
     auto r = new ReflectionMatrix!real(2, 1.0);
@@ -118,6 +183,7 @@ unittest {
     auto m = new BlockMatrix!real(4, 4, 2, [r, d], true);
 
     auto l = new MatrixLayer!real(m);
+    auto k = new MatrixLayer!real(d, v);
 
     auto w = v.dup;
 
@@ -131,6 +197,8 @@ unittest {
     assert(v.norm!"L2" <= 0.00001);
 
     write("Done.\n");
++/
+    write("TODO.\n");
 }
 
 /+ This layer implement a simple linear matrix transformation
