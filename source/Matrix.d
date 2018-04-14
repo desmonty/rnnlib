@@ -19,7 +19,7 @@ version(unittest)
     import core.exception;
 }
 
-
+pure @safe 
 auto dot(R1, R2)(in R1[] lhs, in R2[] rhs)
 {
     R1 s = lhs[0] * rhs[0];
@@ -58,8 +58,9 @@ class MatrixAbstract(T) : Parameter {
     const @property
     MatrixAbstract!T dup()
     {
-        auto tmptypeId = split(typeId, "!")[0];
-        switch (tmptypeId)
+        import std.stdio: writeln;
+        writeln("Hey There"~ typeId, " ", rows, " ", cols);
+        switch (typeId)
         {
             case "BlockMatrix":
                 return cast(MatrixAbstract!T) (cast(BlockMatrix!T) this).dup();
@@ -82,8 +83,8 @@ class MatrixAbstract(T) : Parameter {
             case "Matrix":
                 return cast(MatrixAbstract!T) (cast(Matrix!T) this).dup();
             default:
-                assert(0, tmptypeId~" is not in the 'switch'
-                                      clause of MatrixAbstract");
+                assert(0, "'"~typeId~"' is not in the 'switch' "~
+                                      "clause of MatrixAbstract");
         }
     }
 
@@ -98,9 +99,9 @@ class MatrixAbstract(T) : Parameter {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         // TODO: Refactor. This is ugly but one can't simply use mixin here.
-        auto tmptypeId = split(typeId, "!")[0];
-        switch (tmptypeId)
+        switch (typeId)
         {
             case "BlockMatrix":
                 return cast(BlockMatrix!T) this * v;
@@ -123,8 +124,8 @@ class MatrixAbstract(T) : Parameter {
             case "Matrix":
                 return cast(Matrix!T) this * v;
             default:
-                assert(0, tmptypeId~" is not in the 'switch'
-                                      clause of MatrixAbstract");
+                assert(0, "'"~typeId~"' is not in the 'switch' "~
+                                      "clause of MatrixAbstract");
         }
     }
 
@@ -140,10 +141,9 @@ class MatrixAbstract(T) : Parameter {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        import std.stdio: writeln;
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         // TODO: Refactor.
-        auto tmptypeId = split(typeId, "!")[0];
-        switch (tmptypeId)
+        switch (typeId)
         {
             case "BlockMatrix":
                 return v / cast(BlockMatrix!T) this;
@@ -167,8 +167,8 @@ class MatrixAbstract(T) : Parameter {
                 assert(0, "Division by a general matrix
                            is not yet implemented.");
             default:
-                assert(0, tmptypeId~" is not in the 'switch'
-                                      clause of MatrixAbstract");
+                assert(0, "'"~typeId~"' is not in the 'switch' "~
+                                      "clause of MatrixAbstract");
         }
     }
 }
@@ -178,10 +178,10 @@ unittest
 
 
     class ErrorMatrix(T) : MatrixAbstract!T {
-        this() {
+        this(immutable size_t _r, immutable size_t _c) {
             typeId = "ErrorMatrix";
-            rows = 0;
-            cols = 0;
+            rows = _r;
+            cols = _c;
         }
     }
 
@@ -194,7 +194,7 @@ unittest
                                                     false);
     auto um = new UnitaryMatrix!(Complex!real)(len, 3.14159265351313);
     auto mm = new Matrix!(Complex!real)(len, 5.6);
-    auto em = new ErrorMatrix!(Complex!real)();
+    auto em = new ErrorMatrix!(Complex!real)(len, len);
 
     auto list_mat = [m1, m2, m3, m4, bm, um, mm, em];
     auto m1_hyde = list_mat[0];
@@ -353,6 +353,21 @@ class BlockMatrix(T) : MatrixAbstract!T {
         this(size_in, size_in, size_blocks, blocks, randperm);
     }
 
+    override
+    const @property
+    BlockMatrix!T dup()
+    {
+        auto res = new BlockMatrix!T(size_in, size_out, size_blocks);
+        res.P = P.dup;
+        res.Q = Q.dup;
+        res.blocks = new MatrixAbstract!T[res.num_blocks];
+
+        foreach(i; 0 .. res.num_blocks)
+            res.blocks[i] = blocks[i].dup;
+
+        return res;
+    }
+
     const
     auto opBinary(string op)(in Vector!T v)
     if (op=="*")
@@ -365,6 +380,7 @@ class BlockMatrix(T) : MatrixAbstract!T {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         T[] vec = this.P * v;
 
         size_t blocks_in = size_in / size_blocks;
@@ -405,7 +421,8 @@ class BlockMatrix(T) : MatrixAbstract!T {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        enforce(size_out == size_in, "Warning: Inverse of rectangular
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(size_out == size_in, "Inverse of rectangular
                                       block matrix is not implemented");
         T[] vec = v / this.Q;
 
@@ -594,6 +611,7 @@ if (is(Complex!T : T))
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         T[] res = v.dup;
 
         applyDiagonal(res, 0);
@@ -623,6 +641,7 @@ if (is(Complex!T : T))
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         T[] res = v.dup;
 
         applyDiagonalInv(res, 2);
@@ -705,6 +724,7 @@ if (is(Complex!T : T))
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         return objFFT.fft!Tc(v);
     }
 
@@ -713,6 +733,7 @@ if (is(Complex!T : T))
     Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         return new Vector!T(v.v / this);
     }
 
@@ -857,16 +878,14 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
-        auto vres = v.dup;
-        foreach(i; 0 .. v.length)
-            vres[i] = mat[i] * vres[i];
-        return vres;
+        return new Vector!T(this * v.v);
     }
 
     const pure @safe
     auto opBinary(string op)(in T[] other)
     if (op=="*")
     {
+        enforce(other.length == cols, "Matrix-Vector dimensions mismatch.");
         auto res = new T[other.length];
         foreach(i;0 .. rows)
             res[i] = mat[i] * other[i];
@@ -884,6 +903,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     auto opBinaryRight(string op)(in T[] other)
     if (op=="/")
     {
+        enforce(other.length == cols, "Matrix-Vector dimensions mismatch.");
         auto res = new T[other.length];
         foreach(i;0 .. rows)
             res[i] = other[i] / mat[i];
@@ -1083,6 +1103,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         T[] vres = v.dup;
         T s = vec.conjdot(v, vec);
         T[] tmp = vec.v.dup;
@@ -1104,7 +1125,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        // This is not a bug !
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         // The inverse of a reflection is the very same reflection.
         T[] vres = v.dup;
         T s = vec.conjdot(v, vec);
@@ -1261,6 +1282,7 @@ class PermutationMatrix(T) : MatrixAbstract!T {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         auto vres = new T[v.length];
         foreach(i; 0 .. v.length)
             vres[i] = v[perm[i]];
@@ -1278,6 +1300,7 @@ class PermutationMatrix(T) : MatrixAbstract!T {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
         auto vres = new T[v.length];
         foreach(i; 0 .. v.length)
             vres[perm[i]] = v[i];
@@ -1404,8 +1427,7 @@ class Matrix(T) : MatrixAbstract!T {
     auto opBinary(string op)(in Matrix other)
     if (op == "*")
     {
-        enforce(cols == other.rows,
-            "This is not a correct matrix multiplication");
+        enforce(cols == other.rows,"Matrix-Matrix dimensions mismatch.");
         auto res = new Matrix(rows, other.cols);
         foreach(i;0 .. rows) {
             foreach(j; 0 .. other.cols) {
@@ -1430,7 +1452,8 @@ class Matrix(T) : MatrixAbstract!T {
     auto opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        auto res = new T[v.length];
+        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        auto res = new T[rows];
         foreach(size_t i; 0 .. rows){
             T s = mat[i*cols]*v[0];
             foreach(size_t j; 1 .. cols)

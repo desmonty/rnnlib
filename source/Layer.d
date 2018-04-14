@@ -95,7 +95,7 @@ class MatrixLayer(T) : Layer!T
         size_t num_param = 1;
         if (_v){
             num_param = 2;
-            enforce(_M.rows == _v.length, "Matrix-Vector dimensions mismatch.");
+            enforce(_M.rows == _v.length, "Matrix / Bias dimensions mismatch.");
         }
 
         params = new Parameter[num_param];
@@ -121,7 +121,7 @@ class MatrixLayer(T) : Layer!T
         MatrixAbstract!T m;
 
         if(_matrix_type == "Matrix") {
-            m = new Matrix!T(_dim[0], _random_init);
+            m = new Matrix!T(_dim[0], _dim[1], _random_init);
         }
         else {
             enforce(_dim[0]==_dim[1], _matrix_type~"Matrix must be a square.");
@@ -152,7 +152,8 @@ class MatrixLayer(T) : Layer!T
                     assert(0, "Unrecognized matrix type: "~_matrix_type);
             }
         }
-
+        import std.stdio: writeln;
+        writeln(m.typeId);
         this(m, v);
     }
 
@@ -176,25 +177,58 @@ class MatrixLayer(T) : Layer!T
 unittest {
     write("Unittest: Layer: Matrix ... ");
 /+
-    auto v = new Vector!real(4, 1.0);
+    auto v = new Vector!(Complex!real)(4, 1.0);
 
-    auto r = new ReflectionMatrix!real(2, 1.0);
-    auto d = new DiagonalMatrix!real(2, 2.0);
-    auto m = new BlockMatrix!real(4, 4, 2, [r, d], true);
+    auto r = new ReflectionMatrix!(Complex!real)(2, 1.0);
+    auto d = new DiagonalMatrix!(Complex!real)(2, 2.0);
+    auto b = new BlockMatrix!(Complex!real)(4, 4, 2, [r, d], true);
+    auto f = new FourierMatrix!(Complex!real)(4);
 
-    auto l = new MatrixLayer!real(m);
-    auto k = new MatrixLayer!real(d, v);
+    // Fourier
+    {
+        auto mf = new MatrixLayer!(Complex!real)("Fourier", 4, true, 1.0);
+        auto p = cast(Vector!(Complex!real)) mf.params[1];
 
-    auto w = v.dup;
+        auto res1 = mf.compute(v);
+        auto res2 = f * v;
+        res2 += p;
+        res2 -= res1;
 
-    auto r1 = l.compute(v);
-    auto r2 = m * v;
+        assert(p.norm!"L2" > 0.001);
+        assert(res2.norm!"L2" <= 0.001);
+    }
 
-    r2 -= r1;
-    v -= w;
+    // Matrix
+    {
+        auto vec = new Vector!double(4, 1.0);
+        auto mm = new MatrixLayer!double("Matrix", [2, 4], false, 10.0);
+        auto m = cast(Matrix!double) mm.params[0]; 
 
-    assert(r2.norm!"L2" <= 0.00001);
-    assert(v.norm!"L2" <= 0.00001);
+        auto res1 = mm.compute(vec);
+        auto res2 = m * vec;
+        res2 -= res1;
+
+        assert(res2.norm!"L2" <= 0.001);
+        assert(res2.length == 2);
+    }
+
+    // Block
+    {
+        assertThrown(new MatrixLayer!real("Block", [1,2], true, 1.0));
+        assertThrown(new MatrixLayer!real("Block", 2, true, 1.0));
+
+        auto p = new Vector!(Complex!real)(4, 3.1415926535);
+        auto mb = new MatrixLayer!(Complex!real)(b, p);
+        auto m = cast(BlockMatrix!(Complex!real)) mb.params[0];
+
+        auto res1 = mb.compute(v);
+        auto res2 = m * v;
+        res2 += p;
+        res2 -= res1;
+
+        assert(res2.norm!"L2" <= 0.0001);
+    }
+
 
     write("Done.\n");
 +/
