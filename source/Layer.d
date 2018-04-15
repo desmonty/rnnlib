@@ -99,7 +99,8 @@ class MatrixLayer(T) : Layer!T
         }
 
         params = new Parameter[num_param];
-        params[0] = _M.dup;
+        auto tmp = _M.dup;
+        params[0] = tmp;
 
         if (_v)
             params[1] = _v.dup;
@@ -188,8 +189,26 @@ unittest {
     auto b = new BlockMatrix!(Complex!real)(4, 4, 2, [r, d], true);
     auto f = new FourierMatrix!(Complex!real)(4);
 
+
+
+    // Unrecognized matrix type
+    bool err = false;
+    try {
+        auto mf = new MatrixLayer!float("куриста", 34);
+    }
+    catch (AssertError e) { err = true; }
+    assert(err);
+
+
     // Fourier
     {
+        bool error = false;
+        try {
+            auto mf = new MatrixLayer!float("Fourier", 32);
+        }
+        catch (AssertError e) { error = true; }
+        assert(error);
+
         auto mf = new MatrixLayer!(Complex!real)("Fourier", 4, true, 1.0);
         auto p = cast(Vector!(Complex!real)) mf.params[1];
 
@@ -246,11 +265,18 @@ unittest {
         res1 -= res2;
 
         assert(res1.norm!"L2" <= 0.0001);
+
+        mp = new MatrixLayer!float("Permutation", 17);
+        w = new Vector!float(17, 0.1);
+
+        res1 = mp.compute(w);
+
+        assert(abs(w.norm!"L2" - res1.norm!"L2") <= 0.001);
     }
 
     // Reflection
     {
-        auto mr = new MatrixLayer!(Complex!real)("Reflection", 4, false, 0);
+        auto mr = new MatrixLayer!(Complex!real)("Reflection", 4, false, 0.001);
         auto rm = new ReflectionMatrix!(Complex!real)(4, 5.0);
 
         mr.params[0] = rm.dup;
@@ -264,15 +290,40 @@ unittest {
     }
 
     // Unitary
-    {/+
+    {
+        // Unrecognized matrix type
+        bool error = false;
+        try {
+            auto mf = new MatrixLayer!float("Unitary", 32);
+        }
+        catch (AssertError e) { error = true; }
+        assert(error);
+
+
         auto mu = new MatrixLayer!(Complex!real)("Unitary", 8, false, 1.0);
         auto w = new Vector!(Complex!real)(8, 1.0);
 
-        auto u = new UnitaryMatrix!(Complex!real)(8, 0.1);
+        auto u = cast(UnitaryMatrix!(Complex!real)) mu.params[0];
 
         auto res1 = mu.compute(w);
 
-        assert(abs(res1.norm!"L2" - w.norm!"L2") <= 0.0001); +/
+        assert(abs(res1.norm!"L2" - w.norm!"L2") <= 0.0001);
+    }
+
+    // Diagonal
+    {
+    	auto md = new MatrixLayer!(Complex!real)("Diagonal", 2);
+    	md.params[0] = d;
+
+    	auto w = new Vector!(Complex!real)(2, 100000000.0);
+
+    	auto res = md.compute(w);
+    	w *= d;
+
+    	res -= w;
+
+    	assert(res.norm!"L2" <= 0.01);
+
     }
 
     write("Done.\n");

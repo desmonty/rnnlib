@@ -46,13 +46,25 @@ version(unittest)
  +/
 class NeuralNetwork(T) {
     private {
+    	// Array of the layers.
         Layer!T[] layers;
+
+        // Save the result of the computation of a layer. Allow its multiple use.
         Vector!T[] results;
+
+        // Array of the state vector associated to a layer.
         Vector!T[] states;
+
+        // Used to know which layers to ask for the input of a specific layer.
         size_t[][] input_layers;
+        
+        // Number of layers in the neural network.
         size_t size;
+
+        // Map the name of the layer to their id.
         size_t[string] name_to_id;
 
+        // Give access to all the learnable parameter of the neural network.
         T[] serialized_data;
     }
 
@@ -82,11 +94,11 @@ class NeuralNetwork(T) {
     auto
     addLinearLayer(in size_t _dim_out,
                    in bool _use_bias=false,
+                   in string _type="Matrix",
                    in string[] _in=null,
                    in string[] _to=null,
-                   in string _name=null,
-                   in Vector!T _init_state=null,
-                   T delegate(T,T) _reducer=null)
+                   T delegate(T,T) _reducer=null,
+                   in string _name=null)
     {
         // If the dimension of the output vector is zero.
         if (!_dim_out)
@@ -105,12 +117,11 @@ class NeuralNetwork(T) {
         // Linear Layers don't have any internal states vectors.
         states ~= [null];
 
-        auto tmp_layer = new MatrixLayer!T();
+        auto tmp_layer = new MatrixLayer!T(_type, );
 
 
         return this;
     }
-
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
     Vector!T compute(in Vector!T _v)

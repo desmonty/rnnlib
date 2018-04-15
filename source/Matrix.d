@@ -59,32 +59,8 @@ class MatrixAbstract(T) : Parameter {
     const @property
     MatrixAbstract!T dup()
     {
-        switch (typeId)
-        {
-            case "BlockMatrix":
-                return cast(MatrixAbstract!T) (cast(BlockMatrix!T) this).dup();
-            case "UnitaryMatrix":
-                static if (is(Complex!T : T)) {
-                    return cast(MatrixAbstract!T) (cast(UnitaryMatrix!T) this).dup();
-                }
-                else assert(0, "Unitary matrices must be of complex type.");
-            case "DiagonalMatrix":
-                return cast(MatrixAbstract!T) (cast(DiagonalMatrix!T) this).dup();
-            case "ReflectionMatrix":
-                return cast(MatrixAbstract!T) (cast(ReflectionMatrix!T) this).dup();
-            case "PermutationMatrix":
-                return cast(MatrixAbstract!T) (cast(PermutationMatrix!T) this).dup();
-            case "FourierMatrix":
-                static if (is(Complex!T : T)) {
-                    return cast(MatrixAbstract!T) (cast(FourierMatrix!T) this).dup();
-                }
-                else assert(0, "Fourier matrices must be of complex type.");
-            case "Matrix":
-                return cast(MatrixAbstract!T) (cast(Matrix!T) this).dup();
-            default:
-                assert(0, "'"~typeId~"' is not in the 'switch' "~
+        assert(0, "'"~typeId~"' is not in the 'switch' "~
                                       "clause of MatrixAbstract");
-        }
     }
 
     const
@@ -175,7 +151,6 @@ unittest
 {
     write("Unittest: Matrix: Abstract ... ");
 
-
     class ErrorMatrix(T) : MatrixAbstract!T {
         this(immutable size_t _r, immutable size_t _c) {
             typeId = "ErrorMatrix";
@@ -204,6 +179,61 @@ unittest
     auto um_hyde = list_mat[5];
     auto mm_hyde = list_mat[6];
     auto em_hyde = list_mat[7];
+
+
+    // dup
+    {
+        auto dm1 = m1_hyde.dup;
+        auto dm2 = m2_hyde.dup;
+        auto dm3 = m3_hyde.dup;
+        auto dm4 = m4_hyde.dup;
+        auto dbm = bm_hyde.dup;
+        auto dum = um_hyde.dup;
+        auto dmm = mm_hyde.dup;
+
+        auto v1 = new Vector!(Complex!real)(len/4, 1.0);
+        auto v2 = new Vector!(Complex!real)(len, 1.0);
+
+        Vector!(Complex!real) res1, res2;
+
+        res1 = dm1*v1;
+        res2 = m1*v1;
+        res1 -= res2;
+        assert(res1.norm!"L2" <= 0.0001);
+
+        res1 = dm2*v1;
+        res2 = m2*v1;
+        res1 -= res2;
+        assert(res1.norm!"L2" <= 0.0001);
+
+        res1 = dm3*v1;
+        res2 = m3*v1;
+        res1 -= res2;
+        assert(res1.norm!"L2" <= 0.0001);
+
+        res1 = dm4*v1;
+        res2 = m4*v1;
+        res1 -= res2;
+        assert(res1.norm!"L2" <= 0.0001);
+
+        res1 = dbm*v2;
+        res2 = bm*v2;
+        res1 -= res2;
+        assert(res1.norm!"L2" <= 0.0001);
+
+        res1 = dum*v2;
+        res2 = um*v2;
+        res1 -= res2;
+        assert(res1.norm!"L2" <= 0.0001);
+
+        bool error = false;
+        try {
+            auto dem = em_hyde.dup;
+        }
+        catch (AssertError e) { error = true; }
+        assert(error);
+    }
+
 
 
     auto mr = new Matrix!real(len, 5.6);
@@ -257,6 +287,32 @@ unittest
     error = false;
     try {
         auto ver = v / mm_hyde;
+    }
+    catch (AssertError e) { error = true; }
+    assert(error);
+
+    // Unitary Matrix must be of complex type.
+    error = false;
+    try {
+    	auto mpp = new Matrix!float(4, 4, 0.1);
+    	mpp.typeId = "UnitaryMatrix";
+    	MatrixAbstract!float mmp = mpp;
+    	auto vvv = new Vector!float(4, 0.1);
+
+    	auto res = mmp * vvv;
+    }
+    catch (AssertError e) { error = true; }
+    assert(error);
+
+    // Fourier Matrix must be of complex type.
+    error = false;
+    try {
+    	auto mpp = new Matrix!float(4, 4, 0.1);
+    	mpp.typeId = "FourierMatrix";
+    	MatrixAbstract!float mmp = mpp;
+    	auto vvv = new Vector!float(4, 0.1);
+
+    	auto res = mmp * vvv;
     }
     catch (AssertError e) { error = true; }
     assert(error);
@@ -535,25 +591,22 @@ if (is(Complex!T : T))
     {
         this(size);
 
-        if (randomBound < 0)
-            throw new Exception("'randomBound' must be >= 0");
-        if (randomBound.abs == 0) {
-            foreach(i; 0 .. params.length) params[i] = to!(Tc)(0);
-        }
-        foreach(i;0 .. params.length)
-            params[i] = uniform(-randomBound, randomBound, rnd);
+        if (randomBound <= 0)
+            throw new Exception("'randomBound' must be > 0");
+	    foreach(i;0 .. params.length)
+	        params[i] = uniform(-randomBound, randomBound, rnd);
     }
     
     this(in UnitaryMatrix M)
     {
         typeId = "UnitaryMatrix";
-        auto res = new UnitaryMatrix!T();
+        this();
         rows = M.rows;
         cols = M.cols;
-        res.perm = M.perm.dup;
-        res.fourier = M.fourier.dup;
-        res.fourier = M.fourier.dup;
-        res.params = M.params.dup;
+        perm = M.perm.dup;
+        fourier = M.fourier.dup;
+        fourier = M.fourier.dup;
+        params = M.params.dup;
     }
 
     override
@@ -621,7 +674,7 @@ if (is(Complex!T : T))
         enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
 
         T[] res = v.dup;
-
+        
         applyDiagonal(res, 0);
         
         res = fourier * res;
@@ -691,6 +744,8 @@ unittest
 
         assert(k.norm!"L2" < 0.00001);
         assert(l.norm!"L2" < 0.00001);
+
+        assertThrown(new UnitaryMatrix!(Complex!float)(4, 0.0));
     }
 
     write("Done.\n");
@@ -1017,6 +1072,14 @@ unittest
         assert(m3[1, 1] == m1[1]);
     }
 
+    assertThrown(new DiagonalMatrix!float(4, -6.0));
+    auto d = new DiagonalMatrix!real(1000, 0.0);
+    auto v = new Vector!real(1000, 10.0);
+
+    v *= d;
+
+    assert(v.norm!"L1" <= 0.001);
+
     write("Done.\n");
 }
 
@@ -1048,22 +1111,17 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     {
         this(size);
 
-        if (randomBound < 0)
-            throw new Exception("'randomBound' must be >= 0");
-        if (randomBound.abs == 0) {
-            foreach(i; 0 .. vec.length)
-                vec[i] = to!(T)(0);
+        if (randomBound <= 0)
+            throw new Exception("'randomBound' must be > 0");
+
+        static if (is(Complex!T : T)) {
+            foreach(size_t i;0 .. size)
+                vec[i] = complex(uniform(-randomBound, randomBound, rnd),
+                                 uniform(-randomBound, randomBound, rnd));
         }
         else {
-            static if (is(Complex!T : T)) {
-                foreach(size_t i;0 .. size)
-                    vec[i] = complex(uniform(-randomBound, randomBound, rnd),
-                                     uniform(-randomBound, randomBound, rnd));
-            }
-            else {
-                foreach(size_t i;0 .. size)
-                   vec[i] = uniform(-randomBound, randomBound, rnd);
-            }
+            foreach(size_t i;0 .. size)
+               vec[i] = uniform(-randomBound, randomBound, rnd);
         }
         compute_invSqNormVec2();
     }
@@ -1209,7 +1267,6 @@ unittest
         assert(v.norm!"L2" < 0.0001);
     }
     {
-
         auto vref = new Vector!real(100, 1.0);
 
         auto r1 = new ReflectionMatrix!real(vref);
@@ -1230,6 +1287,9 @@ unittest
         assert(r1.length == 100);
         
     }
+
+    assertThrown(new ReflectionMatrix!(Complex!real)(10, 0.0));
+
     writeln("Done.");
 }
 
@@ -1503,6 +1563,7 @@ class Matrix(T) : MatrixAbstract!T {
 }
 unittest
 {
+    write("                  Matrix ... ");
     auto m1 = new Matrix!(Complex!float)(10, 30, 5.0f);
     auto m2 = m1.dup;
     auto m3 = new Matrix!(Complex!float)(30, 5, 10.0f);
@@ -1530,5 +1591,17 @@ unittest
         isFailed = true;
     }
     assert(isFailed);
-}
 
+    assertThrown(new Matrix!float(5, -0.5));
+
+    auto m = new Matrix!float(7, 2, 0.0);
+
+    auto v = new Vector!float(2, 1.0);
+
+    v *= m;
+
+    assert(v.length == 7);
+    assert(v.norm!"L2" <= 0.0001);
+
+    writeln("Done.");
+}

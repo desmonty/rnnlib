@@ -273,9 +273,9 @@ auto createPoolingFunction(T)(in size_t height, in size_t width,
                         // we create the range that will iterte over the
                         // values in the cell.
                         cell_range = new CellRange!T(tmp_fr_x + tmp_x,
-                                                   tmp_fr_y + tmp_y,
-                                                   cell_w, cell_h,
-                                                   width, _v);
+                                                     tmp_fr_y + tmp_y,
+                                                     cell_w, cell_h,
+                                                     width, _v);
                         // And finally we just reduce the range using the
                         // the user defined reducer.
                         res[index++] = reducer(cell_range);
@@ -289,42 +289,6 @@ auto createPoolingFunction(T)(in size_t height, in size_t width,
 }
 unittest {
     write("Unittest: Utils: createPoolingFunction ...");
-
-    static struct FrameRange {
-        private {
-            const(size_t)[] arr;
-            const(size_t) width;
-        }
-
-        this(ref in size_t[] _arr, in size_t _width) {
-            arr = _arr;
-            width = _width;
-        }
-        
-        int opApply(scope int delegate(size_t, size_t) dg)
-        {
-            int result;
-
-            size_t frame_len = arr[0];
-
-            result = dg(frame_len, 0);
-            if (result)
-                return result;
-
-            immutable size_t len_1 = arr.length -1;
-            for (size_t index = 0; index < len_1; ++index) {
-                frame_len = arr[index+1] - arr[index];
-                result = dg(frame_len, arr[index]);
-                if (result)
-                    break;
-            }
-
-            frame_len = width - arr[len_1];
-            result = dg(frame_len, arr[len_1]);
-
-            return result;
-        }
-    }
 
     size_t[] av = [1, 3];
     size_t[] lenav = [1, 2, 2];
