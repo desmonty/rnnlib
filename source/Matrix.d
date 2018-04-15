@@ -2,6 +2,7 @@ module source.Matrix;
 
 import std.algorithm;
 import std.complex;
+import std.conv: to;
 import std.exception: assertThrown, enforce;
 import std.math;
 import std.numeric : Fft, dotProduct;
@@ -58,8 +59,6 @@ class MatrixAbstract(T) : Parameter {
     const @property
     MatrixAbstract!T dup()
     {
-        import std.stdio: writeln;
-        writeln("Hey There"~ typeId, " ", rows, " ", cols);
         switch (typeId)
         {
             case "BlockMatrix":
@@ -309,7 +308,7 @@ class BlockMatrix(T) : MatrixAbstract!T {
             0 5 0
      +/
     pure @safe
-    this(){}
+    this(){typeId = "BlockMatrix";}
 
     pure @safe
     this(in size_t size_in, in size_t size_out, in size_t size_blocks)
@@ -536,12 +535,18 @@ if (is(Complex!T : T))
     {
         this(size);
 
+        if (randomBound < 0)
+            throw new Exception("'randomBound' must be >= 0");
+        if (randomBound.abs == 0) {
+            foreach(i; 0 .. params.length) params[i] = to!(Tc)(0);
+        }
         foreach(i;0 .. params.length)
             params[i] = uniform(-randomBound, randomBound, rnd);
     }
     
     this(in UnitaryMatrix M)
     {
+        typeId = "UnitaryMatrix";
         auto res = new UnitaryMatrix!T();
         res.perm = M.perm.dup;
         res.fourier = M.fourier.dup;
@@ -612,6 +617,7 @@ if (is(Complex!T : T))
     if (op=="*")
     {
         enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+
         T[] res = v.dup;
 
         applyDiagonal(res, 0);
@@ -793,14 +799,23 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     this(in size_t size, in Tc randomBound)
     {
         this(size);
-        static if (is(Complex!T : T)) {
-            foreach(i;0 .. size)
-                mat[i] = complex(uniform(-randomBound, randomBound, rnd),
-                                 uniform(-randomBound, randomBound, rnd));
+
+        if (randomBound < 0)
+            throw new Exception("'randomBound' must be >= 0");
+        if (randomBound.abs == 0) {
+            foreach(i; 0 .. mat.length)
+                mat[i] = to!(T)(0);
         }
         else {
-            foreach(i;0 .. size)
-                mat[i] = uniform(-randomBound, randomBound, rnd);
+            static if (is(Complex!T : T)) {
+                foreach(i;0 .. size)
+                    mat[i] = complex(uniform(-randomBound, randomBound, rnd),
+                                     uniform(-randomBound, randomBound, rnd));
+            }
+            else {
+                foreach(i;0 .. size)
+                    mat[i] = uniform(-randomBound, randomBound, rnd);
+            }
         }
     }
 
@@ -942,7 +957,9 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
 
     @property const @safe
     T sum()
-    {return mat.sum;}
+    {
+        return mat.sum;
+    }
 }
 unittest
 {
@@ -1029,14 +1046,22 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     {
         this(size);
 
-        static if (is(Complex!T : T)) {
-            foreach(size_t i;0 .. size)
-                vec[i] = complex(uniform(-randomBound, randomBound, rnd),
-                                 uniform(-randomBound, randomBound, rnd));
+        if (randomBound < 0)
+            throw new Exception("'randomBound' must be >= 0");
+        if (randomBound.abs == 0) {
+            foreach(i; 0 .. vec.length)
+                vec[i] = to!(T)(0);
         }
         else {
-            foreach(size_t i;0 .. size)
-               vec[i] = uniform(-randomBound, randomBound, rnd);
+            static if (is(Complex!T : T)) {
+                foreach(size_t i;0 .. size)
+                    vec[i] = complex(uniform(-randomBound, randomBound, rnd),
+                                     uniform(-randomBound, randomBound, rnd));
+            }
+            else {
+                foreach(size_t i;0 .. size)
+                   vec[i] = uniform(-randomBound, randomBound, rnd);
+            }
         }
         compute_invSqNormVec2();
     }
@@ -1046,6 +1071,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     @safe
     this(in ReflectionMatrix dupl)
     {
+        typeId = "ReflectionMatrix";
         rows = dupl.vec.length; cols = dupl.vec.length;
         vec = dupl.vec.dup;
         invSqNormVec2 = dupl.invSqNormVec2;
@@ -1096,7 +1122,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
-        return this * v.v;
+        return new Vector!T(this * v.v);
     }
 
     const pure @safe
@@ -1360,14 +1386,23 @@ class Matrix(T) : MatrixAbstract!T {
         mat = new T[rows*cols];
         this.rows = rows;
         this.cols = cols;
-        static if (is(Complex!T : T)) {
-            foreach(i;0 .. mat.length)
-                mat[i] = complex(uniform(-randomBound, randomBound, rnd),
-                                 uniform(-randomBound, randomBound, rnd));
+
+        if (randomBound < 0)
+            throw new Exception("'randomBound' must be >= 0");
+        if (randomBound.abs == 0) {
+            foreach(i; 0 .. mat.length)
+                mat[i] = to!(T)(0);
         }
         else {
-            foreach(i;0 .. rows*cols)
-                mat[i] = uniform(-randomBound, randomBound, rnd);
+            static if (is(Complex!T : T)) {
+                foreach(i;0 .. mat.length)
+                    mat[i] = complex(uniform(-randomBound, randomBound, rnd),
+                                     uniform(-randomBound, randomBound, rnd));
+            }
+            else {
+                foreach(i;0 .. rows*cols)
+                    mat[i] = uniform(-randomBound, randomBound, rnd);
+            }
         }
     }
 

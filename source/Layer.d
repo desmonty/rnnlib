@@ -82,16 +82,16 @@ abstract class Layer(T)
  +/
 class MatrixLayer(T) : Layer!T
 {
-
-    this(MatrixAbstract!T _M)
+    this(in MatrixAbstract!T _M)
     {
+        // We keep a duplicate of the matrix.
         params = new Parameter[1];
         params[0] = _M.dup;
     }
 
-    this(MatrixAbstract!T _M,
-         Vector!T _v)
+    this(in MatrixAbstract!T _M, in Vector!T _v)
     {
+        // We keep a duplicate of the matrix and of the (bias) vector.
         size_t num_param = 1;
         if (_v){
             num_param = 2;
@@ -111,15 +111,18 @@ class MatrixLayer(T) : Layer!T
          in bool _bias=false,
          in Tc _random_init=0)
     {
+        // Block matrix cannot be created automatically.
         if (_matrix_type == "Block")
             throw new Exception("Block matrix need to be created by the user.");
         
+        // Create a bias vector if needed.
         Vector!T v = null;
         if (_bias)
             v = new Vector!T(_dim[0], _random_init);
 
         MatrixAbstract!T m;
 
+        // Only rectangular matrix allowed are the general "Matrix".
         if(_matrix_type == "Matrix") {
             m = new Matrix!T(_dim[0], _dim[1], _random_init);
         }
@@ -152,8 +155,6 @@ class MatrixLayer(T) : Layer!T
                     assert(0, "Unrecognized matrix type: "~_matrix_type);
             }
         }
-        import std.stdio: writeln;
-        writeln(m.typeId);
         this(m, v);
     }
 
@@ -168,7 +169,10 @@ class MatrixLayer(T) : Layer!T
     override
     Vector!T compute(Vector!T _v)
     {
-        auto res = cast(MatrixAbstract!T) params[0] * _v;
+        // Multiply the vector by the matrix first.
+        auto res = (cast(MatrixAbstract!T) params[0]) * _v;
+
+        // Add the bias vector if needed.
         if (params.length > 1)
             res += cast(Vector!T) params[1];
         return res;
@@ -176,7 +180,7 @@ class MatrixLayer(T) : Layer!T
 }
 unittest {
     write("Unittest: Layer: Matrix ... ");
-/+
+
     auto v = new Vector!(Complex!real)(4, 1.0);
 
     auto r = new ReflectionMatrix!(Complex!real)(2, 1.0);
@@ -229,10 +233,48 @@ unittest {
         assert(res2.norm!"L2" <= 0.0001);
     }
 
+    // Permutation
+    {
+        auto p = new PermutationMatrix!float(16);
+        auto w = new Vector!float(16, 1010101.0);
+
+        auto mp = new MatrixLayer!float(p);
+
+        auto res1 = mp.compute(w);
+        auto res2 = p * w;
+    
+        res1 -= res2;
+
+        assert(res1.norm!"L2" <= 0.0001);
+    }
+
+    // Reflection
+    {
+        auto mr = new MatrixLayer!(Complex!real)("Reflection", 4, false, 0);
+        auto rm = new ReflectionMatrix!(Complex!real)(4, 5.0);
+
+        mr.params[0] = rm.dup;
+        
+        auto res1 = mr.compute(v);
+        auto res2 = rm * res1; // res2 should return to v.
+
+        res2 -= v;
+
+        assert(res2.norm!"L2" <= 0.0001);
+    }
+
+    // Unitary
+    {/+
+        auto mu = new MatrixLayer!(Complex!real)("Unitary", 8, false, 1.0);
+        auto w = new Vector!(Complex!real)(8, 1.0);
+
+        auto res = mu.compute(w);
+
+        assert(abs(res.norm!"L2" - w.norm!"L2") <= 0.0001); 
+    +/}
 
     write("Done.\n");
-+/
-    write("TODO.\n");
+
 }
 
 /+ This layer implement a simple linear matrix transformation

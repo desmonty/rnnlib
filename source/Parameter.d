@@ -71,10 +71,10 @@ class Vector(T) : Parameter {
         super(true);
         v = new T[length];
 
+        if (randomBound < 0)
+            throw new Exception("'randomBound' must be >= 0");
         if (randomBound.abs == 0) {
-            static if (is(Complex!T : T)) {
-                foreach(i; length.iota) v[i] = to!(T)(0);
-            }
+            foreach(i; length.iota) v[i] = to!(T)(0);
         }
         else {
             static if (is(Complex!T : T)) {
