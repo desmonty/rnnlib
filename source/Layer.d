@@ -268,10 +268,12 @@ unittest {
         auto mu = new MatrixLayer!(Complex!real)("Unitary", 8, false, 1.0);
         auto w = new Vector!(Complex!real)(8, 1.0);
 
-        auto res = mu.compute(w);
+        auto u = new UnitaryMatrix!(Complex!real)(8, 0.1);
 
-        assert(abs(res.norm!"L2" - w.norm!"L2") <= 0.0001); 
-    +/}
+        auto res1 = mu.compute(w);
+
+        assert(abs(res1.norm!"L2" - w.norm!"L2") <= 0.0001); +/
+    }
 
     write("Done.\n");
 
@@ -296,7 +298,6 @@ class BiasLayer(T) : Layer!T
         res += to!(Vector!T)(params[0]);
         return res;
     }
-
 }
 unittest {
     write("                 Bias ... ");

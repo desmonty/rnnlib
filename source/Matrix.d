@@ -548,6 +548,8 @@ if (is(Complex!T : T))
     {
         typeId = "UnitaryMatrix";
         auto res = new UnitaryMatrix!T();
+        rows = M.rows;
+        cols = M.cols;
         res.perm = M.perm.dup;
         res.fourier = M.fourier.dup;
         res.fourier = M.fourier.dup;
@@ -1072,7 +1074,8 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     this(in ReflectionMatrix dupl)
     {
         typeId = "ReflectionMatrix";
-        rows = dupl.vec.length; cols = dupl.vec.length;
+        rows = dupl.vec.length;
+        cols = dupl.vec.length;
         vec = dupl.vec.dup;
         invSqNormVec2 = dupl.invSqNormVec2;
     }
