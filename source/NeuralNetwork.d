@@ -61,8 +61,10 @@ class NeuralNetwork(T) {
         // Number of layers in the neural network.
         size_t size;
 
-        // Map the name of the layer to their id.
+        // Map the name of the layer to its id.
         size_t[string] name_to_id;
+        // Map the id of the layer to its name.
+        string[] name_to_id;
 
         // Give access to all the learnable parameter of the neural network.
         T[] serialized_data;
@@ -76,6 +78,9 @@ class NeuralNetwork(T) {
         results = [null];
         input_layers = [null];
         size = 1;
+
+        id_to_name = ["input"];
+        name_to_id["input"] = 0;
     }
 
     /++ Create a Linear Layer in the network and handle the logic for futur
@@ -94,6 +99,7 @@ class NeuralNetwork(T) {
     auto
     addLinearLayer(in size_t _dim_out,
                    in bool _use_bias=false,
+                   in Tc _randomBound=1.0,
                    in string _type="Matrix",
                    in string[] _in=null,
                    in string[] _to=null,
@@ -108,18 +114,24 @@ class NeuralNetwork(T) {
         if (_name && (_name in name_to_id))
             throw new Exception(_name~" is already used as a name.");
 
+        // If no name are given we set it to to!string(size).
+        if (!_name)
+        	_name = to_string(size);
+        id_to_name ~= size;
+        name_to_id[_name] = size;
+
         // If the inputs are not given, we assume it is the last defined layer.
         size_t[] _inputs = _in;
         if (!_in)
-            _inputs = [size - 1];
-        input_layers ~= _inputs;
+            _inputs = [id_to_name[size - 1]];
+        input_layers ~= [_inputs];
 
         // Linear Layers don't have any internal states vectors.
         states ~= [null];
 
-        auto tmp_layer = new MatrixLayer!T(_type, );
+        auto tmp_layer = new MatrixLayer!T(_type, [_dim_out], _use_bias, _randomBound);
 
-
+        ++size;
         return this;
     }
 

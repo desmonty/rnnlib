@@ -327,7 +327,6 @@ unittest {
     }
 
     write("Done.\n");
-
 }
 
 /+ This layer implement a simple linear matrix transformation
