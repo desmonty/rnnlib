@@ -21,17 +21,17 @@ version(unittest) {
  +/ 
 class CellRange(T)
 {
-  private
-  {
-    size_t pos_x, pos_y,
-           cur_pos, 
-           cell_w, cell_h,
-           shift, width;
+    private
+    {
+      size_t pos_x, pos_y,
+             cur_pos, 
+             cell_w, cell_h,
+             shift, width;
 
-    const Vector!T vec;
+      const Vector!T vec;
 
-    bool is_empty = false;
-  }
+      bool is_empty = false;
+    }
 
     @nogc @safe pure
     this(in size_t _pos_x, in size_t _pos_y,
@@ -95,6 +95,29 @@ class CellRange(T)
         }
         return result;
     }
+}
+unittest {
+    
+    auto _v = new Vector!float([1.5, 2.5, 3.5, 4.5]);
+
+    auto cell_range = new CellRange!float(0, 0, 1, 2, 2, _v);
+
+
+    float ii;
+    size_t jj;
+    foreach(i; cell_range) {
+        ii = i;
+        break;
+    }
+    assert(ii == 1.5);
+
+    foreach(j, i; cell_range) {
+        ii = i;
+        jj = j;
+        break;
+    }
+    assert(ii == 1.5 && jj == 0);
+
 }
 
 /++ -FrameRange is used to enhanced clean up the following code.
