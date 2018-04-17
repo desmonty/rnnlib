@@ -1,5 +1,9 @@
 module source.NeuralNetwork;
 
+import std.algorithm: map;
+import std.array: array;
+
+
 import source.Layer;
 import source.Matrix;
 import source.Parameter;
@@ -15,19 +19,11 @@ version(unittest)
  +  Args:
  +      T: Type of the element in the network.
  +
- +  Members:
- +      layers (Layer!T[]): An array mapping the id of a layer to itself.
- +      input_layers (size_t[][]): An array mapping layer's id with a list 
- +                                 of id of layer which send their the layer.
- +      output_layers (size_t[][]): An array mapping layer's id with a list of
- +                                  id of layer to send the output vector of the
- +                                  layer.
- +      serialized_data (T[]): Hold all the learnable data from the NeuralNetwork.
- +                             E.g. Matrix, bias, and so on.
- +                             The serialiwed data is constructed only once at
- +                             the user's demand only.
- +
  +  Note:
+ +
+ +      - The output of NeuralNetwork.compute will always be the output of the last
+ +        layer only. If you want to ouput from another layer, you shouldn't, but
+ +        you can, be smart.
  +
  +      - Adding layers in the network is done by the use of the "addLayer..."
  +        functions. These functions can all take a "_in" and a "_to" as
@@ -52,19 +48,26 @@ class NeuralNetwork(T) {
         // Save the result of the computation of a layer. Allow its multiple use.
         Vector!T[] results;
 
-        // Array of the state vector associated to a layer.
-        Vector!T[] states;
-
         // Used to know which layers to ask for the input of a specific layer.
         size_t[][] input_layers;
         
         // Number of layers in the neural network.
-        size_t size;
+        size_t id;
+
+        // Array of the input dimension for a specific layer.
+        size_t[] arr_dim_in;
+
+        // Array of the output dimension for a specific layer.
+        size_t[] arr_dim_out;
 
         // Map the name of the layer to its id.
         size_t[string] name_to_id;
+
         // Map the id of the layer to its name.
-        string[] name_to_id;
+        string[size_t] id_to_name;
+
+        // Array of delegate to know how to reduce several input vectors.
+        //T delegate(T, T)[] reducers;
 
         // Give access to all the learnable parameter of the neural network.
         T[] serialized_data;
@@ -74,13 +77,15 @@ class NeuralNetwork(T) {
     {
         // We set the first elements of these arrays to null because
         // the first layer is the "Input". 
-        states = [null];
         results = [null];
         input_layers = [null];
-        size = 1;
+        id = 1;
 
         id_to_name = ["input"];
         name_to_id["input"] = 0;
+
+        arr_dim_in = [_dim_in];
+        arr_dim_out = [_dim_in];
     }
 
     /++ Create a Linear Layer in the network and handle the logic for futur
@@ -91,8 +96,6 @@ class NeuralNetwork(T) {
      +      _use_bias (bool): Add a bias vector to the output if true.
      +      _in (size_t[]): A list of layers' name for the layer to take its
      +                        inputs. If empty, the last known layer will be took.
-     +      _to (size_t[]): A list of layers' name for the layer to send its 
-     +                        outpus. If empty, this is the end, my beautiful friend.
      +      _reducer (T deleagte(T,T)): Used to reduce all the inputs vectors
      +                                  into one only.
      +/
@@ -102,8 +105,8 @@ class NeuralNetwork(T) {
                    in Tc _randomBound=1.0,
                    in string _type="Matrix",
                    in string[] _in=null,
-                   in string[] _to=null,
                    T delegate(T,T) _reducer=null,
+                   Vector!T _state=null,
                    in string _name=null)
     {
         // If the dimension of the output vector is zero.
@@ -114,31 +117,45 @@ class NeuralNetwork(T) {
         if (_name && (_name in name_to_id))
             throw new Exception(_name~" is already used as a name.");
 
-        // If no name are given we set it to to!string(size).
-        if (!_name)
-        	_name = to_string(size);
-        id_to_name ~= size;
-        name_to_id[_name] = size;
+        // If a specific name is given, we remember its id to be able to retreive it.
+        if (_name) {
+            id_to_name[id] = _name;
+            name_to_id[_name] = id;
+        }
 
         // If the inputs are not given, we assume it is the last defined layer.
-        size_t[] _inputs = _in;
-        if (!_in)
-            _inputs = [id_to_name[size - 1]];
+        size_t[] _inputs = [id - 1];
+        if (_in)
+            _inputs = _in.map(a => name_to_id[a]).array();
+
         input_layers ~= [_inputs];
 
-        // Linear Layers don't have any internal states vectors.
-        states ~= [null];
+        // Update dimension arrays.
+        arr_dim_in ~= [arr_dim_in[_inputs[0]]];
+        arr_dim_out ~= [_dim_out];
 
-        auto tmp_layer = new MatrixLayer!T(_type, [_dim_out], _use_bias, _randomBound);
+        // Result will be filled by NeuralNetwork.compute.
+        results ~= [new Vector!T(_state)];
 
-        ++size;
+        // Create the Linear Layer.
+        auto tmp_layer = new MatrixLayer!T(_type, [arr_dim_in[id], _dim_out], _use_bias, _randomBound);
+
+        // Add the layer to the network.
+        layers ~= [tmp_layer];
+
+        ++id;
         return this;
     }
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
     Vector!T compute(in Vector!T _v)
     {
+        results[0] = _v;
+        auto tmp_vec = new Vector!T();
+        foreach(cur_id; 0 .. id)
+        {
 
+        }
     }
 }
 unittest {
