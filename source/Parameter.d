@@ -3,7 +3,7 @@ module source.Parameter;
 import std.algorithm;
 import std.complex;
 import std.conv: to;
-import std.exception: assertThrown;
+import std.exception: assertThrown, enforce;
 import std.math;
 import std.datetime;
 import std.random;
@@ -126,13 +126,10 @@ class Vector(T) : Parameter {
    
     /// Simple math operation without memory allocation.
     pure @safe
-    void opOpAssign(string op)(in Vector u)
+    void opOpAssign(string op)(in Vector!T _v)
     {
-        static if (op == "+") { v[] += u.v[]; }
-        else static if (op == "-") { v[] -= u.v[]; }
-        else static if (op == "*") { v[] *= u.v[]; }
-        else static if (op == "/") { v[] /= u.v[]; }
-        else static assert(0, "Operator "~op~" not implemented.");
+        enforce(v.length == _v.length, "Vector-Vector Dimension Mismatch.");
+        mixin("v[]"~op~"=_v.v[];");
     }
 
     /// Return the sum of all the elements in the vector.

@@ -66,9 +66,6 @@ class NeuralNetwork(T) {
         // Map the id of the layer to its name.
         string[size_t] id_to_name;
 
-        // Array of delegate to know how to reduce several input vectors.
-        //T delegate(T, T)[] reducers;
-
         // Give access to all the learnable parameter of the neural network.
         T[] serialized_data;
     }
@@ -96,8 +93,6 @@ class NeuralNetwork(T) {
      +      _use_bias (bool): Add a bias vector to the output if true.
      +      _in (size_t[]): A list of layers' name for the layer to take its
      +                        inputs. If empty, the last known layer will be took.
-     +      _reducer (T deleagte(T,T)): Used to reduce all the inputs vectors
-     +                                  into one only.
      +/
     auto
     addLinearLayer(in size_t _dim_out,
@@ -105,7 +100,6 @@ class NeuralNetwork(T) {
                    in Tc _randomBound=1.0,
                    in string _type="Matrix",
                    in string[] _in=null,
-                   T delegate(T,T) _reducer=null,
                    Vector!T _state=null,
                    in string _name=null)
     {
@@ -135,7 +129,8 @@ class NeuralNetwork(T) {
         arr_dim_out ~= [_dim_out];
 
         // Result will be filled by NeuralNetwork.compute.
-        results ~= [new Vector!T(_state)];
+        if (_state)
+            results ~= [_state.dup];
 
         // Create the Linear Layer.
         auto tmp_layer = new MatrixLayer!T(_type, [arr_dim_in[id], _dim_out], _use_bias, _randomBound);
@@ -151,11 +146,25 @@ class NeuralNetwork(T) {
     Vector!T compute(in Vector!T _v)
     {
         results[0] = _v;
-        auto tmp_vec = new Vector!T();
-        foreach(cur_id; 0 .. id)
-        {
+        Vector!T tmp_vec;
 
+        foreach(cur_id; 1 .. id)
+        {
+            // If there is only one input, we just pass it to the layer for computation. 
+            if (input_layers[cur_id].length == 1)
+                results[cur_id] = layers[cur_id].compute(results[input_layers[cur_id][0]]);
+            else {
+                // Else we need to create a temporary vector to sum all the inputs.
+                tmp_vec = new Vector!T(arr_dim_in[id], 0);
+                foreach(tmp_id; input_layers[cur_id])
+                    tmp_vec += results[tmp_id];
+
+                // Finally, we compute the tmp vector using the layer.
+                results[cur_id] = layers[cur_id].compute(tmp_vec);
+            }
         }
+
+        return results[$-1];
     }
 }
 unittest {
