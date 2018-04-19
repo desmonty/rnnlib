@@ -12,6 +12,7 @@ One of the auxiliary goal of this project is to cut any dependencies between the
 and the recurrent neural netwroks to enable anyone to use it independently.
 
 ## Daily Todo
+* pull request / tasks / overall management.
 * wip: Neural Networks
   * addLayer meta-logic (from, to, name)
   * compute logic
@@ -50,6 +51,8 @@ and the recurrent neural netwroks to enable anyone to use it independently.
 * TESTS
   * _Functional Tests_
     * [Some good examples](https://en.wikipedia.org/wiki/Test_functions_for_optimization)
+  * _Visualizable Tests_
+    * test the optimization algorithm for drawing graphs: force directed layout gives a function.
   * _Machine Learning Tests_
     * Adding Problem
     * XOR
