@@ -151,7 +151,7 @@ class NeuralNetwork(T) {
         }
 
         // Update dimension arrays.
-        arr_dim_in ~= arr_dim_in[_inputs[0]];
+        arr_dim_in ~= arr_dim_out[_inputs[0]];
         arr_dim_out ~= _dim_out;
 
         // Create the Linear Layer.
@@ -171,18 +171,22 @@ class NeuralNetwork(T) {
         results[0] = _v.dup;
         Vector!T tmp_vec;
 
+        //writeln(layers);
+        //writeln(input_layers);
+        //writeln(results);
+        //writeln(arr_dim_in);
+        //writeln(arr_dim_out);
+        //writeln(results);
+
         foreach(cur_id; 1 .. id)
         {
-            writeln(cur_id);
-            writeln(arr_dim_in);
-            writeln(arr_dim_out);
             // If there is only one input,
             // we just pass it to the layer for computation. 
             if (input_layers[cur_id].length == 1)
                 results[cur_id] = layers[cur_id].compute(results[input_layers[cur_id][0]]);
             else {
                 // Else we need to create a temporary vector to sum all the inputs.
-                tmp_vec = new Vector!T(arr_dim_in[id], 0);
+                tmp_vec = new Vector!T(arr_dim_in[cur_id], 0);
                 foreach(tmp_id; input_layers[cur_id])
                     tmp_vec += results[tmp_id];
 
@@ -196,7 +200,7 @@ class NeuralNetwork(T) {
 }
 unittest {
     write("Unittest: NeuralNetwork ... ");
-/+
+
     // Initialize the neural network.
     // At this point, we have the identity function.
     auto nn = new NeuralNetwork!float(4);
@@ -238,13 +242,13 @@ unittest {
 
     // z
     auto z_bis = hidden;
+    writeln(z_bis.length);
     z_bis += v;
-    z_bis *= (cast(Matrix!float) nn.layers[1].params[0]);
-    z_bis *= (cast(Matrix!float) nn.layers[2].params[0]);
-
+    z_bis = (cast(Matrix!float) nn.layers[1].params[0]) * z_bis;
+    z_bis = (cast(Matrix!float) nn.layers[2].params[0]) * z_bis;
+    
     z_bis -= z;
-
-    assert(z_bis.norm!"L2" <= 0.0001);+/
+    assert(z_bis.norm!"L2" <= 0.0001);
 
 
     writeln("TODO.");
