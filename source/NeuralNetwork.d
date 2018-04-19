@@ -171,13 +171,6 @@ class NeuralNetwork(T) {
         results[0] = _v.dup;
         Vector!T tmp_vec;
 
-        //writeln(layers);
-        //writeln(input_layers);
-        //writeln(results);
-        //writeln(arr_dim_in);
-        //writeln(arr_dim_out);
-        //writeln(results);
-
         foreach(cur_id; 1 .. id)
         {
             // If there is only one input,
@@ -207,8 +200,6 @@ unittest {
 
     // Vector of L2 norm = 1.
     auto v = new Vector!float([0.5, 0.0, -0.5, 0.7071068]);
-
-    writeln(v.norm!"L2");
 
     // w should be equal to v.
     auto w = nn.compute(v);
@@ -242,7 +233,6 @@ unittest {
 
     // z
     auto z_bis = hidden;
-    writeln(z_bis.length);
     z_bis += v;
     z_bis = (cast(Matrix!float) nn.layers[1].params[0]) * z_bis;
     z_bis = (cast(Matrix!float) nn.layers[2].params[0]) * z_bis;

@@ -20,6 +20,13 @@ version(unittest)
     import core.exception;
 }
 
+/++ A dot product function. We can make use of vectorization/fma 
+ +  optimization when dealing with non-complex number.
+ +
+ + TODO:
+ +      -implment optimization
+ +      -make sure it is correctly used in the library. 
+ +/
 pure @safe 
 auto dot(R1, R2)(in R1[] lhs, in R2[] rhs)
 {
@@ -40,7 +47,13 @@ unittest
                [-5.0, -1.0, -6.0])) < 0.001);
 }
 
+/++ MatrixAbstract class.
+ + 
+ +  An abstract class of matrix to create array of heterogenous matrix
+ +  and create general-purpose function. It is mostly a wrapper.
+ +/
 class MatrixAbstract(T) : Parameter {
+    // TODO: make member private.
     size_t rows, cols;
     string typeId;
 
@@ -48,21 +61,25 @@ class MatrixAbstract(T) : Parameter {
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
     else alias Tc = T;
 
+    // We have to constructor to allow the existence of a pure and impure one
+    // TODO: bool _b might not be useful because pureness is differentiate them.
     pure @safe
     this(){}
-
+    
     @safe
     this(bool _b){
         super(true);
     }
 
+    // Return a duplicate of the matrix. It should actually call the dup function
+    // of its type (FourierMatrix, UnitaryMatrix, ...).
     const @property
     MatrixAbstract!T dup()
     {
-        assert(0, "'"~typeId~"' is not in the 'switch' "~
-                                      "clause of MatrixAbstract");
+        assert(0, "'"~typeId~"': function 'dup' not implemented");
     }
 
+    // Simple Matrix-Vector Multiplication.
     const
     Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
@@ -70,6 +87,7 @@ class MatrixAbstract(T) : Parameter {
         return new Vector!T(this * v.v);
     }
 
+    // Wrapper Matrix-Vector Multiplication.
     const
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
@@ -104,6 +122,7 @@ class MatrixAbstract(T) : Parameter {
         }
     }
 
+    // Simple inverse(Matrix)-Vector Multiplication.
     const
     Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
@@ -112,6 +131,7 @@ class MatrixAbstract(T) : Parameter {
         return res;
     }
 
+    // Wrapper inverse(Matrix)-Vector Multiplication.
     const
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
@@ -151,6 +171,8 @@ unittest
 {
     write("Unittest: Matrix: Abstract ... ");
 
+    // We create a badly constructed Matrix Class.
+    // This will result in an error => You can't create your own Matrix.
     class ErrorMatrix(T) : MatrixAbstract!T {
         this(immutable size_t _r, immutable size_t _c) {
             typeId = "ErrorMatrix";
@@ -170,6 +192,9 @@ unittest
     auto mm = new Matrix!(Complex!real)(len, 5.6);
     auto em = new ErrorMatrix!(Complex!real)(len, len);
 
+    // The type of list_mat will be "MatrixAbstract!T[]" as a
+    // generalization of each matrices. Hence, every **_hyde matrices
+    // will be of type "MatrixAbstract!T".
     auto list_mat = [m1, m2, m3, m4, bm, um, mm, em];
     auto m1_hyde = list_mat[0];
     auto m2_hyde = list_mat[1];
@@ -234,8 +259,9 @@ unittest
         assert(error);
     }
 
-
-
+    // We test the multiplication for all Matrix type.
+    // This is to make sure, a MatrixAbstract!T will call the right
+    // multiplication algorithm in function of its true type (Fourier, Permutation, ...)
     auto mr = new Matrix!real(len, 5.6);
     auto dr = new DiagonalMatrix!real(len, 5.6);
 
@@ -320,6 +346,43 @@ unittest
     write("Done.\n");
 }
 
+/++ Block Matrix class.
+ +
+ +  Block matrix are used as a way to obtain "sparse" matrix (with a lot of zeros)
+ +  while controlling certain measure of the matrix such as its spectrum.
+ +
+ +  For a general introduction, see: https://en.wikipedia.org/wiki/Block_matrix
+ +
+ +  Note: The blcok matrices you can create using this class can only have one of
+ +        the three format shown below.
+ + 
+ +  We present here the three different kinds of block matrix we
+ +  can have. In the following, each '0' represent a zero square
+ +  matrix of size 'size_blocks' and each number [1-9] represent
+ +  a different square matrix of the same size.
+ +
+ + 1/ Square block matrix:
+ +
+ +      1 0 0 0 0
+ +      0 2 0 0 0
+ +      0 0 3 0 0
+ +      0 0 0 4 0
+ +      0 0 0 0 5
+ +
+ +  2/ Rectangular block matrix with more columns:
+ +
+ +      1 0 0 4 0
+ +      0 2 0 0 5
+ +      0 0 3 0 0
+ +
+ +  2/ Rectangular block matrix with more rows:
+ +
+ +      1 0 0
+ +      0 2 0
+ +      0 0 3
+ +      4 0 0
+ +      0 5 0
+ +/
 class BlockMatrix(T) : MatrixAbstract!T {
     MatrixAbstract!T[] blocks;
     PermutationMatrix!T P, Q;
@@ -335,34 +398,6 @@ class BlockMatrix(T) : MatrixAbstract!T {
     // and so to have a sparse matrix with the properties
     // of the block matrix (e.g. unitary).
 
-    /+
-        We present here the three different kinds of block matrix we
-        can have. In the following, each '0' represent a zero square
-        matrix of size 'size_blocks' and each number [1-9] represent
-        a different square matrix of the same size.
-
-        1/ Square block matrix:
-
-            1 0 0 0 0
-            0 2 0 0 0
-            0 0 3 0 0
-            0 0 0 4 0
-            0 0 0 0 5
-
-        2/ Rectangular block matrix with more columns:
-
-            1 0 0 4 0
-            0 2 0 0 5
-            0 0 3 0 0
-
-        2/ Rectangular block matrix with more rows:
-
-            1 0 0
-            0 2 0
-            0 0 3
-            4 0 0
-            0 5 0
-     +/
     pure @safe
     this(){typeId = "BlockMatrix";}
 
