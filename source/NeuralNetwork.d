@@ -2,7 +2,7 @@ module source.NeuralNetwork;
 
 import std.algorithm: map;
 import std.array: array;
-
+import std.exception: enforce;
 
 import source.Layer;
 import source.Matrix;
@@ -41,6 +41,11 @@ version(unittest)
  +
  +/
 class NeuralNetwork(T) {
+
+    static if (is(Complex!T : T))
+        mixin("alias Tc = "~(T.stringof[8 .. $])~";");
+    else alias Tc = T;
+
     private {
     	// Array of the layers.
         Layer!T[] layers;
@@ -73,12 +78,13 @@ class NeuralNetwork(T) {
     this(in size_t _dim_in)
     {
         // We set the first elements of these arrays to null because
-        // the first layer is the "Input". 
+        // the first layer is the "Input".
+        layers = [null];
         results = [null];
         input_layers = [null];
         id = 1;
 
-        id_to_name = ["input"];
+        id_to_name[0] = "input";
         name_to_id["input"] = 0;
 
         arr_dim_in = [_dim_in];
@@ -90,8 +96,8 @@ class NeuralNetwork(T) {
      +
      +  Args:
      +      _dim_out (size_t): Dimension of the resulting vector.
-     +      _use_bias (bool): Add a bias vector to the output if true.
-     +      _in (size_t[]): A list of layers' name for the layer to take its
+     +      _use_bias (bool, =false): Add a bias vector to the output if true.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
      +                        inputs. If empty, the last known layer will be took.
      +/
     auto
@@ -99,9 +105,10 @@ class NeuralNetwork(T) {
                    in bool _use_bias=false,
                    in Tc _randomBound=1.0,
                    in string _type="Matrix",
+                   in string _name=null,
+                   in Vector!T _state=null,
                    in string[] _in=null,
-                   Vector!T _state=null,
-                   in string _name=null)
+                   in string[] _to=null)
     {
         // If the dimension of the output vector is zero.
         if (!_dim_out)
@@ -117,26 +124,42 @@ class NeuralNetwork(T) {
             name_to_id[_name] = id;
         }
 
+        // Result will be filled by NeuralNetwork.compute.
+        if (_state)
+            results ~= _state.dup;
+        else {
+            results ~= null;
+        }
+
         // If the inputs are not given, we assume it is the last defined layer.
         size_t[] _inputs = [id - 1];
         if (_in)
-            _inputs = _in.map(a => name_to_id[a]).array();
+            _inputs = _in.map!(a => name_to_id[a]).array();
 
-        input_layers ~= [_inputs];
+        input_layers ~= _inputs;
+
+        // If the layer points to other layers, we add it to their inputs.
+        // And we initialize the state vecotr if this is not already done.
+        if (_to) {
+            foreach(tmp_id; _to) {
+                enforce(tmp_id in name_to_id, tmp_id~": name not found.");
+                input_layers[name_to_id[tmp_id]] ~= id;
+            }
+
+            if (results[$-1] is null)
+                results[$-1] = new Vector!T(_dim_out, 0);
+        }
 
         // Update dimension arrays.
-        arr_dim_in ~= [arr_dim_in[_inputs[0]]];
-        arr_dim_out ~= [_dim_out];
-
-        // Result will be filled by NeuralNetwork.compute.
-        if (_state)
-            results ~= [_state.dup];
+        arr_dim_in ~= arr_dim_in[_inputs[0]];
+        arr_dim_out ~= _dim_out;
 
         // Create the Linear Layer.
-        auto tmp_layer = new MatrixLayer!T(_type, [arr_dim_in[id], _dim_out], _use_bias, _randomBound);
+        auto tmp_layer = new MatrixLayer!T(_type, [_dim_out, arr_dim_in[id]],
+                                           _use_bias, _randomBound);
 
         // Add the layer to the network.
-        layers ~= [tmp_layer];
+        layers ~= tmp_layer;
 
         ++id;
         return this;
@@ -145,12 +168,16 @@ class NeuralNetwork(T) {
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
     Vector!T compute(in Vector!T _v)
     {
-        results[0] = _v;
+        results[0] = _v.dup;
         Vector!T tmp_vec;
 
         foreach(cur_id; 1 .. id)
         {
-            // If there is only one input, we just pass it to the layer for computation. 
+            writeln(cur_id);
+            writeln(arr_dim_in);
+            writeln(arr_dim_out);
+            // If there is only one input,
+            // we just pass it to the layer for computation. 
             if (input_layers[cur_id].length == 1)
                 results[cur_id] = layers[cur_id].compute(results[input_layers[cur_id][0]]);
             else {
@@ -168,7 +195,57 @@ class NeuralNetwork(T) {
     }
 }
 unittest {
-        write("Unittest: NeuralNetwork ... ");
+    write("Unittest: NeuralNetwork ... ");
+/+
+    // Initialize the neural network.
+    // At this point, we have the identity function.
+    auto nn = new NeuralNetwork!float(4);
 
-        writeln("Done");
+    // Vector of L2 norm = 1.
+    auto v = new Vector!float([0.5, 0.0, -0.5, 0.7071068]);
+
+    writeln(v.norm!"L2");
+
+    // w should be equal to v.
+    auto w = nn.compute(v);
+    w -= v;
+
+    assert(w.norm!"L2" <= 0.0001);
+
+    // We add a Linear Layer of shape (6, 4).
+    nn.addLinearLayer(6, false, 1.0, "Matrix", "L1");
+    w = nn.compute(v);
+
+    // Hence, the resulting vector should have length 6.
+    assert(w.length == 6);
+
+    // We add some complexity: the layer take the user's input and the ouput of "L1"
+    // and return its output to "L1" (And so create a rnn-like structure) and to
+    // the output (by default, the result of the last layer).
+    nn.addLinearLayer(4, false, 1.0, "Matrix", "L2", null, null, ["L1"]);
+    w = nn.compute(v);
+    auto z = nn.compute(v);
+
+    // Now we reconstruct what we think the neural network should compute.
+    // w
+    auto w_bis = (cast(Matrix!float) nn.layers[1].params[0]) * v;
+    w_bis *= (cast(Matrix!float) nn.layers[2].params[0]);
+
+    auto hidden = w_bis.dup;
+    w_bis -= w;
+
+    assert(w_bis.norm!"L2" <= 0.0001);
+
+    // z
+    auto z_bis = hidden;
+    z_bis += v;
+    z_bis *= (cast(Matrix!float) nn.layers[1].params[0]);
+    z_bis *= (cast(Matrix!float) nn.layers[2].params[0]);
+
+    z_bis -= z;
+
+    assert(z_bis.norm!"L2" <= 0.0001);+/
+
+
+    writeln("TODO.");
 }

@@ -56,23 +56,8 @@ abstract class Layer(T)
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
     else alias Tc = T;
 
-    /// Name of the layer.
-    string name;
-
-    /// Sizes
-    size_t size_in;
-    size_t size_out;
-
     /// Parameter, Layer-specific
     Parameter[] params = null;
-
-    /// Used
-    @nogc @safe pure 
-    void set_name(string _name)
-    {
-        if (_name !is null)
-            name = _name;
-    }
 
     abstract Vector!T compute(Vector!T);
 }
@@ -606,10 +591,6 @@ unittest {
     auto f7 = new FunctionalLayer!double("softmax");
     auto vr7 = f7.compute(vr);
     assert(abs(vr7.sum - 1.0) <= 0.001);
-
-    // set the name of a layer.
-    f1.set_name("f1");
-    assert(f1.name == "f1");
 
     auto vv = new Vector!double(100, 0.2);
 
