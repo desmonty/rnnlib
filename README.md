@@ -12,6 +12,7 @@ One of the auxiliary goal of this project is to cut any dependencies between the
 and the recurrent neural netwroks to enable anyone to use it independently.
 
 ## Daily Todo
+* Think about parameters shared between layers: can the layer be different and share the same parameters ?
 * Makes UnitaryMatrix takes non-complex number
 * pull request / tasks / overall management.
 * wip: Neural Networks
