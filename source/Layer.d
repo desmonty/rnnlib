@@ -20,36 +20,35 @@ version(unittest)
 
 
 
-/+  The layers of the Neural Networks.
-
-    Basically, each layer can be seen as a function, which take a vector and
-    return another vector of a possibly different length. Those functions have
-    parameters (matrix, bias, ..) which are specific to each kind of layer
-    (linear, recurrent, ..). All the logic of how these layers are assembled is
-    in the NeuralNet object.
-
-    If they are trained with an evolutionary algorithm (Which is the primary
-    goal), we will need to have some function to handle *mutation* and
-    *crossover*. This should be enough for many of the optimization we will
-    implement (PSA, GA, RS, ES, and other obscure acronym...).
-
-    The gradient of the layer will be difficult to compute due to the will to
-    play with heavily recurrent networks (which is not the common cas because
-    of the use of gradient-based optimization). However, it would be very
-    interesting to know the gradient of the NeuralNet and could be investigated
-    in this project.
-
-    In practice, each layers must implement one method:
-        - compute
-    which apply the layer to the vector and return the result.
-
-
-    TODO:
-        - convnet
-        - share_parameter in NeuralNet between layer
-
+/++ The layers of the Neural Networks.
+ +
+ +  Basically, each layer can be seen as a function, which take a vector and
+ +  return another vector of a possibly different length. Those functions have
+ +  parameters (matrix, bias, ..) which are specific to each kind of layer
+ +  (linear, recurrent, ..). All the logic of how these layers are assembled is
+ +  in the NeuralNet object.
+ +
+ +  If they are trained with an evolutionary algorithm (Which is the primary
+ +  goal), we will need to have some function to handle *mutation* and
+ +  *crossover*. This should be enough for many of the optimization we will
+ +  implement (PSA, GA, RS, ES, and other obscure acronym...).
+ +
+ +  The gradient of the layer will be difficult to compute due to the will to
+ +  play with heavily recurrent networks (which is not the common cas because
+ +  of the use of gradient-based optimization). However, it would be very
+ +  interesting to know the gradient of the NeuralNet and could be investigated
+ +  in this project.
+ +
+ +  In practice, each layers must implement one method:
+ +      - compute
+ +  which apply the layer to the vector and return the result.
+ +
+ +
+ +  TODO:
+ +      - convnet
+ +      - share_parameter in NeuralNet between layer
+ +
  +/
-
 abstract class Layer(T)
 {
     static if (is(Complex!T : T))
@@ -63,7 +62,7 @@ abstract class Layer(T)
 }
 
 /+ This layer implement a simple linear matrix transformation
-   applied to the vector.
+ + applied to the vector.
  +/
 class MatrixLayer(T) : Layer!T
 {
@@ -297,17 +296,17 @@ unittest {
 
     // Diagonal
     {
-    	auto md = new MatrixLayer!(Complex!real)("Diagonal", 2);
-    	md.params[0] = d;
+        auto md = new MatrixLayer!(Complex!real)("Diagonal", 2);
+        md.params[0] = d;
 
-    	auto w = new Vector!(Complex!real)(2, 100000000.0);
+        auto w = new Vector!(Complex!real)(2, 100000000.0);
 
-    	auto res = md.compute(w);
-    	w *= d;
+        auto res = md.compute(w);
+        w *= d;
 
-    	res -= w;
+        res -= w;
 
-    	assert(res.norm!"L2" <= 0.01);
+        assert(res.norm!"L2" <= 0.01);
 
     }
 
@@ -315,7 +314,9 @@ unittest {
 }
 
 /+ This layer implement a simple linear matrix transformation
-   applied to the vector.
+ + applied to the vector.
+ + 
+ + This might not really be useful..
  +/
 class BiasLayer(T) : Layer!T
 {
@@ -358,18 +359,22 @@ unittest {
     write("Done.\n");
 }
 
-/+ This layer can implement any function that take as input a
-   Vector!T and return another Vector!T.
+/++ This layer can implement any function that take as input a
+ +  Vector!T and return another Vector!T.
+ +
+ +  It aims to be as general as possible. You can basically give everything
+ +  as a delegate in the constructor.
+ +
+ +  For convinence, some function are already implemented and more are to go:
+ +      -SoftMax
+ +      -relu
+ +      -modRelu
+ + 
+ +
+ +  TODO: Add more functions ! The more, the merrier.
  +/
 class FunctionalLayer(T) : Layer!T
 {
-    /++This implements common functions that are not implemented already.
-     + It includes the following:
-     +      -SoftMax
-     +      -relu
-     +      -modRelu
-     +/
-
     private {
         /// function applied to the vector.
         Vector!T delegate(Vector!T, Parameter[]) func;
@@ -381,6 +386,7 @@ class FunctionalLayer(T) : Layer!T
         switch (easyfunc)
         {
             case "relu":
+                // function that compute "max(x, 0)" for every x in the vector.
                 static if (!is(Complex!T : T)) {
                     func =
                         delegate(Vector!T _v, Parameter[] _p) {
@@ -393,6 +399,8 @@ class FunctionalLayer(T) : Layer!T
                 }
                 // else with use modRelu by default.
             case "modRelu":
+                // Complex equivalent of the "relu" function.
+                // It does, however, require a trainable bias vector.
                 static if (is(Complex!T : T)) {
                     enforce(size_in != 0, "'size_in' must be greater than zero
                                             when using 'modRelu'.");
@@ -422,6 +430,7 @@ class FunctionalLayer(T) : Layer!T
                                          be used with complex number.");
                 break;
             case "softmax":
+                // Basic softmax function, can be used to obtain a probability distribution. 
                 static if (!is(Complex!T : T))
                     func =
                         delegate(Vector!T _v, Parameter[] _p) {
@@ -456,6 +465,22 @@ class FunctionalLayer(T) : Layer!T
         func = delegate(Vector!T _v, Parameter[] _p) {
             return _func(_v);
         };
+    }
+
+    // The function to apply to the vector. Can be anything. DELEGATE
+    @safe pure
+    this(Vector!T delegate(Vector!T, Parameter[]) _func)
+    {
+        func = delegate(Vector!T _v, Parameter[] _p) {
+            return _func(_v, _p);
+        };
+    }
+
+    // The function to apply to the vector. Can be anything. Function
+    pure
+    this(Vector!T function(Vector!T, Parameter[]) _func)
+    {
+        this(toDelegate(_func));
     }
 
     // The function to apply to the vector. Can be anything. FUNCTION

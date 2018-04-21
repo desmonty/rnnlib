@@ -152,8 +152,7 @@ class Vector(T) : Parameter {
     T dot(in Vector u)
     {return this.dot(u.v);}
     
-    // TODO intel intrinsics ?
-    // std.math.fma
+    // TODO: use general dot product in source.Matrix.d
     const pure @safe
     T dot(in T[] u)
     {

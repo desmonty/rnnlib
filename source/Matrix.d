@@ -1467,6 +1467,12 @@ unittest
 }
 
 /++ General matrix class.
+ +
+ +  A class that implement a general matrix (with rows*cols parameter).
+ +
+ +  Note: Contrary to most of the others matrix, this class doesn't implement
+ +  	  the division operator (multiplication by the inverse).
+ +
  +/
 class Matrix(T) : MatrixAbstract!T {
     T[] mat;
