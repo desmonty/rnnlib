@@ -384,7 +384,9 @@ unittest
  +      0 5 0
  +/
 class BlockMatrix(T) : MatrixAbstract!T {
+	// List of matrices.
     MatrixAbstract!T[] blocks;
+    // Permutation, can be "turned off" with randperm = false.
     PermutationMatrix!T P, Q;
 
     size_t size_blocks;
@@ -565,29 +567,31 @@ unittest
     write("Done.\n");
 }
 
+/++ Unitary Matrix class.
+ +
+ +  TODO: take non-complex number as input.
+ +
+ +      This matrix is defined in 
+ +          Unitary Evolution Recurrent Neural Networks,
+ +          Arjovsky, Shah, Bengio
+ +          (http://proceedings.mlr.press/v48/arjovsky16.pdf)
+ +
+ +      Its aim is to allow one to learn a unitary matrix that
+ +      depends on number of parameters that is linear relatively
+ +      to the size of matrix.
+ +
+ +      The resulting function is:
+ +          D_3 * R_2 * invF * D_2 * P * R_1 * F * D_1
+ +
+ +      where D_i are diagonal unitary complex matrices,
+ +            R_i are reflection unitary complex matrices,
+ +            F and invF are respectivelly the fourier
+ +              and inverse fourier transform,
+ +            P is a permutation matrix.
+ +/
 class UnitaryMatrix(T) : MatrixAbstract!T
 if (is(Complex!T : T))
 {
-    /+
-        This matrix is defined in 
-            Unitary Evolution Recurrent Neural Networks,
-            Arjovsky, Shah, Bengio
-            (http://proceedings.mlr.press/v48/arjovsky16.pdf)
-
-        Its aim is to allow one to learn a unitary matrix that
-        depends on number of parameters that is linear relatively
-        to the size of matrix.
-
-        The resulting function is:
-            D_3 * R_2 * invF * D_2 * P * R_1 * F * D_1
-
-        where D_i are diagonal unitary complex matrices,
-              R_i are reflection unitary complex matrices,
-              F and invF are respectivelly the fourier
-                and inverse fourier transform,
-              P is a permutation matrix.
-     +/
-
     static assert(is(Complex!T : T),
                "UnitaryMatrix must be complex-valued.");
 
@@ -786,6 +790,11 @@ unittest
     write("Done.\n");
 }
 
+/++ Fourier Matrix class.
+ +
+ +  Implement the fourier matrix.
+ +
+ +/
 class FourierMatrix(T) : MatrixAbstract!T
 if (is(Complex!T : T))
 {
@@ -874,6 +883,12 @@ unittest
     write("Done.\n");
 }
 
+
+/++ Diagonal matrix class.
+ +
+ + TODO: There mmight be too much things, we could need to remove some methods.
+ +
+ +/
 class DiagonalMatrix(T) : MatrixAbstract!T {
     T[] mat;
     
@@ -1118,19 +1133,20 @@ unittest
     write("Done.\n");
 }
 
+/++ Reflection matrix class.
+ +
+ +
+ + We define a reflection matrix to be of the form:
+ +  I - 2vv*/||v||^2
+ + where I is the identity matrix
+ + v is a complex vector
+ + v* denotes the conjugate transpose of v
+ + ||v||^2 is the euclidean norm of v
+ +/
 class ReflectionMatrix(T) : MatrixAbstract!T {
     Vector!T vec;
     real invSqNormVec2 = 1.0;
     
-    /+
-     + We define a reflection matrix to be of the form:
-     +  I - 2vv*/||v||^2
-     + where I is the identity matrix
-     + v is a complex vector
-     + v* denotes the conjugate transpose of v
-     + ||v||^2 is the euclidean norm of v
-     +/
-
     /// Constructor
     pure @safe
     this(in size_t size)
@@ -1328,7 +1344,8 @@ unittest
     writeln("Done.");
 }
 
-
+/++ Permutation matrix class.
+ +/
 class PermutationMatrix(T) : MatrixAbstract!T {
     size_t[] perm;
 
@@ -1449,6 +1466,8 @@ unittest
     write("Done.\n");
 }
 
+/++ General matrix class.
+ +/
 class Matrix(T) : MatrixAbstract!T {
     T[] mat;
 
