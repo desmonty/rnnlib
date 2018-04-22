@@ -12,14 +12,11 @@ One of the auxiliary goal of this project is to cut any dependencies between the
 and the recurrent neural netwroks to enable anyone to use it independently.
 
 ## Daily Todo
-* Think about parameters shared between layers: can the layer be different and share the same parameters ?
 * Makes UnitaryMatrix takes non-complex number
-* pull request / tasks / overall management.
-* wip: Neural Networks
-  * addLayer meta-logic (from, to, name)
-  * compute logic
+* override toString for vector => writeln(vector) should print the array.
+* Think about parameters shared between layers: can the layer be different and share the same parameters ?
 * dropout
-* randclone weigths: serialized_data holds all weigths -> can be constructed using smaller array with random cloning.
+* (optm) randclone weigths: serialized_data holds all weigths -> can be constructed using smaller array with random cloning.
 
 
 # TODO
