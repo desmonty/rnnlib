@@ -47,7 +47,7 @@ class NeuralNetwork(T) {
     else alias Tc = T;
 
     private {
-    	// Array of the layers.
+        // Array of the layers.
         Layer!T[] layers;
 
         // Save the result of the computation of a layer. Allow its multiple use.
@@ -91,24 +91,24 @@ class NeuralNetwork(T) {
         arr_dim_out = [_dim_in];
     }
 
-    /++ Create a Linear Layer in the network and handle the logic for futur
-     +  computation.
+
+    /++ A general method to add a Layer.
+     +  It should be sufficient for all the cases as it only
+     +  handles the direction logic between the layers.
      +
-     +  Args:
-     +      _dim_out (size_t): Dimension of the resulting vector.
-     +      _use_bias (bool, =false): Add a bias vector to the output if true.
-     +      _in (size_t[], =null): A list of layers' name for the layer to take its
-     +                        inputs. If empty, the last known layer will be took.
+     +  It use lazy evaluation to create create the layer at the right time,
+     +  being lazy is the solution for a better generalization !
      +/
+    private
     auto
-    addLinearLayer(in size_t _dim_out,
-                   in bool _use_bias=false,
-                   in Tc _randomBound=1.0,
-                   in string _type="Matrix",
-                   in string _name=null,
-                   in Vector!T _state=null,
-                   in string[] _in=null,
-                   in string[] _to=null)
+    addLayer(in size_t _dim_out,
+             lazy Layer!T _create_layer,
+             in bool _use_bias=false,
+             in Tc _randomBound=1.0,
+             in string _name=null,
+             Vector!T _state=null,
+             in string[] _in=null,
+             in string[] _to=null)
     {
         // If the dimension of the output vector is zero.
         if (!_dim_out)
@@ -154,15 +154,85 @@ class NeuralNetwork(T) {
         arr_dim_in ~= arr_dim_out[_inputs[0]];
         arr_dim_out ~= _dim_out;
 
-        // Create the Linear Layer.
-        auto tmp_layer = new MatrixLayer!T(_type, [_dim_out, arr_dim_in[id]],
-                                           _use_bias, _randomBound);
-
         // Add the layer to the network.
-        layers ~= tmp_layer;
+        layers ~= _create_layer();
 
         ++id;
         return this;
+    }
+
+
+    /++ Create a Linear Layer in the network and handle the logic for futur
+     +  computation.
+     +
+     +  Args:
+     +      _dim_out (size_t): Dimension of the resulting vector.
+     +      _use_bias (bool, =false): Add a bias vector to the output if true.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +/
+    auto
+    addLinearLayer(in size_t _dim_out,
+                   in bool _use_bias=false,
+                   in Tc _randomBound=1.0,
+                   in string _type="Matrix",
+                   in string _name=null,
+                   Vector!T _state=null,
+                   in string[] _in=null,
+                   in string[] _to=null)
+    {
+        return addLayer(_dim_out,
+                        new MatrixLayer!T(_type, [_dim_out, arr_dim_in[id]],
+                                           _use_bias, _randomBound),
+                        _use_bias, _randomBound,
+                        _name, _state, _in, _to);
+    }
+
+
+    // Functional layer.
+    auto
+    addFunctionLayer(in size_t _dim_out,
+                     in string _function,
+                     in string _name=null,
+                     Vector!T _state=null,
+                     in string[] _in=null,
+                     in string[] _to=null)
+    {
+        return addLayer(_dim_out,
+                        new FunctionalLayer!T(_function, arr_dim_out[$-1]),
+                        false, 0.0,
+                        _name, _state,
+                        _in, _to);
+    }
+
+    auto
+    addFunctionLayer(in size_t _dim_out,
+                     Vector!T delegate(Vector!T) _function,
+                     in string _name=null,
+                     Vector!T _state=null,
+                     in string[] _in=null,
+                     in string[] _to=null)
+    {
+        return addLayer(_dim_out,
+                        new FunctionalLayer!T(_function),
+                        false, 0.0,
+                        _name, _state,
+                        _in, _to);
+    }
+
+    auto
+    addFunctionLayer(in size_t _dim_out,
+                     Vector!T delegate(Vector!T, Parameter[]) _function,
+                     in string _name=null,
+                     Vector!T _state=null,
+                     in string[] _in=null,
+                     in string[] _to=null)
+    {
+        return addLayer(_dim_out,
+                        new FunctionalLayer!T(_function),
+                        false, 0.0,
+                        _name, _state,
+                        _in, _to);
     }
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
