@@ -264,52 +264,68 @@ class NeuralNetwork(T) {
 unittest {
     write("Unittest: NeuralNetwork ... ");
 
-    // Initialize the neural network.
-    // At this point, we have the identity function.
-    auto nn = new NeuralNetwork!float(4);
+    // Neural Network 1: Simple linear layer neural network.
+    // Neural Network 2: Two linear layer with a recurrence.
+    {
+        // Initialize the neural network.
+        // At this point, we have the identity function.
+        auto nn = new NeuralNetwork!float(4);
 
-    // Vector of L2 norm = 1.
-    auto v = new Vector!float([0.5, 0.0, -0.5, 0.7071068]);
+        // Vector of L2 norm = 1.
+        auto v = new Vector!float([0.5, 0.0, -0.5, 0.7071068]);
 
-    // w should be equal to v.
-    auto w = nn.compute(v);
-    w -= v;
+        // w should be equal to v.
+        auto w = nn.compute(v);
+        w -= v;
 
-    assert(w.norm!"L2" <= 0.0001);
+        assert(w.norm!"L2" <= 0.0001);
 
-    // We add a Linear Layer of shape (6, 4).
-    nn.addLinearLayer(6, false, 1.0, "Matrix", "L1");
-    w = nn.compute(v);
+        // We add a Linear Layer of shape (6, 4).
+        nn.addLinearLayer(6, false, 1.0, "Matrix", "L1");
+        w = nn.compute(v);
 
-    // Hence, the resulting vector should have length 6.
-    assert(w.length == 6);
+        // Hence, the resulting vector should have length 6.
+        assert(w.length == 6);
 
-    // We add some complexity: the layer take the user's input and the ouput of "L1"
-    // and return its output to "L1" (And so create a rnn-like structure) and to
-    // the output (by default, the result of the last layer).
-    nn.addLinearLayer(4, false, 1.0, "Matrix", "L2", null, null, ["L1"]);
-    w = nn.compute(v);
-    auto z = nn.compute(v);
+        // We add some complexity: the layer take the user's input and the ouput of "L1"
+        // and return its output to "L1" (And so create a rnn-like structure) and to
+        // the output (by default, the result of the last layer).
+        nn.addLinearLayer(4, false, 1.0, "Matrix", "L2", null, null, ["L1"]);
+        w = nn.compute(v);
+        auto z = nn.compute(v);
 
-    // Now we reconstruct what we think the neural network should compute.
-    // w
-    auto w_bis = (cast(Matrix!float) nn.layers[1].params[0]) * v;
-    w_bis *= (cast(Matrix!float) nn.layers[2].params[0]);
+        // Now we reconstruct what we think the neural network should compute.
+        // w
+        auto w_bis = (cast(Matrix!float) nn.layers[1].params[0]) * v;
+        w_bis *= (cast(Matrix!float) nn.layers[2].params[0]);
 
-    auto hidden = w_bis.dup;
-    w_bis -= w;
+        auto hidden = w_bis.dup;
+        w_bis -= w;
 
-    assert(w_bis.norm!"L2" <= 0.0001);
+        assert(w_bis.norm!"L2" <= 0.0001);
 
-    // z
-    auto z_bis = hidden;
-    z_bis += v;
-    z_bis = (cast(Matrix!float) nn.layers[1].params[0]) * z_bis;
-    z_bis = (cast(Matrix!float) nn.layers[2].params[0]) * z_bis;
+        // z
+        auto z_bis = hidden;
+        z_bis += v;
+        z_bis = (cast(Matrix!float) nn.layers[1].params[0]) * z_bis;
+        z_bis = (cast(Matrix!float) nn.layers[2].params[0]) * z_bis;
+        
+        z_bis -= z;
+        assert(z_bis.norm!"L2" <= 0.0001);
+    }
     
-    z_bis -= z;
-    assert(z_bis.norm!"L2" <= 0.0001);
+    // Neural Network 1: Simple linear layer + softmax.
+    // Neural Network 2: RNN: Linear + relu + Linear (+backlink) + .
+    {
+        auto nn1 = new NeuralNetwork!real(5);
+        nn1.addLinearLayer(5)
+           .addFunctionLayer(5, "softmax");
 
+        auto vec = new Vector!real(5, 1.0);
+
+        auto w = nn1.compute(vec);
+
+    }
 
     writeln("TODO.");
 }
