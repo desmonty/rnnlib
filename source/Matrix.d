@@ -92,7 +92,7 @@ class MatrixAbstract(T) : Parameter {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
         // TODO: Refactor. This is ugly but one can't simply use mixin here.
         switch (typeId)
         {
@@ -136,7 +136,7 @@ class MatrixAbstract(T) : Parameter {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
         // TODO: Refactor.
         switch (typeId)
         {
@@ -472,7 +472,7 @@ class BlockMatrix(T) : MatrixAbstract!T {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
         T[] vec = this.P * v;
 
         size_t blocks_in = size_in / size_blocks;
@@ -513,7 +513,7 @@ class BlockMatrix(T) : MatrixAbstract!T {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
         enforce(size_out == size_in, "Inverse of rectangular
                                       block matrix is not implemented");
         T[] vec = v / this.Q;
@@ -710,7 +710,7 @@ if (is(Complex!T : T))
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
 
         T[] res = v.dup;
         
@@ -741,7 +741,7 @@ if (is(Complex!T : T))
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
         T[] res = v.dup;
 
         applyDiagonalInv(res, 2);
@@ -831,7 +831,7 @@ if (is(Complex!T : T))
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
         return objFFT.fft!Tc(v);
     }
 
@@ -840,7 +840,7 @@ if (is(Complex!T : T))
     Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector divison: dimensions mismatch.");
         return new Vector!T(v.v / this);
     }
 
@@ -1007,7 +1007,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     auto opBinary(string op)(in T[] other)
     if (op=="*")
     {
-        enforce(other.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(other.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
         auto res = new T[other.length];
         foreach(i;0 .. rows)
             res[i] = mat[i] * other[i];
@@ -1025,7 +1025,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     auto opBinaryRight(string op)(in T[] other)
     if (op=="/")
     {
-        enforce(other.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(other.length == cols, "Matrix-Vector division: dimensions mismatch.");
         auto res = new T[other.length];
         foreach(i;0 .. rows)
             res[i] = other[i] / mat[i];
@@ -1241,7 +1241,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
         T[] vres = v.dup;
         T s = vec.conjdot(v, vec);
         T[] tmp = vec.v.dup;
@@ -1263,7 +1263,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
         // The inverse of a reflection is the very same reflection.
         T[] vres = v.dup;
         T s = vec.conjdot(v, vec);
@@ -1423,7 +1423,7 @@ class PermutationMatrix(T) : MatrixAbstract!T {
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
         auto vres = new T[v.length];
         foreach(i; 0 .. v.length)
             vres[i] = v[perm[i]];
@@ -1441,7 +1441,7 @@ class PermutationMatrix(T) : MatrixAbstract!T {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
         auto vres = new T[v.length];
         foreach(i; 0 .. v.length)
             vres[perm[i]] = v[i];
@@ -1585,7 +1585,7 @@ class Matrix(T) : MatrixAbstract!T {
     auto opBinary(string op)(in Matrix other)
     if (op == "*")
     {
-        enforce(cols == other.rows,"Matrix-Matrix dimensions mismatch.");
+        enforce(cols == other.rows,"Matrix-Matrix multiplication: dimensions mismatch.");
         auto res = new Matrix(rows, other.cols);
         foreach(i;0 .. rows) {
             foreach(j; 0 .. other.cols) {
@@ -1610,7 +1610,7 @@ class Matrix(T) : MatrixAbstract!T {
     auto opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        enforce(v.length == cols, "Matrix-Vector dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
         auto res = new T[rows];
         foreach(size_t i; 0 .. rows){
             T s = mat[i*cols]*v[0];
