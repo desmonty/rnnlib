@@ -25,6 +25,8 @@ abstract class Parameter {
     static private bool init = true;
     static protected auto rnd = Random(0);
 
+    string typeId;
+
     pure  @safe
     this() {}
 
@@ -62,6 +64,7 @@ class Vector(T) : Parameter {
     this(size_t length)
     {
         v = new T[length];
+        typeId = "Vector";
     }
  
     /// Random constructor.
@@ -70,6 +73,7 @@ class Vector(T) : Parameter {
     {
         super(true);
         v = new T[length];
+        typeId = "Vector";
 
         if (randomBound < 0)
             throw new Exception("'randomBound' must be >= 0");
@@ -219,11 +223,11 @@ class Vector(T) : Parameter {
     { 
         static if (op == "*")
         {
-            v[] *= M.mat[]; 
+            v[] *= M.params[]; 
         }
         else static if (op == "/")
         {
-            v[] /= M.mat[]; 
+            v[] /= M.params[]; 
         }
         else static assert(0, "Operator "~op~" not implemented.");
     }
@@ -541,7 +545,7 @@ unittest
     {
         alias Diag = DiagonalMatrix!float;
         auto m1 = new Diag(1_000, 1.0f);
-        auto v2 = new Vectoruf(m1.mat);
+        auto v2 = new Vectoruf(m1.params);
         auto vr = new Vectoruf(1_000, 1000.0f);
         auto ur = new Vectoruf(vr);
 
@@ -633,7 +637,7 @@ unittest
     // General matrix
     {
         auto m = new Matrix!float(4, 4);
-        m.mat = [1.0, 0.0, 0.0, 0.0,
+        m.params = [1.0, 0.0, 0.0, 0.0,
                  0.0, 0.0, 2.0, 0.0,
                  0.0, 0.5, 0.0, 0.0,
                  0.0, 0.0, 0.0, 1.0];
