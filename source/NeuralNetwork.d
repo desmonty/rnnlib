@@ -322,11 +322,11 @@ class NeuralNetwork(T) {
     auto serialize()
     {
         // First we want to know the size of the total array.
-        size_t total_size = 0;
+        size_t total_size = 0;/+
         foreach(tmp_l; layers)
-        {
-            
-        }
+            total_size += tmp_l.params
+                               .map!(a => type_to_size(a))
+                               .sum;+/
     }
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
