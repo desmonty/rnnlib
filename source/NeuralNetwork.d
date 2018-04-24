@@ -309,6 +309,26 @@ class NeuralNetwork(T) {
                         _in, _to);
     }
 
+    /++ Serialize all the parameters in the neural networks.
+     +  This funciton should be called at the end of the construction of the neural network.
+     +  It is a MANDATORY step for the optimization of the network.
+     +
+     +  This method will create an array of type 'T[]' so that all the parameters (Matrix and Vectors)
+     +  should have their weights in it. In practice, what we want is to change the neural networks
+     +  weights by changing only the array.
+     +  This way of changing the weights of the neural networks should ease the work of the optimization
+     +  algorithms.
+     +/
+    auto serialize()
+    {
+        // First we want to know the size of the total array.
+        size_t total_size = 0;
+        foreach(tmp_l; layers)
+        {
+            
+        }
+    }
+
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
     Vector!T compute(in Vector!T _v)
     {
