@@ -55,7 +55,6 @@ unittest
 class MatrixAbstract(T) : Parameter {
     // TODO: make member private.
     size_t rows, cols;
-    string typeId;
 
     static if (is(Complex!T : T))
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
@@ -890,7 +889,7 @@ unittest
  +
  +/
 class DiagonalMatrix(T) : MatrixAbstract!T {
-    T[] mat;
+    T[] params;
     
     /// Constructor
     pure @safe
@@ -898,7 +897,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     {
         typeId = "DiagonalMatrix";
         rows = size; cols = size;
-        mat = new T[size];
+        params = new T[size];
     }
 
     /// Simple constructor with random initialization
@@ -910,18 +909,18 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
         if (randomBound < 0)
             throw new Exception("'randomBound' must be >= 0");
         if (randomBound.abs == 0) {
-            foreach(i; 0 .. mat.length)
-                mat[i] = to!(T)(0);
+            foreach(i; 0 .. params.length)
+                params[i] = to!(T)(0);
         }
         else {
             static if (is(Complex!T : T)) {
                 foreach(i;0 .. size)
-                    mat[i] = complex(uniform(-randomBound, randomBound, rnd),
+                    params[i] = complex(uniform(-randomBound, randomBound, rnd),
                                      uniform(-randomBound, randomBound, rnd));
             }
             else {
                 foreach(i;0 .. size)
-                    mat[i] = uniform(-randomBound, randomBound, rnd);
+                    params[i] = uniform(-randomBound, randomBound, rnd);
             }
         }
     }
@@ -932,7 +931,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     {
         this(M.rows);
         foreach(i;0 .. rows)
-            this.mat[i] = M.mat[i];
+            this.params[i] = M.params[i];
     }
 
     /// Constructor from list
@@ -940,7 +939,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     this(in T[] valarr)
     {
         this(valarr.length);
-        mat = valarr.dup;
+        params = valarr.dup;
     }
 
 
@@ -960,20 +959,20 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     /// Assign Value to indices.
     pure @safe
     void opIndexAssign(T value, in size_t i, in size_t j)
-    {if (i == j) mat[i] = value;}
+    {if (i == j) params[i] = value;}
     /// Assign Value to index.
     pure @safe
     void opIndexAssign(T value, in size_t i)
-    {mat[i] = value;}
+    {params[i] = value;}
 
     /// Return value by indices.
     pure @safe
     ref T opIndex(in size_t i, in size_t j)
-    {return mat[i];}
+    {return params[i];}
     /// Return value by index.
     pure @safe
     ref T opIndex(in size_t i)
-    {return mat[i];}
+    {return params[i];}
 
     /// Operation +-*/ between Diagonal Matrix.
     const pure @safe
@@ -982,7 +981,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     {
         auto res = new DiagonalMatrix(this);
         foreach(i;0 .. rows)
-            mixin("res.mat[i] " ~ op ~ "= other.mat[i];");
+            mixin("res.params[i] " ~ op ~ "= other.params[i];");
         return res;
     }
 
@@ -992,7 +991,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     if (op=="+" || op=="-" || op=="*" || op=="/")
     {
         foreach(i;0 .. rows)
-            mixin("mat[i] " ~ op ~ "= other.mat[i];");
+            mixin("params[i] " ~ op ~ "= other.params[i];");
     }
 
     ///  Vector multiplication.
@@ -1010,7 +1009,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
         enforce(other.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
         auto res = new T[other.length];
         foreach(i;0 .. rows)
-            res[i] = mat[i] * other[i];
+            res[i] = params[i] * other[i];
         return res;
     }
 
@@ -1028,7 +1027,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
         enforce(other.length == cols, "Matrix-Vector division: dimensions mismatch.");
         auto res = new T[other.length];
         foreach(i;0 .. rows)
-            res[i] = other[i] / mat[i];
+            res[i] = other[i] / params[i];
         return res;
     }
 
@@ -1043,7 +1042,6 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
             return res;
         }
         else static if (op=="*" || op=="/"){
-            // TODO : Implement
             auto res = M.dup;
             foreach(i;0 .. M.rows)
                 mixin("res[i,i] " ~ op ~ "= M[i,i];");
@@ -1065,7 +1063,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     @property const @safe
     T sum()
     {
-        return mat.sum;
+        return params.sum;
     }
 }
 unittest
@@ -1475,7 +1473,7 @@ unittest
  +
  +/
 class Matrix(T) : MatrixAbstract!T {
-    T[] mat;
+    T[] params;
 
     /// Simple constructor
     pure @safe
@@ -1483,7 +1481,7 @@ class Matrix(T) : MatrixAbstract!T {
     {
         super();
         typeId = "Matrix";
-        mat = new T[rows*cols];
+        params = new T[rows*cols];
         this.rows = rows;
         this.cols = cols;
     }
@@ -1506,25 +1504,25 @@ class Matrix(T) : MatrixAbstract!T {
     {
         super(true);
         typeId = "Matrix";
-        mat = new T[rows*cols];
+        params = new T[rows*cols];
         this.rows = rows;
         this.cols = cols;
 
         if (randomBound < 0)
             throw new Exception("'randomBound' must be >= 0");
         if (randomBound.abs == 0) {
-            foreach(i; 0 .. mat.length)
-                mat[i] = to!(T)(0);
+            foreach(i; 0 .. params.length)
+                params[i] = to!(T)(0);
         }
         else {
             static if (is(Complex!T : T)) {
-                foreach(i;0 .. mat.length)
-                    mat[i] = complex(uniform(-randomBound, randomBound, rnd),
+                foreach(i;0 .. params.length)
+                    params[i] = complex(uniform(-randomBound, randomBound, rnd),
                                      uniform(-randomBound, randomBound, rnd));
             }
             else {
                 foreach(i;0 .. rows*cols)
-                    mat[i] = uniform(-randomBound, randomBound, rnd);
+                    params[i] = uniform(-randomBound, randomBound, rnd);
             }
         }
     }
@@ -1535,7 +1533,7 @@ class Matrix(T) : MatrixAbstract!T {
     {
         this(dupl.rows, dupl.cols);
         foreach(i;0 .. rows*cols) {
-            mat[i] = dupl.mat[i];
+            params[i] = dupl.params[i];
         }
     }
 
@@ -1554,19 +1552,19 @@ class Matrix(T) : MatrixAbstract!T {
 
     pure @safe
     void opIndexAssign(T value, in size_t i, in size_t j)
-    {mat[i*cols + j] = value;}
+    {params[i*cols + j] = value;}
 
     /// Return value by index.
     pure const @safe
     T opIndex(in size_t i, in size_t j)
-    {return mat[i*cols + j];}
+    {return params[i*cols + j];}
    
     /// Simple math operation without memory allocation.
     pure @safe
     void opOpAssign(string op)(in Matrix other)
     {
-             static if (op == "+") { mat[] += other.mat[]; }
-        else static if (op == "-") { mat[] -= other.mat[]; }
+             static if (op == "+") { params[] += other.params[]; }
+        else static if (op == "-") { params[] -= other.params[]; }
         else static if (op == "*") { this  = this * other; }
         else static assert(0, "Operator "~op~" not implemented.");
     }
@@ -1576,8 +1574,8 @@ class Matrix(T) : MatrixAbstract!T {
     if (op == "+" || op == "-")
     {
         auto res = new Matrix(this);
-        foreach(i;0 .. mat.length)
-            mixin("res.mat[i] " ~ op ~ "= other.mat[i];");
+        foreach(i;0 .. params.length)
+            mixin("res.params[i] " ~ op ~ "= other.params[i];");
         return res;
     }
 
@@ -1591,7 +1589,7 @@ class Matrix(T) : MatrixAbstract!T {
             foreach(j; 0 .. other.cols) {
                 T s;
                 foreach(k; 0 .. cols){
-                    s += mat[i*cols + k] * other.mat[k*other.cols + j];
+                    s += params[i*cols + k] * other.params[k*other.cols + j];
                 }
                 res[i, j] = s;
             }
@@ -1613,9 +1611,9 @@ class Matrix(T) : MatrixAbstract!T {
         enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
         auto res = new T[rows];
         foreach(size_t i; 0 .. rows){
-            T s = mat[i*cols]*v[0];
+            T s = params[i*cols]*v[0];
             foreach(size_t j; 1 .. cols)
-                s += mat[i*cols + j]*v[j];
+                s += params[i*cols + j]*v[j];
             res[i] = s;
         }
         return res;
@@ -1629,13 +1627,13 @@ unittest
     auto m3 = new Matrix!(Complex!float)(30, 5, 10.0f);
     auto m4 = new Matrix!real(100, 1.0);
     auto m5 = new Matrix!real(100);
-    m5.mat = m4.mat.dup;
+    m5.params = m4.params.dup;
 
     m2 -= m1;
-    assert(m2.mat.sum.abs < 0.1);
+    assert(m2.params.sum.abs < 0.1);
 
     m5 -= m4;
-    assert(m5.mat.sum.abs < 0.1);
+    assert(m5.params.sum.abs < 0.1);
 
     m2 += m1;
     auto m6 = m1 * m3;
