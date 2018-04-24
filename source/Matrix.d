@@ -1143,7 +1143,6 @@ unittest
  +/
 class ReflectionMatrix(T) : MatrixAbstract!T {
     Vector!T vec;
-    real invSqNormVec2 = 1.0;
     
     /// Constructor
     pure @safe
@@ -1172,7 +1171,6 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
             foreach(size_t i;0 .. size)
                vec[i] = uniform(-randomBound, randomBound, rnd);
         }
-        compute_invSqNormVec2();
     }
 
 
@@ -1184,7 +1182,6 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
         rows = dupl.vec.length;
         cols = dupl.vec.length;
         vec = dupl.vec.dup;
-        invSqNormVec2 = dupl.invSqNormVec2;
     }
 
     /// Constructor from list.
@@ -1194,7 +1191,6 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
         rows = valarr.length;
         cols = valarr.length;
         vec = new Vector!T(valarr);
-        compute_invSqNormVec2();
     }
     /// Constructor from Vector.
     pure @safe
@@ -1211,17 +1207,16 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
         return new ReflectionMatrix(this);
     }
 
-    /// Compute the norm (n) of the reflection vector and store -2n^-2
-    pure @safe
-    void compute_invSqNormVec2()
-    {
-        invSqNormVec2 = -2*pow(vec.norm!"L2",-2);
-    }
-
     @property const pure @safe
     size_t length()
     {
         return rows;
+    }
+
+    @property const pure @safe
+    Tc invSqNormVec2()
+    {
+        return -2*pow(vec.norm!"L2",-2);
     }
 
     /+ Vector multiplication.
@@ -1240,6 +1235,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     if (op=="*")
     {
         enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
+        Tc invSqNormVec2 = -2*pow(vec.norm!"L2",-2);
         T[] vres = v.dup;
         T s = vec.conjdot(v, vec);
         T[] tmp = vec.v.dup;
@@ -1262,6 +1258,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     if (op=="/")
     {
         enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
+        Tc invSqNormVec2 = -2*pow(vec.norm!"L2",-2);
         // The inverse of a reflection is the very same reflection.
         T[] vres = v.dup;
         T s = vec.conjdot(v, vec);
@@ -1277,6 +1274,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     Matrix!T toMatrix()
     {
         auto res = new Matrix!T(rows, cols);
+        Tc invSqNormVec2 = -2*pow(vec.norm!"L2",-2);
         T s;
         foreach(size_t i; 0 .. rows) {
             s = vec[i]*invSqNormVec2;

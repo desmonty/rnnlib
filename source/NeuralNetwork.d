@@ -325,7 +325,7 @@ class NeuralNetwork(T) {
         size_t total_size = 0;/+
         foreach(tmp_l; layers)
             total_size += tmp_l.params
-                               .map!(a => type_to_size(a))
+                               .map!(a => typeToSize(a))
                                .sum;+/
     }
 

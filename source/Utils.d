@@ -462,3 +462,30 @@ unittest {
 
     writeln(" Done.");
 }
+
+
+/++ Utility functionused to know the number of parameters in a Parameter Object.
+ +/
+@safe @nogc pure
+size_t typeToSize(T)(in Parameter _param)
+{
+    switch (_param.typeId)
+    {
+        case "Matrix":
+            return (cast(Matrix!T) _param).params.length;
+        case "ReflectionMatrix":
+            return (cast(ReflectionMatrix!T) _param).vec.length;
+        case "DiagonalMatrix":
+            return (cast(DiagonalMatrix!T) _param).params.length;
+        case "UnitaryMatrix":
+            return (cast(UnitaryMatrix!T) _param).params.length;
+        case "BlockMatrix":
+            return (cast(BlockMatrix!T) _param).blocks
+                                               .map(a => typeToSize!T(a))
+                                               .sum;
+        case "Vector":
+            return (cast(Vector!T) _param).length;
+        default:
+            return 0;
+    }
+}
