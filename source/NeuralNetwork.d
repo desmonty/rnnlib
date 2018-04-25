@@ -1,6 +1,6 @@
 module source.NeuralNetwork;
 
-import std.algorithm: map;
+import std.algorithm: map, sum;
 import std.array: array;
 import std.conv: to;
 import std.exception: enforce;
@@ -8,6 +8,7 @@ import std.exception: enforce;
 import source.Layer;
 import source.Matrix;
 import source.Parameter;
+import source.Utils;
 
 version(unittest)
 {
@@ -78,6 +79,7 @@ class NeuralNetwork(T) {
         T[] serialized_data;
     }
 
+    @safe pure
     this(in size_t _dim_in)
     {
         // We set the first elements of these arrays to null because
@@ -103,6 +105,7 @@ class NeuralNetwork(T) {
      +  being lazy is the solution for a better generalization !
      +/
     private
+    @safe
     auto addLayer(size_t _dim_out,
                   lazy Layer!T _create_layer,
                   in bool _use_bias,
@@ -319,14 +322,22 @@ class NeuralNetwork(T) {
      +  This way of changing the weights of the neural networks should ease the work of the optimization
      +  algorithms.
      +/
-    auto serialize()
+    @property
+    void serialize()
     {
         // First we want to know the size of the total array.
-        size_t total_size = 0;/+
+        // We sum the size of each layer.
+        size_t total_size = 0;
         foreach(tmp_l; layers)
-            total_size += tmp_l.params
-                               .map!(a => typeToSize(a))
-                               .sum;+/
+            if (!(tmp_l is null))
+                total_size += tmp_l.params
+                                   .map!(a => paramsToSize!T(a))
+                                   .sum;
+
+        serialized_data = new T[total_size];
+
+        // TODO: Go through each layer, copy the data in serialized_data
+        //       and then make the layers points to it.
     }
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
@@ -379,6 +390,7 @@ unittest {
         nn.Linear(6, false, 1.0, "Matrix", "L1");
         w = nn.compute(v);
 
+
         // Hence, the resulting vector should have length 6.
         assert(w.length == 6);
 
@@ -388,6 +400,7 @@ unittest {
         nn.Linear(4, false, 1.0, "Matrix", "L2", null, null, ["L1"]);
         w = nn.compute(v);
         auto z = nn.compute(v);
+
 
         // Now we reconstruct what we think the neural network should compute.
         // w
@@ -421,6 +434,7 @@ unittest {
            .Function("softmax", 5);
 
 
+
         auto w = nn1.compute(vec);
 
         assert(abs(1 - w.norm!"L1") <= 0.0001);
@@ -434,6 +448,7 @@ unittest {
            .Function("softmax");
 
 
+
         auto s = nn2.results[3].dup; 
 
         auto nn3 = new NeuralNetwork!real(5);
@@ -442,6 +457,7 @@ unittest {
            .Linear(5, false, 1.0, "Matrix", null, s, null, ["Rec_in"])
            .Linear(5, true)
            .Function("softmax");
+
 
 
         // put same parameters in the second nn.
@@ -484,5 +500,5 @@ unittest {
         assert(b_4.norm!"L2" <= 0.0001);
     }
 
-    writeln("Done.");
+    writeln("TODO.");
 }

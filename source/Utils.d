@@ -11,6 +11,7 @@ import source.Matrix;
 import source.Parameter;
 
 version(unittest) {
+    import std.complex;
     import std.stdio: write, writeln;
 }
 
@@ -466,8 +467,8 @@ unittest {
 
 /++ Utility functionused to know the number of parameters in a Parameter Object.
  +/
-@safe @nogc pure
-size_t typeToSize(T)(in Parameter _param)
+@nogc pure
+size_t paramsToSize(T)(in Parameter _param)
 {
     switch (_param.typeId)
     {
@@ -478,14 +479,40 @@ size_t typeToSize(T)(in Parameter _param)
         case "DiagonalMatrix":
             return (cast(DiagonalMatrix!T) _param).params.length;
         case "UnitaryMatrix":
-            return (cast(UnitaryMatrix!T) _param).params.length;
+            static if (is(Complex!T : T))
+                return (cast(UnitaryMatrix!T) _param).params.length;
+            else
+                return 0;
         case "BlockMatrix":
             return (cast(BlockMatrix!T) _param).blocks
-                                               .map(a => typeToSize!T(a))
+                                               .map!(a => paramsToSize!T(a))
                                                .sum;
         case "Vector":
             return (cast(Vector!T) _param).length;
         default:
             return 0;
     }
+}
+unittest{
+    write("                 paramsToSize ...");
+
+    auto v1 = new Vector!float(6, 0);
+    auto v2 = new Vector!(Complex!real)(18, 43.0);
+
+    auto m1 = new Matrix!double(7, 9.9);
+    auto m2 = new UnitaryMatrix!(Complex!real)(64, 1.0);
+    auto m3 = new ReflectionMatrix!float(67, 80.0);
+    auto m4 = new DiagonalMatrix!(Complex!real)(64, 4.141516);
+    auto m5 = new BlockMatrix!(Complex!real)(128, 64, [m2, m4], true);
+
+    assert(paramsToSize!float(v1) == 6);
+    assert(paramsToSize!(Complex!real)(v2) == 18);
+
+    assert(paramsToSize!double(m1) == 7*7);
+    assert(paramsToSize!(Complex!real)(m2) == 64*7);
+    assert(paramsToSize!float(m3) == 67);
+    assert(paramsToSize!(Complex!real)(m4) == 64);
+    assert(paramsToSize!(Complex!real)(m5) == 64*7+64);
+
+    writeln(" TODO.");
 }
