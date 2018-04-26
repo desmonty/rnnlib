@@ -338,6 +338,12 @@ class NeuralNetwork(T) {
 
         // TODO: Go through each layer, copy the data in serialized_data
         //       and then make the layers points to it.
+
+        size_t _index = 0;
+        foreach(tmp_l; layers)
+            if (!(tmp_l is null))
+                foreach(tmp_param; tmp_l.params)
+                    takeOwnership!T(serialized_data, tmp_param, _index);
     }
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
@@ -498,6 +504,28 @@ unittest {
         assert(b_2.norm!"L2" <= 0.0001);
         assert(b_3.norm!"L2" <= 0.0001);
         assert(b_4.norm!"L2" <= 0.0001);
+    }
+
+    // Neural Network: Linear + softmax
+    {
+        auto nn = new NeuralNetwork!real(4);
+        nn.Linear(4, true)
+          .Function("softmax")
+          .serialize;
+
+        auto v = new Vector!real([1.0, -1.0, 0.0, 1.0]);
+
+        assert(nn.serialized_data.length == 4*4+4);
+
+        foreach(i; 0 .. nn.serialized_data.length)
+            nn.serialized_data[i] = 1.0;
+
+        v = nn.compute(v);
+
+        auto res = new Vector!real([0.25, 0.25, 0.25, 0.25]);
+        res -= v;
+
+        assert(res.norm!"L2" <= 0.0001);
     }
 
     writeln("TODO.");

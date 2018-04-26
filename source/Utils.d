@@ -481,8 +481,6 @@ size_t paramsToSize(T)(in Parameter _param)
         case "UnitaryMatrix":
             static if (is(Complex!T : T))
                 return (cast(UnitaryMatrix!T) _param).params.length;
-            else
-                return 0;
         case "BlockMatrix":
             return (cast(BlockMatrix!T) _param).blocks
                                                .map!(a => paramsToSize!T(a))
@@ -504,6 +502,7 @@ unittest{
     auto m3 = new ReflectionMatrix!float(67, 80.0);
     auto m4 = new DiagonalMatrix!(Complex!real)(64, 4.141516);
     auto m5 = new BlockMatrix!(Complex!real)(128, 64, [m2, m4], true);
+    auto m6 = new PermutationMatrix!float(8);
 
     assert(paramsToSize!float(v1) == 6);
     assert(paramsToSize!(Complex!real)(v2) == 18);
@@ -513,6 +512,80 @@ unittest{
     assert(paramsToSize!float(m3) == 67);
     assert(paramsToSize!(Complex!real)(m4) == 64);
     assert(paramsToSize!(Complex!real)(m5) == 64*7+64);
+    assert(m6.paramsToSize!float == 0);
 
-    writeln(" TODO.");
+
+    writeln(" Done.");
+}
+
+/++ A function that put the _ownee array inside the _owner array such that
+ +  any change in the _owner array will be also made to the _ownee array.
+ +  In other words, the _owner array take ownership of the _ownee array.
+ +/
+@safe @nogc pure
+void takeOwnership(T)(ref T[] _owner, ref T[] _ownee, ref size_t _index)
+{
+    _owner[_index .. _index + _ownee.length] = _ownee[];
+    _ownee = _owner[_index .. _index + _ownee.length];
+    _index += _ownee.length;
+}
+unittest {
+    write("                 takeOwnership (T[], T(], size_t))... ");
+    size_t[] a = new size_t[4];
+
+    size_t[] v1 = [1, 3];
+    size_t[] v2 = [5, 7];
+
+    size_t ind = 0;
+    takeOwnership(a, v1, ind);
+    takeOwnership(a, v2, ind);
+
+    assert(a == [1, 3, 5, 7]);
+
+    a[0] = 1000;
+    a[3] = 2000;
+
+    assert(ind == 4);
+    assert(v1 == [1000, 3]);
+    assert(v2 == [5, 2000]);
+
+    writeln("DONE.");
+}
+
+
+@safe @nogc pure
+void takeOwnership(T)(ref T[] _owner, ref Parameter _ownee, ref size_t _index)
+{
+    switch (_ownee.typeId)
+    {
+        case "Matrix":
+            takeOwnership!T(_owner, (cast(Matrix!T) _ownee).params, _index);
+            break;
+        case "ReflectionMatrix":
+            takeOwnership!T(_owner, (cast(ReflectionMatrix!T) _ownee).vec.v, _index);
+            break;
+        case "DiagonalMatrix":
+            takeOwnership!T(_owner, (cast(DiagonalMatrix!T) _ownee).params, _index);
+            break;
+        case "UnitaryMatrix":
+            static if (is(Complex!T : T))
+                takeOwnership!T(_owner, (cast(UnitaryMatrix!T) _ownee).params, _index);
+                break;
+        case "BlockMatrix":
+            foreach(tmp_block; (cast(BlockMatrix!T) _ownee).blocks){
+                auto tmp = cast(Parameter) tmp_block;
+                takeOwnership!T(_owner, tmp, _index);
+            }
+            break;
+        case "Vector":
+            takeOwnership!T(_owner, (cast(Vector!T) _ownee).v, _index);
+            break;
+        default:
+            break;
+    }
+}
+unittest {
+    write("                 takeOwnership (T[], Parameter, size_t) ... ");
+
+    writeln("TODO.");
 }
