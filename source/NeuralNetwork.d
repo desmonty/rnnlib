@@ -506,27 +506,71 @@ unittest {
         assert(b_4.norm!"L2" <= 0.0001);
     }
 
-    // Neural Network: Linear + softmax
+    // Neural Network 1: Linear + softmax
+    // Neural Network 2: Linear + softmax + Linear + Recurrent + Linear + norm!"L2"^-1
     {
-        auto nn = new NeuralNetwork!real(4);
-        nn.Linear(4, true)
+        auto nn1 = new NeuralNetwork!real(4);
+        nn1.Linear(4, true)
           .Function("softmax")
           .serialize;
 
         auto v = new Vector!real([1.0, -1.0, 0.0, 1.0]);
 
-        assert(nn.serialized_data.length == 4*4+4);
+        assert(nn1.serialized_data.length == 4*4+4);
 
-        foreach(i; 0 .. nn.serialized_data.length)
-            nn.serialized_data[i] = 1.0;
+        foreach(i; 0 .. nn1.serialized_data.length)
+            nn1.serialized_data[i] = 1.0;
 
-        v = nn.compute(v);
+        v = nn1.compute(v);
 
         auto res = new Vector!real([0.25, 0.25, 0.25, 0.25]);
         res -= v;
 
         assert(res.norm!"L2" <= 0.0001);
+
+
+
+        auto nn2 = new NeuralNetwork!real(4);
+        nn2.Linear(5)
+           .Function("softmax")
+           .Linear(5)
+           .Recurrent()
+           .Linear(4)
+           .Function(delegate(Vector!real _v) {
+                auto res = _v.dup;
+                res /= res.norm!"L2";
+                return res;
+            })
+           .serialize;
+
+        auto w = nn2.compute(v);
+
+        // Test if the delegate works as needed.
+        assert(abs(1 - w.norm!"L2") <= 0.0001);
+
+        // We set each weights to one.
+        foreach(i; 0 .. nn2.serialized_data.length)
+            nn2.serialized_data[i] = 1.0;
+
+        w = nn2.compute(v);
+        
+        // We then apply each step separately with weights 1 using the fact that v = [1, -1, 0, 1].
+
+        //Apply Linear(5): [1, 1, 1, 1, 1]
+
+        //Apply softmax: [0.2, 0.2, 0.2, 0.2, 0.2]
+
+        //Apply Recurrent (relu(1 + previous vector)): [1.2, 1.2, 1.2, 1.2, 1.2]
+
+        //Linear(4): [4.8, 4.8, 4.8, 4.8]
+
+        //Divide by norm!"L2": [0.5, 0.5, 0.5, 0.5]
+
+        auto true_res = new Vector!real([0.5, 0.5, 0.5, 0.5]);
+        true_res -= w;
+
+        assert(true_res.norm!"L2" <= 0.0001);
     }
 
-    writeln("TODO.");
+    writeln("Done.");
 }
