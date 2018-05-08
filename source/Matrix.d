@@ -54,6 +54,7 @@ unittest
  +/
 class MatrixAbstract(T) : Parameter {
     // TODO: make member private.
+    string typeId;
     size_t rows, cols;
 
     static if (is(Complex!T : T))
@@ -64,11 +65,6 @@ class MatrixAbstract(T) : Parameter {
     // TODO: bool _b might not be useful because pureness is differentiate them.
     pure @safe
     this(){}
-    
-    @safe
-    this(bool _b){
-        super(true);
-    }
 
     // Return a duplicate of the matrix. It should actually call the dup function
     // of its type (FourierMatrix, UnitaryMatrix, ...).
@@ -86,38 +82,38 @@ class MatrixAbstract(T) : Parameter {
         return new Vector!T(this * v.v);
     }
 
-    // Wrapper Matrix-Vector Multiplication.
+    // // Wrapper Matrix-Vector Multiplication.
     const
-    T[] opBinary(string op)(in T[] v)
-    if (op=="*")
-    {
-        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
-        // TODO: Refactor. This is ugly but one can't simply use mixin here.
-        switch (typeId)
-        {
-            case "BlockMatrix":
-                return cast(BlockMatrix!T) this * v;
-            case "UnitaryMatrix":
-                static if (is(Complex!T : T)) {
-                    return cast(UnitaryMatrix!T) this * v;
-                }
-                else assert(0, "Unitary matrices must be of complex type.");
-            case "DiagonalMatrix":
-                return cast(DiagonalMatrix!T) this * v;
-            case "ReflectionMatrix":
-                return cast(ReflectionMatrix!T) this * v;
-            case "PermutationMatrix":
-                return cast(PermutationMatrix!T) this * v;
-            case "FourierMatrix":
-                static if (is(Complex!T : T)) {
-                    return cast(FourierMatrix!T) this * v;
-                }
-                else assert(0, "Fourier matrices must be of complex type.");
-            case "Matrix":
-                return cast(Matrix!T) this * v;
-            default:
-                assert(0, "'"~typeId~"' is not in the 'switch' "~
-                                      "clause of MatrixAbstract");
+    T[] opBinary(string op)(in T[] v){
+        if (op=="*"){
+            enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
+            // TODO: Refactor. This is ugly but one can't simply use mixin here.
+            switch (typeId)
+            {
+                case "BlockMatrix":
+                    return cast(BlockMatrix!T) this * v;
+                case "UnitaryMatrix":
+                    static if (is(Complex!T : T)) {
+                        return cast(UnitaryMatrix!T) this * v;
+                    }
+                    else assert(0, "Unitary matrices must be of complex type.");
+                case "DiagonalMatrix":
+                    return cast(DiagonalMatrix!T) this * v;
+                case "ReflectionMatrix":
+                    return cast(ReflectionMatrix!T) this * v;
+                case "PermutationMatrix":
+                    return cast(PermutationMatrix!T) this * v;
+                case "FourierMatrix":
+                    static if (is(Complex!T : T)) {
+                        return cast(FourierMatrix!T) this * v;
+                    }
+                    else assert(0, "Fourier matrices must be of complex type.");
+                case "Matrix":
+                    return cast(Matrix!T) this * v;
+                default:
+                    assert(0, "'"~typeId~"' is not in the 'switch' "~
+                                        "clause of MatrixAbstract");
+            }
         }
     }
 
@@ -1502,7 +1498,6 @@ class Matrix(T) : MatrixAbstract!T {
     @safe
     this(in size_t rows, in size_t cols, in Tc randomBound)
     {
-        super(true);
         typeId = "Matrix";
         params = new T[rows*cols];
         this.rows = rows;
