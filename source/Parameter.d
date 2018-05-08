@@ -1,4 +1,5 @@
 module source.Parameter;
+import core.thread : getpid;
 
 import std.algorithm;
 import std.complex;
@@ -21,25 +22,16 @@ version(unittest)
     import core.exception;
 }
 
-abstract class Parameter {
-    static private bool init = true;
-    static protected auto rnd = Random(0);
-
-    string typeId;
-
-    pure  @safe
-    this() {}
-
-    @safe
-    this(bool random=true)
-    {
-        if (init) {
-            rnd = Random(cast(uint) ((Clock.currTime()
-                         - SysTime(unixTimeToStdTime(0))).total!"msecs"));
-            init = false;
-        }
-    }
+/+  Parameter Class
+    super to vector and abstractMatrix
+    Used to share rng between all child ctors
+    TODO: "move up" common methods to this interface
++/
+interface Parameter {
+    // __TIME__ is string of compile time (minute resolution)
+    static protected auto rnd = Xorshift128(cast(uint) __TIME__.hashOf());
 }
+
 
 /+  Vector class.
     This is a simple vector class that add utilities
@@ -64,16 +56,15 @@ class Vector(T) : Parameter {
     this(size_t length)
     {
         v = new T[length];
-        typeId = "Vector";
+        // typeId = "Vector";
     }
  
     /// Random constructor.
     @safe
     this(size_t length, Tc randomBound)
     {
-        super(true);
         v = new T[length];
-        typeId = "Vector";
+        // typeId = "Vector";
 
         if (randomBound < 0)
             throw new Exception("'randomBound' must be >= 0");
@@ -328,7 +319,7 @@ class Vector(T) : Parameter {
                 assert(0, "Fourier transform can only be applied to complex"
                   ~"vector as this is what it'll return.");
             }
-        } 
+        }
     }
  
     void opOpAssign(string op)(in BlockMatrix!T M)
