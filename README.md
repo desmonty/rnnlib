@@ -24,6 +24,11 @@ This library will be used to try to answer the following questions:
   * Random Matrix
   * Random NN
   * Random * with constraint (e.g. distribution of final weigths).
+* _Sparsification_
+  * Weights augmentation allow us to work with potentially huge neural networks (Billion of weigths). The resulting efficiency is still to be studied but what we can be sure of is that it will be energy consuming to use a huge RNN or FFNN on ligthweigth device (iot, mobile, ...). Hence we would like to come up with a way to reduce drastically the number of nonzero element in every matrices. There is several ways to do this.
+    1) Spectral sparsification (between learning phase ?).
+    2) Use the fact we used weigths augmentation.
+    3) Train sparse matrix (e.g. block matrices).
 
 
 ## Daily Todo
