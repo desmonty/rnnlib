@@ -11,6 +11,21 @@ a rnn like vanishing/exploding gradients (e.g. see _[On the difficulty of traini
 One of the auxiliary goal of this project is to cut any dependencies between the evolutionary algorithms
 and the recurrent neural netwroks to enable anyone to use it independently.
 
+
+# Research Goals
+This library will be used to try to answer the following questions:
+
+* _Optimizations_
+  * How good are gradient free algorithms in training (r)nn ? Metrics: Training Time / Precision / Generalization
+  * Benchmark Several different algorithms against a set of problems.
+* _Weights Augmentation_
+  * Gradient-free optimizations algorithms can be much more time consuming than SGD. We could remove this issue by applying dimensionality augmentation technics to generate the weights of the NN with a small intial weigths vector (This can be compared to Genetic Algorithm). Hence the goal would be to test different technics to augment small vectors.
+  * Random Sampling
+  * Random Matrix
+  * Random NN
+  * Random * with constraint (e.g. distribution of final weigths).
+
+
 ## Daily Todo
 * Think about parameters shared between layers: can the layer be different and share the same parameters ?
 * (optm) randclone weigths: serialized_data holds all weigths -> can be constructed using smaller array with random cloning.
