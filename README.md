@@ -31,7 +31,8 @@ This library will be used to try to answer the following questions:
     3) Train sparse matrix (e.g. block matrices).
 * _Connection Optimization_
   * The use of gradient-free optimization allow us to optimize the way nodes in the neural networks are connected. Discussion: We could either want to modify the connection of the neural network viewed as a graph or the connection between computational component of the nn.  
-
+* _Scientific paper generation_
+  * Because why not ? And also this could be a nice POC that rnnlib works well for image generation (let's implement GANs).
 
 ## Daily Todo
 * Think about parameters shared between layers: can the layer be different and share the same parameters ?
