@@ -260,7 +260,7 @@ class Vector(T) : Parameter {
            E.g. compiling the unitary matrix with T=real will
            give you compile-time error. 
          +/
-        auto tmptypeId = split(M.typeId, "!")[0];
+        auto tmptypeId = split(M.typeId(), "!")[0];
         if (tmptypeId == "UnitaryMatrix") {
             static if (is(Complex!T : T)) {
                 auto mat = cast(UnitaryMatrix!T) M;
