@@ -85,7 +85,7 @@ class MatrixAbstract(T) : Parameter {
     // // Wrapper Matrix-Vector Multiplication.
     const
     T[] opBinary(string op)(in T[] v){
-        if (op=="*"){
+        static if (op=="*"){
             enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
             // TODO: Refactor. This is ugly but one can't simply use mixin here.
             switch (typeId)
@@ -115,6 +115,7 @@ class MatrixAbstract(T) : Parameter {
                                         "clause of MatrixAbstract");
             }
         }
+        assert(0);
     }
 
     // Simple inverse(Matrix)-Vector Multiplication.
