@@ -40,7 +40,7 @@ unittest
     assert(dot([1.0, 2.0, 3.0], [-6.0, -5.0, -1.0]) ==
            dot([-6.0, -5.0, -1.0], [1.0, 2.0, 3.0]));
 
-    assert(abs(dot([complex(1.0, 8.5), complex(6.4, 3.58), complex(10.8, 7.65)],
+    assert(std.complex.abs(dot([complex(1.0, 8.5), complex(6.4, 3.58), complex(10.8, 7.65)],
                [-6.0, -5.0, -1.0])
            -
                dot([complex(6.4, 3.58), complex(10.8, 7.65), complex(1.0, 8.5)],
@@ -1106,7 +1106,7 @@ unittest
         assert(m3.sum == m1.sum);
 
         m3 += m2;
-        assert(m3.sum.abs < 0.0001);
+        assert(std.complex.abs(m3.sum) < 0.0001);
 
         m3 -= m4;
         assert(m3[3] == m1[3]);
@@ -1626,7 +1626,7 @@ unittest
     m5.params = m4.params.dup;
 
     m2 -= m1;
-    assert(m2.params.sum.abs < 0.1);
+    assert(std.complex.abs(m2.params.sum) < 0.1);
 
     m5 -= m4;
     assert(m5.params.sum.abs < 0.1);

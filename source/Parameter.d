@@ -163,17 +163,20 @@ class Vector(T) : Parameter {
     @property const @nogc pure @safe
     auto norm(string method)()
     {
+        static if (is(Complex!T : T)) {
+            import std.complex: abs;
+        }
         Tc s = v[0].re*0.0f;
         static if (method=="euclidean" || method=="L2")
-        {
+        { 
             foreach(e;v)
-                s += pow(e.abs, 2);
+                s += pow(abs(e), 2);
             return sqrt(s);
         }
         else static if (method=="manhattan" || method=="L1") 
         {
             foreach(e;v)
-                s += e.abs;
+                s += abs(e);
             return s;
         }
         else static if (method=="sparse" || method=="L0")
@@ -185,18 +188,18 @@ class Vector(T) : Parameter {
         }
         else static if (method=="max" || method=="Linf")
         {
-            s = v[0].abs;
+            s = abs(v[0]);
             foreach(e;v)
-                if(s < e.abs)
-                    s = e.abs;
+                if(s < abs(e))
+                    s = abs(e);
             return s;
         }
         else static if (method=="min")
         {
-            s = v[0].abs;
+            s = abs(v[0]);
             foreach(e;v)
-                if(s > e.abs)
-                    s = e.abs;
+                if(s > abs(e))
+                    s = abs(e);
             return s;
         }
         else static assert(0, "Method '"~method~"' is not implemented.");
