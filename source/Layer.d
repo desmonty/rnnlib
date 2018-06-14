@@ -409,6 +409,11 @@ class FunctionalLayer(T) : Layer!T
                     
                     func =
                         delegate(Vector!T _v, Parameter[] _p) {
+
+                            static if (is(Complex!T : T)) {
+                                import std.complex: abs;
+                            }
+
                             auto absv = _v[0].abs;
                             auto tmp = absv;
                             auto res = _v.dup;
@@ -590,7 +595,7 @@ unittest {
     (cast(Vector!double) f5.params[0])[2] = -0.9;
     (cast(Vector!double) f5.params[0])[3] = -0.9;
     auto v5 = f5.compute(w);
-    assert(abs(v5.sum) < 0.0001);
+    assert(std.complex.abs(v5.sum) < 0.0001);
 
     // vector 'e' doesn't have the right length.
     assertThrown(f1.compute(e));
