@@ -54,8 +54,9 @@ unittest
  +/
 class MatrixAbstract(T) : Parameter {
     // TODO: make member private.
-    string typeId;
-    size_t rows, cols;
+    abstract const pure @safe @nogc string typeId();
+    abstract const pure @safe @nogc size_t rows();
+    abstract const pure @safe @nogc size_t cols();
 
     static if (is(Complex!T : T))
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
@@ -71,7 +72,7 @@ class MatrixAbstract(T) : Parameter {
     const @property
     MatrixAbstract!T dup()
     {
-        assert(0, "'"~typeId~"': function 'dup' not implemented");
+        assert(0, "'"~typeId()~"': function 'dup' not implemented");
     }
 
     // Simple Matrix-Vector Multiplication.
@@ -88,7 +89,7 @@ class MatrixAbstract(T) : Parameter {
         static if (op=="*"){
             enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
             // TODO: Refactor. This is ugly but one can't simply use mixin here.
-            switch (typeId)
+            switch (typeId())
             {
                 case "BlockMatrix":
                     return cast(BlockMatrix!T) this * v;
@@ -111,7 +112,7 @@ class MatrixAbstract(T) : Parameter {
                 case "Matrix":
                     return cast(Matrix!T) this * v;
                 default:
-                    assert(0, "'"~typeId~"' is not in the 'switch' "~
+                    assert(0, "'"~typeId()~"' is not in the 'switch' "~
                                         "clause of MatrixAbstract");
             }
         }
@@ -170,10 +171,14 @@ unittest
     // We create a badly constructed Matrix Class.
     // This will result in an error => You can't create your own Matrix.
     class ErrorMatrix(T) : MatrixAbstract!T {
+        override const pure @safe @nogc string typeId() {return "ErrorMatrix";}
+        size_t _rows, _cols;
+        override const pure @safe @nogc size_t rows() { return _rows; }
+        override const pure @safe @nogc size_t cols() { return _cols; }
         this(immutable size_t _r, immutable size_t _c) {
-            typeId = "ErrorMatrix";
-            rows = _r;
-            cols = _c;
+            // typeId = "ErrorMatrix";
+            this._rows = _r;
+            this._cols = _c;
         }
     }
 
@@ -313,31 +318,36 @@ unittest
     catch (AssertError e) { error = true; }
     assert(error);
 
-    // Unitary Matrix must be of complex type.
-    error = false;
-    try {
-    	auto mpp = new Matrix!float(4, 4, 0.1);
-    	mpp.typeId = "UnitaryMatrix";
-    	MatrixAbstract!float mmp = mpp;
-    	auto vvv = new Vector!float(4, 0.1);
 
-    	auto res = mmp * vvv;
-    }
-    catch (AssertError e) { error = true; }
-    assert(error);
+                            // These should be moved to their respective place
+                            // setting matrix type by typeid is no good
 
-    // Fourier Matrix must be of complex type.
-    error = false;
-    try {
-    	auto mpp = new Matrix!float(4, 4, 0.1);
-    	mpp.typeId = "FourierMatrix";
-    	MatrixAbstract!float mmp = mpp;
-    	auto vvv = new Vector!float(4, 0.1);
 
-    	auto res = mmp * vvv;
-    }
-    catch (AssertError e) { error = true; }
-    assert(error);
+                            // // Unitary Matrix must be of complex type.
+                            // error = false;
+                            // try {
+                            // 	auto mpp = new Matrix!float(4, 4, 0.1);
+                            // 	mpp.typeId = "UnitaryMatrix";
+                            // 	MatrixAbstract!float mmp = mpp;
+                            // 	auto vvv = new Vector!float(4, 0.1);
+
+                            // 	auto res = mmp * vvv;
+                            // }
+                            // catch (AssertError e) { error = true; }
+                            // assert(error);
+
+                            // // Fourier Matrix must be of complex type.
+                            // error = false;
+                            // try {
+                            // 	auto mpp = new Matrix!float(4, 4, 0.1);
+                            // 	mpp.typeId = "FourierMatrix";
+                            // 	MatrixAbstract!float mmp = mpp;
+                            // 	auto vvv = new Vector!float(4, 0.1);
+
+                            // 	auto res = mmp * vvv;
+                            // }
+                            // catch (AssertError e) { error = true; }
+                            // assert(error);
 
     write("Done.\n");
 }
@@ -385,6 +395,11 @@ class BlockMatrix(T) : MatrixAbstract!T {
     // Permutation, can be "turned off" with randperm = false.
     PermutationMatrix!T P, Q;
 
+    override const pure @safe @nogc string typeId() { return "BlockMatrix"; }
+    size_t _rows, _cols;
+    override const pure @safe @nogc size_t rows() { return _rows; }
+    override const pure @safe @nogc size_t cols() { return _cols; }
+
     size_t size_blocks;
     size_t num_blocks;
     size_t size_out;
@@ -397,18 +412,18 @@ class BlockMatrix(T) : MatrixAbstract!T {
     // of the block matrix (e.g. unitary).
 
     pure @safe
-    this(){typeId = "BlockMatrix";}
+    this(){} // typeId = "BlockMatrix";}
 
     pure @safe
     this(in size_t size_in, in size_t size_out, in size_t size_blocks)
     {
-        typeId = "BlockMatrix";
+        // typeId = "BlockMatrix";
         enforce(size_out%size_blocks == 0,
                 "'size_out' must be a multiple of 'size_blocks'.");
         enforce(size_in%size_blocks == 0,
                 "'size_in' must be a multiple of 'size_blocks'.");
-        rows = size_out;
-        cols = size_in;
+        this._rows = size_out;
+        this._cols = size_in;
 
         this.size_blocks = size_blocks;
         size_t maxsize = size_out; if (maxsize<size_in) maxsize=size_in;
@@ -595,6 +610,10 @@ if (is(Complex!T : T))
     FourierMatrix!T fourier;
     Tc[] params;
 
+    override const pure @safe @nogc string typeId(){ return "UnitaryMatrix"; }
+    size_t _rows, _cols;
+    override const pure @safe @nogc size_t rows() { return _rows; }
+    override const pure @safe @nogc size_t cols() { return _cols; }
 
     /+ The params vector include in the following order:
        + 3 diagonal unitary complex matrices.
@@ -612,10 +631,10 @@ if (is(Complex!T : T))
         this();
         assert(std.math.isPowerOf2(size), "Size of Unitary Matrix
                                            must be a power of 2.");
-        typeId = "UnitaryMatrix";
+        // typeId = "UnitaryMatrix";
 
-        rows = size;
-        cols = size;
+        this._rows = size;
+        this._cols = size;
 
         perm = new PermutationMatrix!T(size ,1.0);
         fourier = new FourierMatrix!T(size);
@@ -634,10 +653,10 @@ if (is(Complex!T : T))
     
     this(in UnitaryMatrix M)
     {
-        typeId = "UnitaryMatrix";
+        // typeId = "UnitaryMatrix";
         this();
-        rows = M.rows;
-        cols = M.cols;
+        this._rows = M.rows;
+        this._cols = M.cols;
         perm = M.perm.dup;
         fourier = M.fourier.dup;
         fourier = M.fourier.dup;
@@ -795,18 +814,23 @@ class FourierMatrix(T) : MatrixAbstract!T
 if (is(Complex!T : T))
 {
     Fft objFFT;
-    
+
+    override const pure @safe @nogc string typeId() { return "FourierMatrix"; }
+    size_t _rows, _cols;
+    override const pure @safe @nogc size_t rows() { return _rows; }
+    override const pure @safe @nogc size_t cols() { return _cols; }
+
     this(size_t size)
     {
-        typeId = "FourierMatrix";
-        rows = size;
-        cols = size;
+        // typeId = "FourierMatrix";
+        this._rows = size;
+        this._cols = size;
         objFFT = new Fft(size);
     };
     
     this(in FourierMatrix M)
     {
-        this(M.rows);
+        this(M.rows());
     }
 
     override
@@ -887,13 +911,17 @@ unittest
  +/
 class DiagonalMatrix(T) : MatrixAbstract!T {
     T[] params;
-    
+
+    override const pure @safe @nogc string typeId(){ return "DiagonalMatrix"; }
+    size_t _rows, _cols;
+    override const pure @safe @nogc size_t rows() { return _rows; }
+    override const pure @safe @nogc size_t cols() { return _cols; }
     /// Constructor
     pure @safe
     this(in size_t size)
     {
-        typeId = "DiagonalMatrix";
-        rows = size; cols = size;
+        // typeId = "DiagonalMatrix";
+        this._rows = size; this._cols = size;
         params = new T[size];
     }
 
@@ -1142,12 +1170,17 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     Vector!T vec;
     real invSqNormVec2 = 1.0;
     
+    override const pure @safe @nogc string typeId() { return "ReflectionMatrix"; }
+    size_t _rows, _cols;
+    override const pure @safe @nogc size_t rows() { return _rows; }
+    override const pure @safe @nogc size_t cols() { return _cols; }
+
     /// Constructor
     pure @safe
     this(in size_t size)
     {
-        typeId = "ReflectionMatrix";
-        rows = size; cols = size;
+        // typeId = "ReflectionMatrix";
+        this._rows = size; this._cols = size;
         vec = new Vector!T(size);
     }
 
@@ -1177,9 +1210,9 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     @safe
     this(in ReflectionMatrix dupl)
     {
-        typeId = "ReflectionMatrix";
-        rows = dupl.vec.length;
-        cols = dupl.vec.length;
+        // typeId = "ReflectionMatrix";
+        this._rows = dupl.vec.length;
+        this._cols = dupl.vec.length;
         vec = dupl.vec.dup;
         invSqNormVec2 = dupl.invSqNormVec2;
     }
@@ -1188,8 +1221,8 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     pure @safe
     this(in T[] valarr)
     {
-        rows = valarr.length;
-        cols = valarr.length;
+        this._rows = valarr.length;
+        this._cols = valarr.length;
         vec = new Vector!T(valarr);
         compute_invSqNormVec2();
     }
@@ -1344,12 +1377,16 @@ unittest
 class PermutationMatrix(T) : MatrixAbstract!T {
     size_t[] perm;
 
+    override const pure @safe @nogc string typeId() { return "PermutationMatrix"; }
+    size_t _rows, _cols;
+    override const pure @safe @nogc size_t rows() { return _rows; }
+    override const pure @safe @nogc size_t cols() { return _cols; }
     /// Constructor
     pure @safe
     this(in size_t size)
     {
-        typeId = "PermutationMatrix";
-        rows = size; cols = size;
+        // typeId = "PermutationMatrix";
+        this._rows = size; this._cols = size;
         perm = new size_t[size];
     }
 
@@ -1472,15 +1509,19 @@ unittest
 class Matrix(T) : MatrixAbstract!T {
     T[] params;
 
+    override const pure @safe @nogc string typeId() { return "Matrix"; }
+    size_t _rows, _cols;
+    override const pure @safe @nogc size_t rows() { return _rows; }
+    override const pure @safe @nogc size_t cols() { return _cols; }
     /// Simple constructor
     pure @safe
     this(in size_t rows, in size_t cols)
     {
         super();
-        typeId = "Matrix";
+        // typeId = "Matrix";
         params = new T[rows*cols];
-        this.rows = rows;
-        this.cols = cols;
+        this._rows = rows;
+        this._cols = cols;
     }
     
     pure @safe
@@ -1499,10 +1540,10 @@ class Matrix(T) : MatrixAbstract!T {
     @safe
     this(in size_t rows, in size_t cols, in Tc randomBound)
     {
-        typeId = "Matrix";
+        // typeId = "Matrix";
         params = new T[rows*cols];
-        this.rows = rows;
-        this.cols = cols;
+        this._rows = rows;
+        this._cols = cols;
 
         if (randomBound < 0)
             throw new Exception("'randomBound' must be >= 0");
@@ -1527,7 +1568,7 @@ class Matrix(T) : MatrixAbstract!T {
     pure @safe
     this(in Matrix dupl)
     {
-        this(dupl.rows, dupl.cols);
+        this(dupl.rows(), dupl.cols());
         foreach(i;0 .. rows*cols) {
             params[i] = dupl.params[i];
         }

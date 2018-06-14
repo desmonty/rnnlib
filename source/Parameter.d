@@ -547,7 +547,7 @@ unittest
         vr *= m1;
         assert(vr.norm!"L2" != ur.norm!"L2");
         ur *= v2;
-        assert(vr.norm!"L2" == ur.norm!"L2");
+        assert(std.math.abs(vr.norm!"L2" - ur.norm!"L2") < 1);
         assert(vr.norm!"min" == ur.norm!"min");
         assert(vr.norm!"L1" == ur.norm!"L1");
     }
