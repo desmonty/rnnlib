@@ -122,22 +122,11 @@ class MatrixLayer(Mtype, T) : Layer!T
             else {
                 enforce(_dim[0]==_dim[1], "Only \"Matrix\" can be rectangular.");
     
-                static if (is(Mtype: UnitaryMatrix!T)){
-                    Mtype!T m = new UnitaryMatrix!T(_dim[0], _random_init);
-                }
-                else static if (is(Mtype: DiagonalMatrix!T)){
-                    Mtype!T m = new DiagonalMatrix!T(_dim[0], _random_init);
-                }
-                else static if (is(Mtype: ReflectionMatrix!T)){
-                    Mtype!T m = new ReflectionMatrix!T(_dim[0], _random_init);
-                }
-                else static if (is(Mtype: PermutationMatrix!T)){
-                    Mtype!T m = new PermutationMatrix!T(_dim[0], _random_init);
-                }
-                else static if (is(Mtype: FourierMatrix!T)){
+                static if (is(Mtype: FourierMatrix!T)){
                     Mtype!T m = new FourierMatrix!T(_dim[0]);
                 }
-                else static assert(0, "Unrecognized matrix type: "~Mtype.stringof);
+                else
+                    Mtype!T m = new Mtype!T(_dim[0], _random_init);
             }
             this(m, v);
         }
