@@ -15,7 +15,6 @@ import source.Parameter;
 version(unittest)
 {
     import std.stdio : writeln, write;
-    import source.Parameter;
     import std.datetime;
     import core.exception;
 }
@@ -37,6 +36,7 @@ auto dot(R1, R2)(in R1[] lhs, in R2[] rhs)
 }
 unittest
 {
+    write("Unittest: Matrix: Dot Product ...");
     assert(dot([1.0, 2.0, 3.0], [-6.0, -5.0, -1.0]) ==
            dot([-6.0, -5.0, -1.0], [1.0, 2.0, 3.0]));
 
@@ -45,312 +45,9 @@ unittest
            -
                dot([complex(6.4, 3.58), complex(10.8, 7.65), complex(1.0, 8.5)],
                [-5.0, -1.0, -6.0])) < 0.001);
-}
-
-/++ MatrixAbstract class.
- + 
- +  An abstract class of matrix to create array of heterogenous matrix
- +  and create general-purpose function. It is mostly a wrapper.
- +/
-class MatrixAbstract(T) : Parameter {
-    // TODO: make member private.
-    abstract const pure @safe @nogc string typeId();
-    abstract const pure @safe @nogc size_t rows();
-    abstract const pure @safe @nogc size_t cols();
-
-    static if (is(Complex!T : T))
-        mixin("alias Tc = "~(T.stringof[8 .. $])~";");
-    else alias Tc = T;
-
-    // We have to constructor to allow the existence of a pure and impure one
-    // TODO: bool _b might not be useful because pureness is differentiate them.
-    pure @safe
-    this(){}
-
-    // Return a duplicate of the matrix. It should actually call the dup function
-    // of its type (FourierMatrix, UnitaryMatrix, ...).
-    const @property
-    MatrixAbstract!T dup()
-    {
-        assert(0, "'"~typeId()~"': function 'dup' not implemented");
-    }
-
-    // Simple Matrix-Vector Multiplication.
-    const
-    Vector!T opBinary(string op)(in Vector!T v)
-    if (op=="*")
-    {
-        return new Vector!T(this * v.v);
-    }
-
-    // // Wrapper Matrix-Vector Multiplication.
-    const
-    T[] opBinary(string op)(in T[] v){
-        static if (op=="*"){
-            enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
-            // TODO: Refactor. This is ugly but one can't simply use mixin here.
-            switch (typeId())
-            {
-                case "BlockMatrix":
-                    return cast(BlockMatrix!T) this * v;
-                case "UnitaryMatrix":
-                    static if (is(Complex!T : T)) {
-                        return cast(UnitaryMatrix!T) this * v;
-                    }
-                    else assert(0, "Unitary matrices must be of complex type.");
-                case "DiagonalMatrix":
-                    return cast(DiagonalMatrix!T) this * v;
-                case "ReflectionMatrix":
-                    return cast(ReflectionMatrix!T) this * v;
-                case "PermutationMatrix":
-                    return cast(PermutationMatrix!T) this * v;
-                case "FourierMatrix":
-                    static if (is(Complex!T : T)) {
-                        return cast(FourierMatrix!T) this * v;
-                    }
-                    else assert(0, "Fourier matrices must be of complex type.");
-                case "Matrix":
-                    return cast(Matrix!T) this * v;
-                default:
-                    assert(0, "'"~typeId()~"' is not in the 'switch' "~
-                                        "clause of MatrixAbstract");
-            }
-        }
-        assert(0);
-    }
-
-    // Simple inverse(Matrix)-Vector Multiplication.
-    const
-    Vector!T opBinaryRight(string op)(in Vector!T v)
-    if (op=="/")
-    {
-        auto res = new Vector!T(v.v / this);
-        return res;
-    }
-
-    // Wrapper inverse(Matrix)-Vector Multiplication.
-    const
-    T[] opBinaryRight(string op)(in T[] v)
-    if (op=="/")
-    {
-        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
-        // TODO: Refactor.
-        switch (typeId)
-        {
-            case "BlockMatrix":
-                return v / cast(BlockMatrix!T) this;
-            case "UnitaryMatrix":
-                static if (is(Complex!T : T)) {
-                    return v / cast(UnitaryMatrix!T) this;
-                }
-                else assert(0, "Unitary matrices must be of complex type.");
-            case "DiagonalMatrix":
-                return v / cast(DiagonalMatrix!T) this;
-            case "ReflectionMatrix":
-                return v / cast(ReflectionMatrix!T) this;
-            case "PermutationMatrix":
-                return v / cast(PermutationMatrix!T) this;
-            case "FourierMatrix":
-                static if (is(Complex!T : T)) {
-                    return v / cast(FourierMatrix!T) this;
-                }
-                else assert(0, "Fourier matrices must be of complex type.");
-            case "Matrix":
-                assert(0, "Division by a general matrix
-                           is not yet implemented.");
-            default:
-                assert(0, "'"~typeId~"' is not in the 'switch' "~
-                                      "clause of MatrixAbstract");
-        }
-    }
-}
-unittest
-{
-    write("Unittest: Matrix: Abstract ... ");
-
-    // We create a badly constructed Matrix Class.
-    // This will result in an error => You can't create your own Matrix.
-    class ErrorMatrix(T) : MatrixAbstract!T {
-        override const pure @safe @nogc string typeId() {return "ErrorMatrix";}
-        size_t _rows, _cols;
-        override const pure @safe @nogc size_t rows() { return _rows; }
-        override const pure @safe @nogc size_t cols() { return _cols; }
-        this(immutable size_t _r, immutable size_t _c) {
-            // typeId = "ErrorMatrix";
-            this._rows = _r;
-            this._cols = _c;
-        }
-    }
-
-    auto len = 1024;
-    auto m1 = new PermutationMatrix!(Complex!real)(len/4, 1.0);
-    auto m2 = new DiagonalMatrix!(Complex!real)(len/4, 1.0);
-    auto m3 = new ReflectionMatrix!(Complex!real)(len/4, 1.0);
-    auto m4 = new FourierMatrix!(Complex!real)(len/4);
-    auto bm = new BlockMatrix!(Complex!real)(len, len/4, [m1,m2,m3,m4],
-                                                    false);
-    auto um = new UnitaryMatrix!(Complex!real)(len, 3.14159265351313);
-    auto mm = new Matrix!(Complex!real)(len, 5.6);
-    auto em = new ErrorMatrix!(Complex!real)(len, len);
-
-    // The type of list_mat will be "MatrixAbstract!T[]" as a
-    // generalization of each matrices. Hence, every **_hyde matrices
-    // will be of type "MatrixAbstract!T".
-    auto list_mat = [m1, m2, m3, m4, bm, um, mm, em];
-    auto m1_hyde = list_mat[0];
-    auto m2_hyde = list_mat[1];
-    auto m3_hyde = list_mat[2];
-    auto m4_hyde = list_mat[3];
-    auto bm_hyde = list_mat[4];
-    auto um_hyde = list_mat[5];
-    auto mm_hyde = list_mat[6];
-    auto em_hyde = list_mat[7];
-
-
-    // dup
-    {
-        auto dm1 = m1_hyde.dup;
-        auto dm2 = m2_hyde.dup;
-        auto dm3 = m3_hyde.dup;
-        auto dm4 = m4_hyde.dup;
-        auto dbm = bm_hyde.dup;
-        auto dum = um_hyde.dup;
-        auto dmm = mm_hyde.dup;
-
-        auto v1 = new Vector!(Complex!real)(len/4, 1.0);
-        auto v2 = new Vector!(Complex!real)(len, 1.0);
-
-        Vector!(Complex!real) res1, res2;
-
-        res1 = dm1*v1;
-        res2 = m1*v1;
-        res1 -= res2;
-        assert(res1.norm!"L2" <= 0.0001);
-
-        res1 = dm2*v1;
-        res2 = m2*v1;
-        res1 -= res2;
-        assert(res1.norm!"L2" <= 0.0001);
-
-        res1 = dm3*v1;
-        res2 = m3*v1;
-        res1 -= res2;
-        assert(res1.norm!"L2" <= 0.0001);
-
-        res1 = dm4*v1;
-        res2 = m4*v1;
-        res1 -= res2;
-        assert(res1.norm!"L2" <= 0.0001);
-
-        res1 = dbm*v2;
-        res2 = bm*v2;
-        res1 -= res2;
-        assert(res1.norm!"L2" <= 0.0001);
-
-        res1 = dum*v2;
-        res2 = um*v2;
-        res1 -= res2;
-        assert(res1.norm!"L2" <= 0.0001);
-
-        bool error = false;
-        try {
-            auto dem = em_hyde.dup;
-        }
-        catch (AssertError e) { error = true; }
-        assert(error);
-    }
-
-    // We test the multiplication for all Matrix type.
-    // This is to make sure, a MatrixAbstract!T will call the right
-    // multiplication algorithm in function of its true type (Fourier, Permutation, ...)
-    auto mr = new Matrix!real(len, 5.6);
-    auto dr = new DiagonalMatrix!real(len, 5.6);
-
-    auto list_mat2 = [mr, dr];
-    auto mr_hyde = list_mat[0];
-
-    auto v = new Vector!(Complex!real)(len);
-    auto w = new Vector!(Complex!real)(len/4);
-    foreach(i; 0 .. len)
-        v[i] = complex(cast(real)(i*2 - len/2), cast(real)(len/3 - i/3.0));
-
-
-    auto v2 = bm_hyde * v;
-    auto v3 = v2 / bm_hyde;
-
-    v3 -= v; assert(v3.norm!"L2" < 0.01);
-    v2 -= v; assert(v2.norm!"L2" > 1.0);
-
-    v2 = um_hyde * v;
-    v3 = v2 / um_hyde;
-
-    v3 -= v; assert(v3.norm!"L2" < 0.01);
-    v2 -= v; assert(v2.norm!"L2" > 1.0);
-
-
-    v2 = mm_hyde * v;
-    v3 = mm * v;
-
-    v3 -= v2; assert(v3.norm!"L2" < 0.01);
-    v2 -= v; assert(v2.norm!"L2" > 1.0);
-
-    // class ErrorMatrix is not handled by MatrixAbstract in multiplication.
-    bool error = false;
-    try {
-        auto ver = em_hyde * v;
-    }
-    catch (AssertError e) { error = true; }
-    assert(error);
-
-    // Same as above, but with division.
-    error = false;
-    try {
-        auto ver = v / em_hyde;
-    }
-    catch (AssertError e) { error = true; }
-    assert(error);
-
-    // Division by a Matrix is not implemented.
-    error = false;
-    try {
-        auto ver = v / mm_hyde;
-    }
-    catch (AssertError e) { error = true; }
-    assert(error);
-
-
-                            // These should be moved to their respective place
-                            // setting matrix type by typeid is no good
-
-
-                            // // Unitary Matrix must be of complex type.
-                            // error = false;
-                            // try {
-                            // 	auto mpp = new Matrix!float(4, 4, 0.1);
-                            // 	mpp.typeId = "UnitaryMatrix";
-                            // 	MatrixAbstract!float mmp = mpp;
-                            // 	auto vvv = new Vector!float(4, 0.1);
-
-                            // 	auto res = mmp * vvv;
-                            // }
-                            // catch (AssertError e) { error = true; }
-                            // assert(error);
-
-                            // // Fourier Matrix must be of complex type.
-                            // error = false;
-                            // try {
-                            // 	auto mpp = new Matrix!float(4, 4, 0.1);
-                            // 	mpp.typeId = "FourierMatrix";
-                            // 	MatrixAbstract!float mmp = mpp;
-                            // 	auto vvv = new Vector!float(4, 0.1);
-
-                            // 	auto res = mmp * vvv;
-                            // }
-                            // catch (AssertError e) { error = true; }
-                            // assert(error);
-
     write("Done.\n");
 }
+
 
 /++ Block Matrix class.
  +
@@ -389,16 +86,18 @@ unittest
  +      4 0 0
  +      0 5 0
  +/
-class BlockMatrix(T) : MatrixAbstract!T {
-	// List of matrices.
-    MatrixAbstract!T[] blocks;
+class BlockMatrix(Mtype, T) : Parameter {
+    static if (is(Complex!T : T))
+        mixin("alias Tc = "~(T.stringof[8 .. $])~";");
+    else alias Tc = T;
+
+    // List of matrices.
+    Mtype[] blocks;
+
     // Permutation, can be "turned off" with randperm = false.
     PermutationMatrix!T P, Q;
 
-    override const pure @safe @nogc string typeId() { return "BlockMatrix"; }
-    size_t _rows, _cols;
-    override const pure @safe @nogc size_t rows() { return _rows; }
-    override const pure @safe @nogc size_t cols() { return _cols; }
+    size_t rows, cols;
 
     size_t size_blocks;
     size_t num_blocks;
@@ -411,19 +110,17 @@ class BlockMatrix(T) : MatrixAbstract!T {
     // and so to have a sparse matrix with the properties
     // of the block matrix (e.g. unitary).
 
-    pure @safe
-    this(){} // typeId = "BlockMatrix";}
+    this(){}
 
     pure @safe
     this(in size_t size_in, in size_t size_out, in size_t size_blocks)
     {
-        // typeId = "BlockMatrix";
         enforce(size_out%size_blocks == 0,
                 "'size_out' must be a multiple of 'size_blocks'.");
         enforce(size_in%size_blocks == 0,
                 "'size_in' must be a multiple of 'size_blocks'.");
-        this._rows = size_out;
-        this._cols = size_in;
+        this.rows = size_out;
+        this.cols = size_in;
 
         this.size_blocks = size_blocks;
         size_t maxsize = size_out; if (maxsize<size_in) maxsize=size_in;
@@ -434,8 +131,9 @@ class BlockMatrix(T) : MatrixAbstract!T {
 
     @safe
     this(in size_t size_in, in size_t size_out, in size_t size_blocks,
-         MatrixAbstract!T[] blocks, bool randperm=false)
+         Mtype[] blocks, bool randperm=false)
     {
+        enforce(!randperm || (size_in == size_out), "randperm => (size_in == size_out)." );
         this(size_in, size_out, size_blocks);
         this.blocks = blocks;
 
@@ -443,27 +141,22 @@ class BlockMatrix(T) : MatrixAbstract!T {
             P = new PermutationMatrix!T(size_in, 1.0);
             Q = new PermutationMatrix!T(size_out, 1.0);
         }
-        else {
-            P = new PermutationMatrix!T(size_in.iota.array);
-            Q = new PermutationMatrix!T(size_out.iota.array);
-        }
     }
 
     @safe
     this(in size_t size_in, in size_t size_blocks,
-         MatrixAbstract!T[] blocks, bool randperm=false)
+         Mtype[] blocks, bool randperm=false)
     {
         this(size_in, size_in, size_blocks, blocks, randperm);
     }
 
-    override
     const @property
-    BlockMatrix!T dup()
+    BlockMatrix!(Mtype, T) dup()
     {
-        auto res = new BlockMatrix!T(size_in, size_out, size_blocks);
+        auto res = new BlockMatrix!(Mtype, T)(size_in, size_out, size_blocks);
         res.P = P.dup;
         res.Q = Q.dup;
-        res.blocks = new MatrixAbstract!T[res.num_blocks];
+        res.blocks = new Mtype[res.num_blocks];
 
         foreach(i; 0 .. res.num_blocks)
             res.blocks[i] = blocks[i].dup;
@@ -471,7 +164,6 @@ class BlockMatrix(T) : MatrixAbstract!T {
         return res;
     }
 
-    const
     auto opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
@@ -479,69 +171,83 @@ class BlockMatrix(T) : MatrixAbstract!T {
         return new Vector!T(res);
     }
 
-    const
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
         enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
-        T[] vec = this.P * v;
+        T[] res;
+        if (P) res = this.P * v;
+        else res = new T[size_out];
 
         size_t blocks_in = size_in / size_blocks;
         size_t blocks_out = size_out / size_blocks;
 
-        T[] res = new T[size_out];
         T[] s;
         size_t index;
+        size_t b_tmp = 0; // used when size_in < size_out to cycle through the small vector.
 
-        foreach(size_t b; 0 .. blocks_out) {
-            // We take the first block matrix and multiply it with
-            // the corresponding part of the vector.
-            s = blocks[b] * vec[(b*size_blocks) .. ((b+1)*size_blocks)];
-            // We then increment the index in case the block matrix
-            // is rectangular with more columns than rows.
-            index = b + blocks_out;
-            while(index < blocks_in) {
-                s[] += (blocks[index] *
-                       vec[(index*size_blocks) .. ((index+1)*size_blocks)])[];
-                index += blocks_out;
+        // We construct two different forloop here.
+        // The goal of this dichotomy is that it allow us to save computation in both case.
+        if (size_out > size_in)
+            foreach(size_t b; 0 .. blocks_out) {
+                // We take the first block matrix and multiply it with
+                // the corresponding part of the vector.
+                s = blocks[b] * v[(b_tmp*size_blocks) .. ((b_tmp+1)*size_blocks)];
+                res[(b*size_blocks) .. ((b+1)*size_blocks)] = s;
+
+                // This line is needed only in this case.
+                if (++b_tmp == blocks_in) b_tmp = 0;
+            }
+        else
+            foreach(size_t b; 0 .. blocks_out) {
+                // We take the first block matrix and multiply it with
+                // the corresponding part of the vector.
+                s = blocks[b] * v[(b*size_blocks) .. ((b+1)*size_blocks)];
+
+                // We then increment the index in case the block matrix
+                // is rectangular with more columns than rows.
+                // The while loop is only needed in this case.
+                index = b + blocks_out;
+                while(index < blocks_in) {
+                    s[] += (blocks[index] *
+                           v[(index*size_blocks) .. ((index+1)*size_blocks)])[];
+                    index += blocks_out;
+                }
+
+                res[(b*size_blocks) .. ((b+1)*size_blocks)] = s;
             }
 
-            res[(b*size_blocks) .. ((b+1)*size_blocks)] = s;
-        }
 
-        res = this.Q * res;
+        if (Q) res = this.Q * res;
         return res;
     }
 
-    const
     auto opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
         return new Vector!T(v.v / this);
     }
 
-    const
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
         enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
-        enforce(size_out == size_in, "Inverse of rectangular
-                                      block matrix is not implemented");
-        T[] vec = v / this.Q;
-
+        enforce(size_out == size_in, "Inverse of rectangular BlockMatrix not implemented");
+        T[] res;
+        if (P) res = v / this.Q;
+        else res = new T[size_in];
+        
         size_t blocks_in = size_in / size_blocks;
         size_t blocks_out = size_out / size_blocks;
-
-        T[] res = new T[size_out];
 
         foreach(size_t b; 0 .. blocks_out) {
             // We take the first block matrix and multiply it with
             // the corresponding part of the vector.
             res[(b*size_blocks) .. ((b+1)*size_blocks)] =
-                vec[(b*size_blocks) .. ((b+1)*size_blocks)] / blocks[b];
+                v[(b*size_blocks) .. ((b+1)*size_blocks)] / blocks[b];
         }
 
-        res = res / this.P;
+        if (P) res = res / this.P;
         return res;
     }
 }
@@ -549,38 +255,108 @@ unittest
 {
     write("                  Block ... ");
 
+    // create an empt BlockMatrix for the seek of coverage.
+    auto mtmp_blue_unused = new BlockMatrix!(UnitaryMatrix!real, real)();
+
     auto len = 1024;
-    auto m0 = new BlockMatrix!float();
-    auto m1 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
-    auto m2 = new DiagonalMatrix!(Complex!float)(len/4, 1.0);
-    auto m3 = new ReflectionMatrix!(Complex!float)(len/4, 1.0);
-    auto m4 = new FourierMatrix!(Complex!float)(len/4);
-    auto bm = new BlockMatrix!(Complex!float)(len, len/4, [m1,m2,m3,m4],
-                                                     false);
+    
+    // Matrix | in: len | out: len
+    auto vec1 = new Vector!float(len, 1.0);
+    auto m1_1 = new Matrix!float(len/4, 1.0);
+    auto m1_2 = new Matrix!float(len/4, 1.0);
+    auto m1_3 = new Matrix!float(len/4, 1.0);
+    auto m1_4 = new Matrix!float(len/4, 1.0);
+    auto b1 = new BlockMatrix!(Matrix!float, float)
+                              (len, len/4, [m1_1, m1_2, m1_3, m1_4]);
+    auto res1_1 = b1*vec1;
+    auto res1_2 = vec1.dup();
+    res1_2.v[0 .. len/4] = m1_1 * vec1.v[0 .. len/4];
+    res1_2.v[len/4 .. len/2] = m1_2 * vec1.v[len/4 .. len/2];
+    res1_2.v[len/2 .. (len/2 + len/4)] = m1_3 * vec1.v[len/2 .. (len/4 + len/2)];
+    res1_2.v[(len/2 + len/4) .. $] = m1_4 * vec1.v[(len/4 + len/2) .. $];
+    res1_1 -= res1_2;
+    assert(res1_1.norm!"L2" <= 0.00001);
+    
+    // PermutationMatrix | in: len | out: len/2
+    auto vec2 = new Vector!(Complex!float)(len, 1.0);
+    auto m2_1 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
+    auto m2_2 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
+    auto m2_3 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
+    auto m2_4 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
+    auto b2 = new BlockMatrix!(PermutationMatrix!(Complex!float), Complex!float)
+                              (len, len/2, len/4, [m2_1, m2_2, m2_3, m2_4]);
+    auto res2_1 = b2*vec2;
+    auto res2_2 = new Vector!(Complex!float)(len/2);
+    res2_2.v[0 .. len/4] = m2_1 * vec2.v[0 .. len/4];
+    res2_2.v[len/4 .. len/2] = m2_2 * vec2.v[len/4 .. len/2];
+    res2_2.v[0 .. len/4][] += (m2_3 * vec2.v[len/2 .. (len/4 + len/2)])[];
+    res2_2.v[len/4 .. len/2][] += (m2_4 * vec2.v[(len/4 + len/2) .. $])[];
+    res2_1 -= res2_2;
+    assert(res2_1.norm!"L2" <= 0.00001);
+    
+    // DiagonalMatrix | in: len/2 | out: len
+    auto vec3 = new Vector!(Complex!real)(len/2, 1.0);
+    auto m3_1 = new DiagonalMatrix!(Complex!real)(len/4, 1.0);
+    auto m3_2 = new DiagonalMatrix!(Complex!real)(len/4, 1.0);
+    auto m3_3 = new DiagonalMatrix!(Complex!real)(len/4, 1.0);
+    auto m3_4 = new DiagonalMatrix!(Complex!real)(len/4, 1.0);
+    auto b3 = new BlockMatrix!(DiagonalMatrix!(Complex!real), Complex!real)
+                              (len/2, len, len/4, [m3_1, m3_2, m3_3, m3_4]);
+    auto res3_1 = b3*vec3;
+    auto res3_2 = new Vector!(Complex!real)(len);
+    res3_2.v[0 .. len/4] = m3_1 * vec3.v[0 .. len/4];
+    res3_2.v[len/4 .. len/2] = m3_2 * vec3.v[len/4 .. len/2];
+    res3_2.v[len/2 .. (len/2 + len/4)] = m3_3 * vec3.v[0 .. len/4];
+    res3_2.v[(len/2 + len/4) .. $] = m3_4 * vec3.v[len/4 .. len/2];
+    res3_1 -= res3_2;
+    assert(res3_1.norm!"L2" <= 0.00001);
+    
+    // ReflectionMatrix | in: len | out: len
+    auto vec4 = new Vector!double(len, 1.0);
+    auto m4_1 = new ReflectionMatrix!double(len/4, 1.0);
+    auto m4_2 = new ReflectionMatrix!double(len/4, 1.0);
+    auto m4_3 = new ReflectionMatrix!double(len/4, 1.0);
+    auto m4_4 = new ReflectionMatrix!double(len/4, 1.0);
+    auto b4 = new BlockMatrix!(ReflectionMatrix!double, double)
+                              (len, len/4, [m4_1, m4_2, m4_3, m4_4]);
+    auto res4_1 = b4*vec4;
+    auto res4_2 = vec4.dup();
+    res4_2.v[0 .. len/4] = m4_1 * vec4.v[0 .. len/4];
+    res4_2.v[len/4 .. len/2] = m4_2 * vec4.v[len/4 .. len/2];
+    res4_2.v[len/2 .. (len/2 + len/4)] = m4_3 * vec4.v[len/2 .. (len/4 + len/2)];
+    res4_2.v[(len/2 + len/4) .. $] = m4_4 * vec4.v[(len/4 + len/2) .. $];
+    res4_1 -= res4_2;
+    assert(res4_1.norm!"L2" <= 0.00001);
+    
+    // FourierMatrix
+    auto vec5 = new Vector!(Complex!double)(len, 1.0);
+    auto m5_1 = new FourierMatrix!(Complex!double)(len/4);
+    auto m5_2 = new FourierMatrix!(Complex!double)(len/4);
+    auto m5_3 = new FourierMatrix!(Complex!double)(len/4);
+    auto m5_4 = new FourierMatrix!(Complex!double)(len/4);
+    auto b5 = new BlockMatrix!(FourierMatrix!(Complex!double), Complex!double)
+                              (len, len/4, [m5_1, m5_2, m5_3, m5_4]);
+    auto res5_1 = b5*vec5;
+    auto res5_2 = vec5.dup();
+    res5_2.v[0 .. len/4] = m5_1 * vec5.v[0 .. len/4];
+    res5_2.v[len/4 .. len/2] = m5_2 * vec5.v[len/4 .. len/2];
+    res5_2.v[len/2 .. (len/2 + len/4)] = m5_3 * vec5.v[len/2 .. (len/4 + len/2)];
+    res5_2.v[(len/2 + len/4) .. $] = m5_4 * vec5.v[(len/4 + len/2) .. $];
+    res5_1 -= res5_2;
+    assert(res5_1.norm!"L2" <= 0.00001);
 
-    auto v = new Vector!(Complex!float)(len);
-    foreach(i; 0 .. len)
-        v[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
 
-    auto mem = v.dup;
-
-
-    auto v2 = bm * v;
-    auto v3 = v2 / bm;
-    v3 -= v;
-    assert(v3.norm!"L2" < 1.0);
-    v2 -= v;
-    assert(v2.norm!"L2" > 1.0);
-
-    assertThrown(new BlockMatrix!real(4u, 4u, 3u));
-    assertThrown(new BlockMatrix!real(4u, 3u, 3u));
+    assertThrown(new BlockMatrix!(DiagonalMatrix!real, real)(4u, 4u, 3u));
+    assertThrown(new BlockMatrix!(DiagonalMatrix!real, real)(4u, 3u, 3u));
 
     write("Done.\n");
 }
 
+
 /++ Unitary Matrix class.
  +
  +  TODO: take non-complex number as input.
+ +        handle permutation
  +
  +      This matrix is defined in 
  +          Unitary Evolution Recurrent Neural Networks,
@@ -600,20 +376,21 @@ unittest
  +              and inverse fourier transform,
  +            P is a permutation matrix.
  +/
-class UnitaryMatrix(T) : MatrixAbstract!T
-if (is(Complex!T : T))
+class UnitaryMatrix(T) : Parameter
 {
-    static assert(is(Complex!T : T),
-               "UnitaryMatrix must be complex-valued.");
+    static if (is(Complex!T : T))
+        mixin("alias Tc = "~(T.stringof[8 .. $])~";");
+    else alias Tc = T;
+
+    size_t rows, cols;
 
     PermutationMatrix!T perm;
     FourierMatrix!T fourier;
     Tc[] params;
-
-    override const pure @safe @nogc string typeId(){ return "UnitaryMatrix"; }
-    size_t _rows, _cols;
-    override const pure @safe @nogc size_t rows() { return _rows; }
-    override const pure @safe @nogc size_t cols() { return _cols; }
+    // used to save temporary values during the calculation to avoid mem alloc.
+    
+    static if (!is(Complex!T: T)) mixin("Tc[] tmp_vector;");
+    else mixin("T[] tmp_vector;");
 
     /+ The params vector include in the following order:
        + 3 diagonal unitary complex matrices.
@@ -627,18 +404,24 @@ if (is(Complex!T : T))
     this() {}
 
     this(in size_t size)
-    {   
+    {
         this();
         assert(std.math.isPowerOf2(size), "Size of Unitary Matrix
                                            must be a power of 2.");
-        // typeId = "UnitaryMatrix";
 
-        this._rows = size;
-        this._cols = size;
+        rows = size;
+        cols = size;
 
         perm = new PermutationMatrix!T(size ,1.0);
         fourier = new FourierMatrix!T(size);
         params = new Tc[7*size];
+        
+        static if (!is(Complex!T : T)) {
+            tmp_vector = new Tc[4*size];
+        }
+        else {
+            tmp_vector = new T[size];
+        }
     }
 
     this(in size_t size, in Tc randomBound)
@@ -647,142 +430,267 @@ if (is(Complex!T : T))
 
         if (randomBound <= 0)
             throw new Exception("'randomBound' must be > 0");
-	    foreach(i;0 .. params.length)
-	        params[i] = uniform(-randomBound, randomBound, rnd);
+        foreach(i;0 .. params.length)
+            params[i] = uniform(-randomBound, randomBound, rnd);
     }
     
     this(in UnitaryMatrix M)
     {
-        // typeId = "UnitaryMatrix";
         this();
-        this._rows = M.rows;
-        this._cols = M.cols;
+        rows = M.rows;
+        cols = M.cols;
         perm = M.perm.dup;
         fourier = M.fourier.dup;
         fourier = M.fourier.dup;
         params = M.params.dup;
+        tmp_vector = M.tmp_vector.dup;
     }
 
-    override
     const @property 
     UnitaryMatrix!T dup()
     {
         return new UnitaryMatrix(this);
     }
 
-
     /// Apply the "num"th diagonal matrix on the given vector.
-    const pure @safe
-    void applyDiagonal(ref T[] v, in size_t num)
+    pure @safe
+    void applyDiagonal(T)(ref T[] v, in size_t num)
     {
-        // we use expi to convert each value to a complex number
-        // the value is the angle of the complex number with radius 1.
-        size_t start_index = num*rows;
-        foreach(i; 0 .. rows)
-            v[i] *= cast(T) std.complex.expi(params[start_index + i]);
-    }    /// Apply the "num"th diagonal matrix on the given vector.
-    
-    const pure @safe
+        static if (!is(Complex!T : T)) {
+            // we use expi to convert each value to a complex number
+            // the value is the angle of the complex number with radius 1.
+            size_t start_index = num*rows;
+            size_t end_index = num*rows + rows;
+
+            // save cos & sin values
+            fill(tmp_vector[0 .. $>>2], params[start_index .. end_index].map!(a => cos(a)));
+            fill(tmp_vector[$>>2 .. $>>1], params[start_index .. end_index].map!(a => sin(a)));
+
+            // do some math magic
+            tmp_vector[$>>1 .. $ - ($>>2)] = v[0 .. $>>1] * tmp_vector[0 .. $>>2]
+                                         - v[$>>1 .. $] * tmp_vector[$>>2 .. $>>1];
+
+            tmp_vector[$ - ($>>2) .. $] = v[$>>1 .. $] * tmp_vector[0 .. $>>2]
+                                      + v[0 .. $>>1] * tmp_vector[$>>2 .. $>>1];
+
+            v[] = tmp_vector[$>>1 .. $];
+        }
+        else {
+            size_t start_index = num*rows;
+            foreach(i; 0 .. rows)
+                v[i] *= cast(T) std.complex.expi(params[start_index + i]);
+        }
+    }
+
+    pure @safe
     void applyDiagonalInv(ref T[] v, in size_t num)
     {
-        // we use expi to convert each value to a complex number
-        // the value is the angle of the complex number with radius 1.
-        size_t start_index = num*rows;
-        foreach(i; 0 .. rows)
-            v[i] /= cast(T) std.complex.expi(params[start_index + i]);
+        static if (!is(Complex!T : T)) {
+            // we use expi to convert each value to a complex number
+            // the value is the angle of the complex number with radius 1.
+            // SAME as applyDiagonal except we take -sin.
+            size_t start_index = num*rows;
+            size_t end_index = num*rows + rows;
+
+            // save cos & sin values
+            fill(tmp_vector[0 .. $>>2], params[start_index .. end_index].map!(a => cos(a)));
+            fill(tmp_vector[$>>2 .. $>>1], params[start_index .. end_index].map!(a => -sin(a)));
+
+            // do some math magic
+            tmp_vector[$>>1 .. $ - ($>>2)] = v[0 .. $>>1] * tmp_vector[0 .. $>>2]
+                                         - v[$>>1 .. $] * tmp_vector[$>>2 .. $>>1];
+
+            tmp_vector[$ - ($>>2) .. $] = v[$>>1 .. $] * tmp_vector[0 .. $>>2]
+                                      + v[0 .. $>>1] * tmp_vector[$>>2 .. $>>1];
+
+            v[] = tmp_vector[$>>1 .. $];
+        }
+        else {
+            // we use expi to convert each value to a complex number
+            // the value is the angle of the complex number with radius 1.
+            size_t start_index = num*rows;
+            foreach(i; 0 .. rows)
+                v[i] /= cast(T) std.complex.expi(params[start_index + i]);
+        }
     }
 
     /// Apply the "num"th reflection matrix on the given vector.
-    const pure @safe
+    // TODO pure @safe
     auto applyReflection(ref T[] v, in size_t num)
     {
-        // The '+3' is because the diagonal matrices are first
-        // in the params array.
-        // The '*2' is because each reflection matrix need
-        // 2 * rows parameters to be defined.
         size_t start_index = (2*num + 3)*rows;
-        size_t start_indexPlRows = start_index + rows;
-        auto a = params[start_index .. start_indexPlRows];
-        auto b = params[start_indexPlRows .. start_indexPlRows + rows];
-        T tmp_c = dot(v, a) - complex(0, 1) * dot(v, b);
-        T[] tmp_vec = new T[rows];
-        tmp_c *= 2 / (dot(a, a) + dot(b, b));
+        static if (!is(Complex!T : T)) {
+            auto h = params[start_index .. start_index + 2*rows];
 
-        foreach(i; 0 .. rows)
-            tmp_vec[i] = complex(a[i], b[i]) *  tmp_c;
+            auto t_a = dot(h[0 .. rows], v[0 .. rows])
+                     + dot(h[rows .. rows << 1], v[rows .. rows << 1]);
+            auto t_b = dot(h[0 .. rows], v[rows .. rows << 1])
+                     - dot(h[rows .. rows << 1], v[0 .. rows]);
 
-        v[] -= tmp_vec[];
+            tmp_vector[0 .. rows][]  = h[0 .. rows][];
+            tmp_vector[0 .. rows][] *= t_a;
+            tmp_vector[(rows<<1) .. ((rows<<1)+rows)][] = h[rows .. rows << 1][];
+            tmp_vector[(rows<<1) .. ((rows<<1)+rows)][] *= t_b;
+            tmp_vector[0 .. rows][] -= tmp_vector[(rows<<1) .. ((rows<<1)+rows)][];
+
+            tmp_vector[rows .. (rows<<1)][] = h[0 .. rows][];
+            tmp_vector[rows .. (rows<<1)][] *= t_b;
+            tmp_vector[(rows<<1) .. ((rows<<1)+rows)][] = h[rows .. rows << 1][];
+            tmp_vector[(rows<<1) .. ((rows<<1)+rows)][] *= t_a;
+            tmp_vector[rows .. (rows<<1)][] += tmp_vector[(rows<<1) .. ((rows<<1)+rows)][];
+
+            tmp_vector[0 .. (rows<<1)][] *= 2.0 / h.map!(a => a*a).sum;
+
+            v[] -= tmp_vector[0 .. rows << 1];
+
+
+        }
+        else {
+            // The '+3' is because the diagonal matrices are first
+            // in the params array.
+            // The '*2' is because each reflection matrix need
+            // 2 * rows parameters to be defined.
+            size_t start_indexPlRows = start_index + rows;
+            auto a = params[start_index .. start_indexPlRows];
+            auto b = params[start_indexPlRows .. start_indexPlRows + rows];
+            T tmp_c = dot(v, a) - complex(0, 1) * dot(v, b);
+            tmp_c *= 2 / (dot(a, a) + dot(b, b));
+
+            foreach(i; 0 .. rows)
+                tmp_vector[i] = complex(a[i], b[i]) *  tmp_c;
+
+            v[] -= tmp_vector[];
+        }
     }
 
-    const
+    /// Apply permutation multiplication on array based on the type of the matrix.
+    @safe pure
+    T[] permMult(T[] tmp_v)
+    {
+        // Complex valued vector
+        static if (is(Complex!T : T)) {
+            return this.perm * tmp_v;
+        }
+        // Real valued vector
+        else {
+            tmp_vector[0 .. ($ >> 1)][] = tmp_v[];
+            size_t tmp_len = tmp_v.length >> 1;
+            foreach(i; 0 .. tmp_len){
+                tmp_v[i] = tmp_vector[this.perm.perm[i]];
+                tmp_v[i + tmp_len] = tmp_vector[this.perm.perm[i] + tmp_len];
+            }
+            return tmp_v;
+        }
+    }
+
+    /// Apply permutation inverse on array based on the type of the matrix.
+    @safe pure
+    T[] permInv(T[] tmp_v)
+    {
+        // Complex valued vector
+        static if (is(Complex!T : T)) {
+            return tmp_v / this.perm;
+        }
+        // Real valued vector
+        else {
+            tmp_vector[0 .. ($ >> 1)][] = tmp_v[];
+            size_t tmp_len = tmp_v.length >> 1;
+            foreach(i; 0 .. tmp_len){
+                tmp_v[this.perm.perm[i]] = tmp_vector[i];
+                tmp_v[this.perm.perm[i] + tmp_len] = tmp_vector[i + tmp_len];
+            }
+            return tmp_v;
+        }
+    }
+
     Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
         return new Vector!T(this * v.v);
     }
 
-    const
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
         enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
 
-        T[] res = v.dup;
-        
-        applyDiagonal(res, 0);
-        
+        static if (!is(Complex!T : T)) {
+            T[] res = new T[v.length << 1];
+            res[0 .. v.length] = v[];
+            res[v.length .. $] = 0;
+        }
+        else {
+            T[] res = v.dup;
+        }
+
+        this.applyDiagonal(res, 0);
+
         res = fourier * res;
 
-        applyReflection(res, 0);
-        res = perm * res;
-        applyDiagonal(res, 1);
-        
-        res = res / fourier;
-        
-        applyReflection(res, 1);
-        applyDiagonal(res, 2);
+        this.applyReflection(res, 0);
+        res = this.permMult(res);
+        this.applyDiagonal(res, 1);
 
-        return res;
+        res = res / fourier;
+
+        this.applyReflection(res, 1);
+        this.applyDiagonal(res, 2);
+
+        static if (!is(Complex!T: T))
+            return res[0 .. ($ >> 1)][];
+        else
+            return res;
     }
 
-    const
     Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
         return new Vector!T(v.v / this);
     }
 
-    const
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
         enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
-        T[] res = v.dup;
+        
+        static if (!is(Complex!T : T)) {
+            T[] res = new T[v.length << 1];
+            res[0 .. v.length] = v[];
+            res[v.length .. $] = 0;
+        }
+        else {
+            T[] res = v.dup;
+        }
 
-        applyDiagonalInv(res, 2);
-        applyReflection(res, 1);
+        this.applyDiagonalInv(res, 2);
+        this.applyReflection(res, 1);
         
         res = fourier * res;
 
-        applyDiagonalInv(res, 1);
-        res = res / perm;
-        applyReflection(res, 0);
+        this.applyDiagonalInv(res, 1);
+        res = this.permInv(res);
+        this.applyReflection(res, 0);
         
         res = res / fourier;
         
-        applyDiagonalInv(res, 0);
+        this.applyDiagonalInv(res, 0);
 
-        return res;
+        static if (!is(Complex!T: T))
+            return res[0 .. ($ >> 1)][];
+        else
+            return res;
     }
 }
 unittest
 {
     write("                  Unitary ... ");
+    // Complex valued Matrix
     {
         auto m0 = new UnitaryMatrix!(Complex!float)();
         auto m = new UnitaryMatrix!(Complex!double)(1024, 9.0);
         auto n= m.dup;
         auto v = new Vector!(Complex!double)(1024, 1.2);
+        auto memcop = v.dup;
 
         auto k = v.dup;
         auto l = k.dup;
@@ -802,6 +710,49 @@ unittest
         assertThrown(new UnitaryMatrix!(Complex!float)(4, 0.0));
     }
 
+    // There is a bug in the applyReflection method
+    // Real valued Matrix
+    {
+        size_t len = 2;
+        auto mc = new UnitaryMatrix!(Complex!real)(len, 1.0);
+        auto mr = new UnitaryMatrix!real(len, 1.0);
+    
+        // Copy mc parameters into mr.
+        mr.params = mc.params.dup;
+        mr.perm.perm = mc.perm.perm.dup;
+
+        auto vr = new Vector!real(len, 1.0);
+        auto vc = new Vector!(Complex!real)(len);
+        foreach(i; 0 .. len)
+            vc[i] = complex(vr[i], 0);
+        
+        { // Multiplication
+            auto res_c = mc * vc;
+            auto res_r = mr * vr;
+
+            // Take only real values.
+            auto res_c_r = new Vector!real(len);
+            foreach(i; 0 .. len)
+                res_c_r[i] = res_c[i].re;
+
+            res_c_r -= res_r;
+            assert(res_c_r.norm!"L2" <= 0.00001);
+        }
+
+        { // Inverse
+            auto res_c = vc / mc;
+            auto res_r = vr / mr;
+
+            // Take only real values.
+            auto res_c_r = new Vector!real(len);
+            foreach(i; 0 .. len)
+                res_c_r[i] = res_c[i].re;
+
+            res_c_r -= res_r;
+            assert(res_c_r.norm!"L2" <= 0.00001);
+        }
+    }
+
     write("Done.\n");
 }
 
@@ -809,119 +760,184 @@ unittest
  +
  +  Implement the fourier matrix.
  +
+ +  TODO: Allow non complex vector as input => assume it is of the form [real values, imaginary values]
  +/
-class FourierMatrix(T) : MatrixAbstract!T
-if (is(Complex!T : T))
+class FourierMatrix(T) : Parameter
 {
+    static if (is(Complex!T : T))
+        mixin("alias Tc = "~(T.stringof[8 .. $])~";");
+    else alias Tc = T;
+
+    size_t rows, cols;
+
     Fft objFFT;
-
-    override const pure @safe @nogc string typeId() { return "FourierMatrix"; }
-    size_t _rows, _cols;
-    override const pure @safe @nogc size_t rows() { return _rows; }
-    override const pure @safe @nogc size_t cols() { return _cols; }
-
+    Complex!T[] tmp_vector;
+    Complex!T[] tmp_result;
+    T[] return_vector_real;
+    
     this(size_t size)
     {
-        // typeId = "FourierMatrix";
-        this._rows = size;
-        this._cols = size;
+        rows = size;
+        cols = size;
         objFFT = new Fft(size);
+
+        tmp_vector = new Complex!T[size];
+        tmp_result = new Complex!T[size];
+        return_vector_real = new T[size << 1];
     };
     
     this(in FourierMatrix M)
     {
-        this(M.rows());
+        this(M.rows);
     }
 
-    override
     const @property
     FourierMatrix!T dup()
     {
         return new FourierMatrix(this);
     }
 
-    const
     Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
         return new Vector!T(this * v.v);
     }
 
-    const
     T[] opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
-        return objFFT.fft!Tc(v);
+        static if (!is(Complex!T : T)) {
+            enforce((v.length >> 1) == cols, "Matrix-Vector divison: dimensions mismatch.");
+            foreach(i; 0 .. v.length >> 1)
+            {
+                tmp_vector[i] = complex(v[i], v[i+($>>1)]);
+            }
+            objFFT.fft(tmp_vector, tmp_result);
+            foreach(i, c; tmp_result)
+            {
+                return_vector_real[i] = c.re;
+                return_vector_real[i + ($ >> 1)] = c.im;
+            }
+            return return_vector_real;
+        }
+        else {
+            enforce(v.length == cols, "Matrix-Vector divison: dimensions mismatch.");
+            objFFT.fft(v, tmp_vector);
+            tmp_result[] = tmp_vector[];
+            return tmp_result;
+        }
     }
 
-
-    const
     Vector!T opBinaryRight(string op)(in Vector!T v)
     if (op=="/")
     {
-        enforce(v.length == cols, "Matrix-Vector divison: dimensions mismatch.");
         return new Vector!T(v.v / this);
     }
 
-    const
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        return objFFT.inverseFft!Tc(v);
+        static if (!is(Complex!T : T)) {
+            enforce((v.length >> 1) == cols, "Matrix-Vector divison: dimensions mismatch.");
+            foreach(i; 0 .. v.length >> 1)
+            {
+                tmp_vector[i] = complex(v[i], v[i+($>>1)]);
+            }
+            objFFT.inverseFft(tmp_vector, tmp_result);
+            foreach(i, c; tmp_result)
+            {
+                return_vector_real[i] = c.re;
+                return_vector_real[i + ($ >> 1)] = c.im;
+            }
+            return return_vector_real;
+        }
+        else {
+            enforce(v.length == cols, "Matrix-Vector divison: dimensions mismatch.");
+            objFFT.inverseFft(v, tmp_vector);
+            tmp_result[] = tmp_vector[];
+            return tmp_result;
+        }
     }
 }
 unittest
 {
     write("                  Fourrier ... ");
+
+    size_t len = 4;
+    // Complex
     {
         alias Fourier = FourierMatrix!(Complex!double);
-        auto f = new Fourier(1024);
+        auto f = new Fourier(len);
         auto g =  f.dup;
-        auto v = new Complex!double[2048];
-        auto vc = v[15 .. 1039];
-
-        assert(vc.length == 1024);
+        auto vc = new Complex!double[len];
 
         auto rnd_tmp = Random(cast(uint) ((Clock.currTime()
                          - SysTime(unixTimeToStdTime(0))).total!"msecs"));
 
-        foreach(i;0 .. 1024)
+        foreach(i;0 .. len)
             vc[i] = complex(uniform(-1.0, 1.0, rnd_tmp),
                             uniform(-1.0, 1.0, rnd_tmp));
 
         auto r1 = f * (vc / f);
         auto r2 = (g * vc) / g;
+        auto r3 = (f * vc) / f;
 
-        foreach(i;0 .. 1024){
+        foreach(i;0 .. len){
             assert(std.complex.abs(r1[i] - vc[i]) <= 0.0001);
             assert(std.complex.abs(r2[i] - vc[i]) <= 0.0001);
             assert(std.complex.abs(r1[i] - r1[i]) <= 0.0001);
         }
     }
 
+    // Real
+    {
+        alias Fourier = FourierMatrix!real;
+        auto f = new Fourier(len);
+        auto g = new FourierMatrix!(Complex!real)(len);
+
+        auto v = new Vector!real(len << 1, 1.0);
+
+        auto c = new Vector!(Complex!real)(len, 0);
+
+        foreach(i; 0 .. len)
+            c[i] = complex(v[i], v[i + len]);
+        
+        auto r1 = f*v;
+        auto r2 = g*c;
+
+        auto r = v.dup;
+        foreach(i; 0 .. len)
+        {
+            r[i] = r2[i].re;
+            r[i + len] = r2[i].im;
+        }
+
+        r -= r1;
+
+        assert(r.norm!"L2" <= 0.0001);
+    }
+
     write("Done.\n");
 }
-
 
 /++ Diagonal matrix class.
  +
  + TODO: There mmight be too much things, we could need to remove some methods.
  +
  +/
-class DiagonalMatrix(T) : MatrixAbstract!T {
+class DiagonalMatrix(T) : Parameter {
+    static if (is(Complex!T : T))
+        mixin("alias Tc = "~(T.stringof[8 .. $])~";");
+    else alias Tc = T;
+
     T[] params;
 
-    override const pure @safe @nogc string typeId(){ return "DiagonalMatrix"; }
-    size_t _rows, _cols;
-    override const pure @safe @nogc size_t rows() { return _rows; }
-    override const pure @safe @nogc size_t cols() { return _cols; }
+    size_t rows, cols;
     /// Constructor
     pure @safe
     this(in size_t size)
     {
-        // typeId = "DiagonalMatrix";
-        this._rows = size; this._cols = size;
+        this.rows = size; this.cols = size;
         params = new T[size];
     }
 
@@ -968,7 +984,7 @@ class DiagonalMatrix(T) : MatrixAbstract!T {
     }
 
 
-    override
+    
     const @property
     DiagonalMatrix!T dup()
     {
@@ -1166,21 +1182,21 @@ unittest
  + v* denotes the conjugate transpose of v
  + ||v||^2 is the euclidean norm of v
  +/
-class ReflectionMatrix(T) : MatrixAbstract!T {
+class ReflectionMatrix(T) : Parameter {
+    static if (is(Complex!T : T))
+        mixin("alias Tc = "~(T.stringof[8 .. $])~";");
+    else alias Tc = T;
+
     Vector!T vec;
     real invSqNormVec2 = 1.0;
     
-    override const pure @safe @nogc string typeId() { return "ReflectionMatrix"; }
-    size_t _rows, _cols;
-    override const pure @safe @nogc size_t rows() { return _rows; }
-    override const pure @safe @nogc size_t cols() { return _cols; }
+    size_t rows, cols;
 
     /// Constructor
     pure @safe
     this(in size_t size)
     {
-        // typeId = "ReflectionMatrix";
-        this._rows = size; this._cols = size;
+        this.rows = size; this.cols = size;
         vec = new Vector!T(size);
     }
 
@@ -1210,9 +1226,8 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     @safe
     this(in ReflectionMatrix dupl)
     {
-        // typeId = "ReflectionMatrix";
-        this._rows = dupl.vec.length;
-        this._cols = dupl.vec.length;
+        this.rows = dupl.vec.length;
+        this.cols = dupl.vec.length;
         vec = dupl.vec.dup;
         invSqNormVec2 = dupl.invSqNormVec2;
     }
@@ -1221,8 +1236,8 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     pure @safe
     this(in T[] valarr)
     {
-        this._rows = valarr.length;
-        this._cols = valarr.length;
+        this.rows = valarr.length;
+        this.cols = valarr.length;
         vec = new Vector!T(valarr);
         compute_invSqNormVec2();
     }
@@ -1234,7 +1249,7 @@ class ReflectionMatrix(T) : MatrixAbstract!T {
     }
 
 
-    override
+    
     const @property
     ReflectionMatrix!T dup()
     {
@@ -1374,19 +1389,19 @@ unittest
 
 /++ Permutation matrix class.
  +/
-class PermutationMatrix(T) : MatrixAbstract!T {
+class PermutationMatrix(T) : Parameter {
+    static if (is(Complex!T : T))
+        mixin("alias Tc = "~(T.stringof[8 .. $])~";");
+    else alias Tc = T;
+
     size_t[] perm;
 
-    override const pure @safe @nogc string typeId() { return "PermutationMatrix"; }
-    size_t _rows, _cols;
-    override const pure @safe @nogc size_t rows() { return _rows; }
-    override const pure @safe @nogc size_t cols() { return _cols; }
+    size_t rows, cols;
     /// Constructor
     pure @safe
     this(in size_t size)
     {
-        // typeId = "PermutationMatrix";
-        this._rows = size; this._cols = size;
+        this.rows = size; this.cols = size;
         perm = new size_t[size];
     }
 
@@ -1418,7 +1433,7 @@ class PermutationMatrix(T) : MatrixAbstract!T {
     }
 
 
-    override
+    
     const @property
     PermutationMatrix!T dup()
     {
@@ -1445,10 +1460,7 @@ class PermutationMatrix(T) : MatrixAbstract!T {
     Vector!T opBinary(string op)(in Vector!T v)
     if (op=="*")
     {
-        auto vres = new Vector!T(v.length);
-        foreach(i; 0 .. v.length)
-            vres[i] = v[perm[i]];
-        return vres;
+        return new Vector!T(this * v.v);
     }
 
     const pure @safe
@@ -1506,22 +1518,21 @@ unittest
  +  	  the division operator (multiplication by the inverse).
  +
  +/
-class Matrix(T) : MatrixAbstract!T {
+class Matrix(T) : Parameter {
+    static if (is(Complex!T : T))
+        mixin("alias Tc = "~(T.stringof[8 .. $])~";");
+    else alias Tc = T;
+
     T[] params;
 
-    override const pure @safe @nogc string typeId() { return "Matrix"; }
-    size_t _rows, _cols;
-    override const pure @safe @nogc size_t rows() { return _rows; }
-    override const pure @safe @nogc size_t cols() { return _cols; }
+    size_t rows, cols;
     /// Simple constructor
     pure @safe
     this(in size_t rows, in size_t cols)
     {
-        super();
-        // typeId = "Matrix";
         params = new T[rows*cols];
-        this._rows = rows;
-        this._cols = cols;
+        this.rows = rows;
+        this.cols = cols;
     }
     
     pure @safe
@@ -1540,10 +1551,9 @@ class Matrix(T) : MatrixAbstract!T {
     @safe
     this(in size_t rows, in size_t cols, in Tc randomBound)
     {
-        // typeId = "Matrix";
         params = new T[rows*cols];
-        this._rows = rows;
-        this._cols = cols;
+        this.rows = rows;
+        this.cols = cols;
 
         if (randomBound < 0)
             throw new Exception("'randomBound' must be >= 0");
@@ -1568,13 +1578,13 @@ class Matrix(T) : MatrixAbstract!T {
     pure @safe
     this(in Matrix dupl)
     {
-        this(dupl.rows(), dupl.cols());
+        this(dupl.rows, dupl.cols);
         foreach(i;0 .. rows*cols) {
             params[i] = dupl.params[i];
         }
     }
 
-    override
+    
     const @property
     Matrix!T dup()
     {
