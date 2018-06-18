@@ -179,21 +179,20 @@ class NeuralNetwork(T) {
      +                        inputs. If empty, the last known layer will be took.
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +/
-    auto Linear(size_t _dim_out=0,
-                in bool _use_bias=false,
-                in Tc _randomBound=1.0,
-                in string _type="Matrix",
-                in string _name=null,
-                Vector!T _state=null,
-                in string[] _in=null,
-                in string[] _to=null)
+    auto Linear(Mtype = Matrix!T)(size_t _dim_out=0,
+                               in bool _use_bias=false,
+                               in Tc _randomBound=1.0,
+                               in string _name=null,
+                               Vector!T _state=null,
+                               in string[] _in=null,
+                               in string[] _to=null)
     {
         if (!_dim_out)
             _dim_out = arr_dim_out[$-1];
 
         return addLayer(_dim_out,
-                        new MatrixLayer!T(_type, [_dim_out, arr_dim_in[id]],
-                                           _use_bias, _randomBound),
+                        new MatrixLayer!(Mtype, T)([_dim_out, arr_dim_in[id]],
+                            _use_bias, _randomBound),
                         _use_bias, _randomBound,
                         _name, _state, _in, _to);
     }
@@ -208,7 +207,6 @@ class NeuralNetwork(T) {
      +
      +  Args:
      +      _function (string, ="relu"): The name of the function to use as non-linearity.
-     +      _type (string, ="Matrix"): The type of the matrix to create (e.g. Fourier, Unitary).
      +      _randomBound (Tc, =1.0): Used for the generation of random values in the parameters.
      +      _name_in (string, =null): Name of the first layer for futur redirection.
      +      _name_to (string, =null): Name of the last layer for futur redirection.
@@ -217,14 +215,13 @@ class NeuralNetwork(T) {
      +                        inputs. If empty, the last known layer will be took.
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +/
-    auto Recurrent(in string _function="relu",
-                   in string _type="Matrix",
-                   in Tc _randomBound=1.0,
-                   string _name_in=null,
-                   in string _name_to=null,
-                   Vector!T _state=null,
-                   in string[] _in=null,
-                   in string[] _to=null)
+    auto Recurrent(Mtype = Matrix!T)(in string _function="relu",
+                           in Tc _randomBound=1.0,
+                           string _name_in=null,
+                           in string _name_to=null,
+                           Vector!T _state=null,
+                           in string[] _in=null,
+                           in string[] _to=null)
     {
         if (!_name_in)
             _name_in = "IN_RECURRENT_LAYER_" ~ to!string(id);
@@ -241,14 +238,13 @@ class NeuralNetwork(T) {
                       _in,        // 'in' references. 
                       null);      // no 'out' references.
 
-        this.Linear(0,            // dim out = dim in.
-                    false,        // no bias vector.
-                    _randomBound, // random bound for the initialisation.
-                    _type,        // Matrix type.
-                    _name_to,    // Name for futur references out of the recurrent layer.
-                    _state,       // intial state vector.
-                    null,         // no 'in' references.
-                    tmp_to);         // 'out' references.
+        this.Linear!(Mtype)(0,            // dim out = dim in.
+                            false,        // no bias vector.
+                            _randomBound, // random bound for the initialisation.
+                            _name_to,    // Name for futur references out of the recurrent layer.
+                            _state,       // intial state vector.
+                            null,         // no 'in' references.
+                            tmp_to);         // 'out' references.
 
         return this;
     }
@@ -356,7 +352,7 @@ unittest {
         assert(w.norm!"L2" <= 0.0001);
 
         // We add a Linear Layer of shape (6, 4).
-        nn.Linear(6, false, 1.0, "Matrix", "L1");
+        nn.Linear!(Matrix!float)(6, false, 1.0, "L1");
         w = nn.compute(v);
 
         // Hence, the resulting vector should have length 6.
@@ -365,7 +361,7 @@ unittest {
         // We add some complexity: the layer take the user's input and the ouput of "L1"
         // and return its output to "L1" (And so create a rnn-like structure) and to
         // the output (by default, the result of the last layer).
-        nn.Linear(4, false, 1.0, "Matrix", "L2", null, null, ["L1"]);
+        nn.Linear!(Matrix!float)(4, false, 1.0, "L2", null, null, ["L1"]);
         w = nn.compute(v);
         auto z = nn.compute(v);
 
@@ -417,9 +413,9 @@ unittest {
         auto s = nn2.results[3].dup; 
 
         auto nn3 = new NeuralNetwork!real(5);
-        nn3.Linear(5, true, 1.0, "Matrix")
+        nn3.Linear(5, true, 1.0)
            .Function("relu", 5, "Rec_in")
-           .Linear(5, false, 1.0, "Matrix", null, s, null, ["Rec_in"])
+           .Linear(5, false, 1.0, null, s, null, ["Rec_in"])
            .Linear(5, true)
            .Function("softmax");
 

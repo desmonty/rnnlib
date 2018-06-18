@@ -63,99 +63,98 @@ abstract class Layer(T)
 
 /+ This layer implement a simple linear matrix transformation
  + applied to the vector.
+ +
+ + M (type): Type of the matrix to be used in the layer.
+ + T (type): Type of the matrix.
+ +
+ + WE ASSUME NOBODY WE'LL USE ANYTHING ELSE THAN A MATRIX FOR "M".
+ + TODO: use some kind of limitation to make sure M is a known matrix
+ + (std.variant, enum, set ...).
+ +
  +/
-class MatrixLayer(T) : Layer!T
+class MatrixLayer(Mtype, T) : Layer!T
 {
-    this(in MatrixAbstract!T _M)
+    this()
     {
+        // TODO: Add check to see if Mtype is a Matrix*!T
+    }
+
+    this(in Mtype _M)
+    {
+        this();
         // We keep a duplicate of the matrix.
         params = new Parameter[1];
         params[0] = _M.dup;
     }
 
-    this(in MatrixAbstract!T _M, in Vector!T _v)
+    this(in Mtype _M, in Vector!T _v)
     {
-        // We keep a duplicate of the matrix and of the (bias) vector.
-        size_t num_param = 1;
         if (_v){
-            num_param = 2;
-            enforce(_M.rows == _v.length, "Matrix / Bias dimensions mismatch.");
-        }
+            this();
+            enforce(_M.cols == _v.length, "Matrix / Bias dimensions mismatch.");
 
-        params = new Parameter[num_param];
-        auto tmp = _M.dup;
-        params[0] = tmp;
-
-        if (_v)
+            params = new Parameter[2];
+            params[0] = _M.dup;
             params[1] = _v.dup;
+        }
+        else
+            this(_M);
     }
 
 
-    this(immutable string _matrix_type,
-         in size_t[2] _dim,
+    this(in size_t[2] _dim,
          in bool _bias=false,
          in Tc _random_init=0)
     {
         // Block matrix cannot be created automatically.
-        if (_matrix_type == "Block")
+        static if (Mtype.stringof[0 .. 5] == "Block")
             throw new Exception("Block matrix need to be created by the user.");
-        
-        // Create a bias vector if needed.
-        Vector!T v = null;
-        if (_bias)
-            v = new Vector!T(_dim[0], _random_init);
-
-        MatrixAbstract!T m;
-
-        // Only rectangular matrix allowed are the general "Matrix".
-        if(_matrix_type == "Matrix") {
-            m = new Matrix!T(_dim[0], _dim[1], _random_init);
-        }
         else {
-            enforce(_dim[0]==_dim[1], _matrix_type~"Matrix must be a square.");
-            switch (_matrix_type)
-            {
-                case "Unitary":
-                    static if (is(Complex!T : T)) {
-                        m = new UnitaryMatrix!T(_dim[0], _random_init);
-                    }
-                    else assert(0, "Unitary matrices must be of complex type.");
-                    break;
-                case "Diagonal":
-                    m = new DiagonalMatrix!T(_dim[0], _random_init);
-                    break;
-                case "Reflection":
-                    m = new ReflectionMatrix!T(_dim[0], _random_init);
-                    break;
-                case "Permutation":
-                    m = new PermutationMatrix!T(_dim[0], _random_init);
-                    break;
-                case "Fourier":
-                    static if (is(Complex!T : T)) {
-                        m = new FourierMatrix!T(_dim[0]);
-                    }
-                    else assert(0, "Fourier matrices must be of complex type.");
-                    break;
-                default:
-                    assert(0, "Unrecognized matrix type: "~_matrix_type);
+            // Create a bias vector if needed.
+            Vector!T v = null;
+            if (_bias)
+                v = new Vector!T(_dim[0], _random_init);
+
+            // Only rectangular matrix allowed are the general "Matrix".
+            static if(is(Mtype: Matrix!T)) {
+                Mtype!T m = new Matrix!T(_dim[0], _dim[1], _random_init);
             }
+            else {
+                enforce(_dim[0]==_dim[1], "Only \"Matrix\" can be rectangular.");
+    
+                static if (is(Mtype: UnitaryMatrix!T)){
+                    Mtype!T m = new UnitaryMatrix!T(_dim[0], _random_init);
+                }
+                else static if (is(Mtype: DiagonalMatrix!T)){
+                    Mtype!T m = new DiagonalMatrix!T(_dim[0], _random_init);
+                }
+                else static if (is(Mtype: ReflectionMatrix!T)){
+                    Mtype!T m = new ReflectionMatrix!T(_dim[0], _random_init);
+                }
+                else static if (is(Mtype: PermutationMatrix!T)){
+                    Mtype!T m = new PermutationMatrix!T(_dim[0], _random_init);
+                }
+                else static if (is(Mtype: FourierMatrix!T)){
+                    Mtype!T m = new FourierMatrix!T(_dim[0]);
+                }
+                else static assert(0, "Unrecognized matrix type: "~Mtype.stringof);
+            }
+            this(m, v);
         }
-        this(m, v);
     }
 
-    this(immutable string _matrix_type,
-         in size_t _dim,
+    this(in size_t _dim,
          in bool _bias=false,
          in Tc _random_init=0)
     {
-        this(_matrix_type, [_dim, _dim], _bias, _random_init);
+        this([_dim, _dim], _bias, _random_init);
     }
     
     override
     Vector!T compute(Vector!T _v)
     {
         // Multiply the vector by the matrix first.
-        auto res = (cast(MatrixAbstract!T) params[0]) * _v;
+        auto res = (cast(Mtype) params[0]) * _v;
 
         // Add the bias vector if needed.
         if (params.length > 1)
@@ -170,30 +169,15 @@ unittest {
 
     auto r = new ReflectionMatrix!(Complex!real)(2, 1.0);
     auto d = new DiagonalMatrix!(Complex!real)(2, 2.0);
-    auto b = new BlockMatrix!(Complex!real)(4, 4, 2, [r, d], true);
+    auto gm = new Matrix!(Complex!real)(2, 2.0);
+    auto b = new BlockMatrix!(Matrix!(Complex!real), Complex!real)(4, 4, 2, [gm, gm], true);
+
     auto f = new FourierMatrix!(Complex!real)(4);
-
-
-
-    // Unrecognized matrix type
-    bool err = false;
-    try {
-        auto mf = new MatrixLayer!float("куриста", 34);
-    }
-    catch (AssertError e) { err = true; }
-    assert(err);
 
 
     // Fourier
     {
-        bool error = false;
-        try {
-            auto mf = new MatrixLayer!float("Fourier", 32);
-        }
-        catch (AssertError e) { error = true; }
-        assert(error);
-
-        auto mf = new MatrixLayer!(Complex!real)("Fourier", 4, true, 1.0);
+        auto mf = new MatrixLayer!(FourierMatrix!(Complex!real), Complex!real)(4, true, 1.0);
         auto p = cast(Vector!(Complex!real)) mf.params[1];
 
         auto res1 = mf.compute(v);
@@ -208,7 +192,7 @@ unittest {
     // Matrix
     {
         auto vec = new Vector!double(4, 1.0);
-        auto mm = new MatrixLayer!double("Matrix", [2, 4], false, 10.0);
+        auto mm = new MatrixLayer!(Matrix!double, double)([2, 4], false, 10.0);
         auto m = cast(Matrix!double) mm.params[0]; 
 
         auto res1 = mm.compute(vec);
@@ -221,12 +205,9 @@ unittest {
 
     // Block
     {
-        assertThrown(new MatrixLayer!real("Block", [1,2], true, 1.0));
-        assertThrown(new MatrixLayer!real("Block", 2, true, 1.0));
-
         auto p = new Vector!(Complex!real)(4, 3.1415926535);
-        auto mb = new MatrixLayer!(Complex!real)(b, p);
-        auto m = cast(BlockMatrix!(Complex!real)) mb.params[0];
+        auto mb = new MatrixLayer!(BlockMatrix!(Matrix!(Complex!real), Complex!real), Complex!real)(b, p);
+        auto m = cast(BlockMatrix!(Matrix!(Complex!real), Complex!real)) mb.params[0];
 
         auto res1 = mb.compute(v);
         auto res2 = m * v;
@@ -234,6 +215,7 @@ unittest {
         res2 -= res1;
 
         assert(res2.norm!"L2" <= 0.0001);
+        assertThrown(new MatrixLayer!(BlockMatrix!(Matrix!real, real), real)([2, 3], false, 10.0));
     }
 
     // Permutation
@@ -241,7 +223,7 @@ unittest {
         auto p = new PermutationMatrix!float(16);
         auto w = new Vector!float(16, 1010101.0);
 
-        auto mp = new MatrixLayer!float(p);
+        auto mp = new MatrixLayer!(PermutationMatrix!float, float)(p);
 
         auto res1 = mp.compute(w);
         auto res2 = p * w;
@@ -250,7 +232,7 @@ unittest {
 
         assert(res1.norm!"L2" <= 0.0001);
 
-        mp = new MatrixLayer!float("Permutation", 17);
+        mp = new MatrixLayer!(PermutationMatrix!float, float)(17);
         w = new Vector!float(17, 0.1);
 
         res1 = mp.compute(w);
@@ -260,7 +242,7 @@ unittest {
 
     // Reflection
     {
-        auto mr = new MatrixLayer!(Complex!real)("Reflection", 4, false, 0.001);
+        auto mr = new MatrixLayer!(ReflectionMatrix!(Complex!real), Complex!real)(4, false, 0.001);
         auto rm = new ReflectionMatrix!(Complex!real)(4, 5.0);
 
         mr.params[0] = rm.dup;
@@ -275,28 +257,23 @@ unittest {
 
     // Unitary
     {
-        // Unrecognized matrix type
-        bool error = false;
-        try {
-            auto mf = new MatrixLayer!float("Unitary", 32);
-        }
-        catch (AssertError e) { error = true; }
-        assert(error);
-
-
-        auto mu = new MatrixLayer!(Complex!real)("Unitary", 8, false, 1.0);
+        auto mu = new MatrixLayer!(UnitaryMatrix!(Complex!real), Complex!real)(8, false, 1.0);
         auto w = new Vector!(Complex!real)(8, 1.0);
 
         auto u = cast(UnitaryMatrix!(Complex!real)) mu.params[0];
 
         auto res1 = mu.compute(w);
-
         assert(abs(res1.norm!"L2" - w.norm!"L2") <= 0.0001);
+        
+        w *= u;
+        w -= res1;
+        assert(w.norm!"L2" <= 0.0001);
+        
     }
 
     // Diagonal
     {
-        auto md = new MatrixLayer!(Complex!real)("Diagonal", 2);
+        auto md = new MatrixLayer!(DiagonalMatrix!(Complex!real), Complex!real)(2);
         md.params[0] = d;
 
         auto w = new Vector!(Complex!real)(2, 100000000.0);
@@ -312,6 +289,8 @@ unittest {
 
     write("Done.\n");
 }
+
+
 
 /+ This layer implement a simple linear matrix transformation
  + applied to the vector.
