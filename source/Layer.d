@@ -115,30 +115,20 @@ class MatrixLayer(Mtype, T) : Layer!T
             if (_bias)
                 v = new Vector!T(_dim[0], _random_init);
 
-            // Only rectangular matrix allowed are the general "Matrix".
-            static if(is(Mtype: Matrix!T)) {
-                Mtype!T m = new Matrix!T(_dim[0], _dim[1], _random_init);
+            // Rectangular Random Matrices
+            static if (__traits(compiles, new Mtype!T(_dim[0], _dim[1], _random_init))) {
+                Mtype!T m = new Mtype!T(_dim[0], _dim[1], _random_init);
             }
-            else {
-                enforce(_dim[0]==_dim[1], "Only \"Matrix\" can be rectangular.");
-    
-                static if (is(Mtype: UnitaryMatrix!T)){
-                    Mtype!T m = new UnitaryMatrix!T(_dim[0], _random_init);
-                }
-                else static if (is(Mtype: DiagonalMatrix!T)){
-                    Mtype!T m = new DiagonalMatrix!T(_dim[0], _random_init);
-                }
-                else static if (is(Mtype: ReflectionMatrix!T)){
-                    Mtype!T m = new ReflectionMatrix!T(_dim[0], _random_init);
-                }
-                else static if (is(Mtype: PermutationMatrix!T)){
-                    Mtype!T m = new PermutationMatrix!T(_dim[0], _random_init);
-                }
-                else static if (is(Mtype: FourierMatrix!T)){
-                    Mtype!T m = new FourierMatrix!T(_dim[0]);
-                }
-                else static assert(0, "Unrecognized matrix type: "~Mtype.stringof);
+            // Random Matrices
+            else static if (__traits(compiles, new Mtype!T(_dim[0], _random_init))) {
+                Mtype!T m = new Mtype!T(_dim[0], _random_init);
             }
+            // Others
+            else static if (__traits(compiles, new Mtype!T(_dim[0]))) {
+                Mtype!T m = new Mtype!T(_dim[0]);
+            }
+            else static assert(0, "Automatic creation of the matrix failed.");
+
             this(m, v);
         }
     }
