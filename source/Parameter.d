@@ -1,4 +1,5 @@
 module source.Parameter;
+import core.thread : getpid;
 
 import std.algorithm;
 import std.complex;
@@ -21,25 +22,16 @@ version(unittest)
     import core.exception;
 }
 
-abstract class Parameter {
-    static private bool init = true;
-    static protected auto rnd = Random(0);
-
-    string typeId;
-
-    pure  @safe
-    this() {}
-
-    @safe
-    this(bool random=true)
-    {
-        if (init) {
-            rnd = Random(cast(uint) ((Clock.currTime()
-                         - SysTime(unixTimeToStdTime(0))).total!"msecs"));
-            init = false;
-        }
-    }
+/+  Parameter Class
+    super to vector and abstractMatrix
+    Used to share rng between all child ctors
+    TODO: "move up" common methods to this interface
++/
+interface Parameter {
+    // __TIME__ is string of compile time (minute resolution)
+    static protected auto rnd = Xorshift128(cast(uint) __TIME__.hashOf());
 }
+
 
 /+  Vector class.
     This is a simple vector class that add utilities
@@ -47,33 +39,28 @@ abstract class Parameter {
 
     Args:
         T: Type of the element of the vector.
-        S: Type of the indices. It should allow us
-           to deploy small vector with small indices (e.g. ushort)
-           which will be useful for memory optmization in some matrix
-           multiplication (e.g. permutation).
  +/
 class Vector(T) : Parameter {
-    T[] v;
-
     static if (is(Complex!T : T))
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
     else alias Tc = T;
+
+    T[] v;
 
     /// Simple constructor.
     pure @safe
     this(size_t length)
     {
         v = new T[length];
-        typeId = "Vector";
+        // typeId = "Vector";
     }
  
     /// Random constructor.
     @safe
     this(size_t length, Tc randomBound)
     {
-        super(true);
         v = new T[length];
-        typeId = "Vector";
+        // typeId = "Vector";
 
         if (randomBound < 0)
             throw new Exception("'randomBound' must be >= 0");
@@ -172,17 +159,20 @@ class Vector(T) : Parameter {
     @property const @nogc pure @safe
     auto norm(string method)()
     {
+        static if (is(Complex!T : T)) {
+            import std.complex: abs;
+        }
         Tc s = v[0].re*0.0f;
         static if (method=="euclidean" || method=="L2")
-        {
+        { 
             foreach(e;v)
-                s += pow(e.abs, 2);
+                s += pow(abs(e), 2);
             return sqrt(s);
         }
         else static if (method=="manhattan" || method=="L1") 
         {
             foreach(e;v)
-                s += e.abs;
+                s += abs(e);
             return s;
         }
         else static if (method=="sparse" || method=="L0")
@@ -194,18 +184,18 @@ class Vector(T) : Parameter {
         }
         else static if (method=="max" || method=="Linf")
         {
-            s = v[0].abs;
+            s = abs(v[0]);
             foreach(e;v)
-                if(s < e.abs)
-                    s = e.abs;
+                if(s < abs(e))
+                    s = abs(e);
             return s;
         }
         else static if (method=="min")
         {
-            s = v[0].abs;
+            s = abs(v[0]);
             foreach(e;v)
-                if(s > e.abs)
-                    s = e.abs;
+                if(s > abs(e))
+                    s = abs(e);
             return s;
         }
         else static assert(0, "Method '"~method~"' is not implemented.");
@@ -218,17 +208,31 @@ class Vector(T) : Parameter {
         this.v = M * this.v;
     }
 
+    void opOpAssign(string op)(FourierMatrix!T F)
+    {
+        static if (op == "*")
+            this.v = F * this.v;
+        else static if (op == "/")
+            this.v = this.v / F;
+        else static assert("Operator '"~op~"' is not implemented.");
+    }
+
+    void opOpAssign(string op)(UnitaryMatrix!T U)
+    {
+        static if (op == "*")
+            this.v = U * this.v;
+        else static if (op == "/")
+            this.v = this.v / U;
+        else static assert("Operator '"~op~"' is not implemented.");
+    }
+
     pure @safe
     void opOpAssign(string op)(in DiagonalMatrix!T M)
     { 
         static if (op == "*")
-        {
             v[] *= M.params[]; 
-        }
         else static if (op == "/")
-        {
             v[] /= M.params[]; 
-        }
         else static assert(0, "Operator "~op~" not implemented.");
     }
 
@@ -260,78 +264,8 @@ class Vector(T) : Parameter {
         tmp *= M.invSqNormVec2*s;
         this += tmp;
     }
-    
-    void opOpAssign(string op)(in MatrixAbstract!T M)
-    {
-        /+ This should only be used to handle Matrix that
-           have a template definition which can only
-           be created if the type is Complex.
-           E.g. compiling the unitary matrix with T=real will
-           give you compile-time error. 
-         +/
-        auto tmptypeId = split(M.typeId, "!")[0];
-        if (tmptypeId == "UnitaryMatrix") {
-            static if (is(Complex!T : T)) {
-                auto mat = cast(UnitaryMatrix!T) M;
-                static if (op == "*") 
-                {
-                    mat.applyDiagonal(v, 0);
-                    
-                    this *= mat.fourier;
 
-                    mat.applyReflection(v, 0);
-                    this *= mat.perm;
-                    mat.applyDiagonal(v, 1);
-                    
-                    this /= mat.fourier;
-                    
-                    mat.applyReflection(v, 1);
-                    mat.applyDiagonal(v, 2);
-                }
-
-                else static if (op == "/") 
-                {
-                    mat.applyDiagonalInv(v, 2);
-                    mat.applyReflection(v, 1);
-
-                    this *= mat.fourier;
-
-                    mat.applyDiagonalInv(v, 1);
-                    this /= mat.perm;
-                    mat.applyReflection(v, 0);
-
-                    this /= mat.fourier;
-
-                    mat.applyDiagonalInv(v, 0);
-                }
-                else static assert(0, "Operator "~op~" not implemented.");
-            }
-            else {
-                assert(0, "Unitary transform can only be applied to complex"
-                  ~"vector as this is what it'll return.");
-            }
-        }
-        else if (tmptypeId == "FourierMatrix") {
-            static if (is(Complex!T : T)) {
-                static if (!is(Complex!T : T))
-                    assert(0, "Fourier transform can only be applied to complex"
-                             ~"vector as this is what it'll return.");
-        
-                static if (op=="*")
-                    v = (cast (FourierMatrix!T) M).objFFT.fft!(Tc)(v);
-                else static if (op=="/")
-                    v = (cast (FourierMatrix!T) M).objFFT.inverseFft!(Tc)(v);
-                else static
-                    assert(0, "Operator "~op~" not implemented.");
-            }
-            else {
-                assert(0, "Fourier transform can only be applied to complex"
-                  ~"vector as this is what it'll return.");
-            }
-        } 
-    }
- 
-    void opOpAssign(string op)(in BlockMatrix!T M)
+    void opOpAssign(string op, Mtype)(in BlockMatrix!(Mtype, T) M)
     {
         static if (op == "*") {
             T[] vec = M.P * v;
@@ -383,6 +317,7 @@ class Vector(T) : Parameter {
         }
         else static assert(0, "Operator "~op~" not implemented.");
     }
+
 
     pure @safe
     void opOpAssign(string op)(in T scalar)
@@ -553,7 +488,7 @@ unittest
         vr *= m1;
         assert(vr.norm!"L2" != ur.norm!"L2");
         ur *= v2;
-        assert(vr.norm!"L2" == ur.norm!"L2");
+        assert(std.math.abs(vr.norm!"L2" - ur.norm!"L2") < 1);
         assert(vr.norm!"min" == ur.norm!"min");
         assert(vr.norm!"L1" == ur.norm!"L1");
     }
@@ -671,56 +606,28 @@ unittest
     // Block matrix
     {
         auto len = 1024;
-        auto m1 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
-        auto m2 = new DiagonalMatrix!(Complex!float)(len/4, 1.0);
-        auto m3 = new ReflectionMatrix!(Complex!float)(len/4, 1.0);
-        auto m4 = new FourierMatrix!(Complex!float)(len/4);
-        auto bm = new BlockMatrix!(Complex!float)(len, len/4,
-                                                         [m1,m2,m3,m4], false);
-
-        auto v = new Vector!(Complex!float)(len);
-        foreach(i; 0 .. len)
-            v[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
-
-        auto mem= v.dup;
+        auto m1 = new Matrix!(Complex!float)(len/4, 1.0);
+        auto m2 = new Matrix!(Complex!float)(len/4, 3.0);
+        auto m3 = new Matrix!(Complex!float)(len/4, 0.5);
+        auto m4 = new Matrix!(Complex!float)(len/4, 4.0);
+        auto bm = new BlockMatrix!(Matrix!(Complex!float), Complex!float)(len, len/4, [m1,m2,m3,m4], false);
 
 
-        auto v2 = bm * v;
-        auto v3 = v2 / bm;
+        auto v = new Vector!(Complex!float)(len, 0.1);
+        auto res1 = new Vector!(Complex!float)(len);
 
-        v *= bm;
-        v2 -= v;
-        assert(v2.norm!"L2" < 0.1);
-        v /= bm;
+        res1.v[0 .. len/4] = m1 * v.v[0 .. len/4];
+        res1.v[len/4 .. len/2] = m2 * v.v[len/4 .. len/2];
+        res1.v[len/2 .. (len/2 + len/4)] = m3 * v.v[len/2 .. (len/2 + len/4)];
+        res1.v[(len/2 + len/4) .. len] = m4 * v.v[(len/2 + len/4) .. len];
 
-        v -= mem;
-        v3 -= mem;
-        assert(v3.norm!"L2" < 0.1);
-        assert(v.norm!"L2" < 0.1);
+        auto res2 = bm * v;
 
-        alias Block = BlockMatrix!(Complex!float);
-        auto bmrec = new Block(len, len/2, len/4, [m1,m2,m3,m4], true);
-        auto vv = new Vector!(Complex!float)(len);
-        foreach(i; 0 .. len)
-            vv[i] = complex(cast(float)(i*2 - len/2), cast(float)(len/3 - i/3.0));
+        res2 -= res1;
 
-        auto mev = vv.dup;
-        auto w = v.dup;
-
-        vv *= bmrec;
-        w = bmrec * mev;
-
-        vv -= w;
-        assert(vv.norm!"L2" < 0.001);
-        bool error =  false;
-        try {
-            vv /= bmrec;
-        }
-        catch (AssertError e) {
-            error = true;
-        }
-        assert(error);
+        assert(res2.norm!"L2" <= 0.00001); 
     }
+
   }
   write("Done.\n");
 }
