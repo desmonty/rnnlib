@@ -121,7 +121,7 @@ unittest {
 
 }
 
-/++ -FrameRange is used to enhanced clean up the following code.
+/++ FrameRange is used to enhanced clean up the following code.
  +  -By adding complexity ..?
  +  -Yes ! It is worth it because it will allow us to do a simple
  +    "foreach" and get both...
@@ -464,59 +464,6 @@ unittest {
     writeln(" Done.");
 }
 
-
-/++ Utility functionused to know the number of parameters in a Parameter Object.
- +/
-@nogc pure
-size_t paramsToSize(T)(in Parameter _param)
-{
-    switch (_param.typeId)
-    {
-        case "Matrix":
-            return (cast(Matrix!T) _param).params.length;
-        case "ReflectionMatrix":
-            return (cast(ReflectionMatrix!T) _param).vec.length;
-        case "DiagonalMatrix":
-            return (cast(DiagonalMatrix!T) _param).params.length;
-        case "UnitaryMatrix":
-            static if (is(Complex!T : T))
-                return (cast(UnitaryMatrix!T) _param).params.length;
-        case "BlockMatrix":
-            return (cast(BlockMatrix!T) _param).blocks
-                                               .map!(a => paramsToSize!T(a))
-                                               .sum;
-        case "Vector":
-            return (cast(Vector!T) _param).length;
-        default:
-            return 0;
-    }
-}
-unittest{
-    write("                 paramsToSize ...");
-
-    auto v1 = new Vector!float(6, 0);
-    auto v2 = new Vector!(Complex!real)(18, 43.0);
-
-    auto m1 = new Matrix!double(7, 9.9);
-    auto m2 = new UnitaryMatrix!(Complex!real)(64, 1.0);
-    auto m3 = new ReflectionMatrix!float(67, 80.0);
-    auto m4 = new DiagonalMatrix!(Complex!real)(64, 4.141516);
-    auto m5 = new BlockMatrix!(Complex!real)(128, 64, [m2, m4], true);
-    auto m6 = new PermutationMatrix!float(8);
-
-    assert(paramsToSize!float(v1) == 6);
-    assert(paramsToSize!(Complex!real)(v2) == 18);
-
-    assert(paramsToSize!double(m1) == 7*7);
-    assert(paramsToSize!(Complex!real)(m2) == 64*7);
-    assert(paramsToSize!float(m3) == 67);
-    assert(paramsToSize!(Complex!real)(m4) == 64);
-    assert(paramsToSize!(Complex!real)(m5) == 64*7+64);
-    assert(m6.paramsToSize!float == 0);
-
-
-    writeln(" Done.");
-}
 
 /++ A function that put the _ownee array inside the _owner array such that
  +  any change in the _owner array will be also made to the _ownee array.

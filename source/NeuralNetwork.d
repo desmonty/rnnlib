@@ -324,14 +324,9 @@ class NeuralNetwork(T) {
         size_t total_size = 0;
         foreach(tmp_l; layers)
             if (!(tmp_l is null))
-                total_size += tmp_l.params
-                                   .map!(a => paramsToSize!T(a))
-                                   .sum;
+                total_size += tmp_l.size;
 
         serialized_data = new T[total_size];
-
-        // TODO: Go through each layer, copy the data in serialized_data
-        //       and then make the layers points to it.
 
         size_t _index = 0;
         foreach(tmp_l; layers)

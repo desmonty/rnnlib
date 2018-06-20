@@ -55,6 +55,9 @@ abstract class Layer(T)
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
     else alias Tc = T;
 
+    /// Number of parameter in the layer.
+    size_t size;
+
     /// Parameter, Layer-specific
     Parameter[] params = null;
 
@@ -82,6 +85,7 @@ class MatrixLayer(Mtype, T) : Layer!T
     this(in Mtype _M)
     {
         this();
+        size = _M.rows * _M.cols;
         // We keep a duplicate of the matrix.
         params = new Parameter[1];
         params[0] = _M.dup;
@@ -92,6 +96,8 @@ class MatrixLayer(Mtype, T) : Layer!T
         if (_v){
             this();
             enforce(_M.cols == _v.length, "Matrix / Bias dimensions mismatch.");
+
+            size = _M.rows * _M.cols + _v.length;
 
             params = new Parameter[2];
             params[0] = _M.dup;
@@ -292,6 +298,7 @@ class BiasLayer(T) : Layer!T
     @safe
     this(const size_t size_in, const Tc randomBound)
     {
+        size = size_in;
         params = new Parameter[1];
         params[0] = new Vector!T(size_in, randomBound);
     }
@@ -349,7 +356,6 @@ class FunctionalLayer(T) : Layer!T
         Vector!T delegate(Vector!T, Parameter[]) func;
     }
 
-
     this(string easyfunc, in size_t size_in=0)
     {
         switch (easyfunc)
@@ -375,6 +381,7 @@ class FunctionalLayer(T) : Layer!T
                                             when using 'modRelu'.");
                     params = new Parameter[1];
                     params[0] = new Vector!Tc(size_in, 1.0);
+                    size = size_in;
                     
                     func =
                         delegate(Vector!T _v, Parameter[] _p) {
