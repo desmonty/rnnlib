@@ -96,7 +96,6 @@ class Vector(T) : Parameter {
         v = valarr.dup;
     }
 
-
     final const pure
     @property @safe @nogc 
     size_t length() {return v.length;}

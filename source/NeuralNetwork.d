@@ -319,6 +319,9 @@ class NeuralNetwork(T) {
     @property
     void serialize()
     {
+        /++ This method allocate memory for the all neural network.
+         +/
+
         // First we want to know the size of the total array.
         // We sum the size of each layer.
         size_t total_size = 0;
@@ -328,11 +331,12 @@ class NeuralNetwork(T) {
 
         serialized_data = new T[total_size];
 
+        // We copy the values in the new array and replace the old
+        // ones by a reference to the new array. 
         size_t _index = 0;
         foreach(tmp_l; layers)
             if (!(tmp_l is null))
-                foreach(tmp_param; tmp_l.params)
-                    takeOwnership!T(serialized_data, tmp_param, _index);
+                tmp_l.takeOwnership(serialized_data, _index);
     }
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.

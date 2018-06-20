@@ -469,8 +469,37 @@ unittest {
  +  any change in the _owner array will be also made to the _ownee array.
  +  In other words, the _owner array take ownership of the _ownee array.
  +/
+
+
+ @safe @nogc pure
+void takeOwnership_util_matrix(Mtype, T)(ref T[] _owner, ref Mtype _ownee, ref size_t _index)
+{
+    static if (is(Mtype : Matrix!T)) {
+        takeOwnership_util!T(_owner, _ownee.params, _index);
+    }
+    else static if (is(Mtype : ReflectionMatrix!T)){
+        takeOwnership_util!T(_owner, _ownee.vec.v, _index);
+    }
+    else static if (is(Mtype : DiagonalMatrix!T)){
+        takeOwnership_util!T(_owner, _ownee.params, _index);
+    }
+    else static if (is(Mtype : UnitaryMatrix!T)){
+        static if (is(Complex!T : T))
+            assert(0, "Cannot serialize UnitaryMatrix in complex network for the moment.");
+        else
+            takeOwnership_util!T(_owner, _ownee.params, _index);
+    }
+    else static if (Mtype.stringof.startsWith("BlockMatrix")) {
+        mixin("alias BlockMatType = "~Mtype.stringof.split("!")[1][1 .. $]~"!T;");
+        foreach(tmp_block; _ownee.blocks){
+            takeOwnership_util!(BlockMatType, T)(_owner, tmp_block, _index);
+        }
+    }
+}
+
+
 @safe @nogc pure
-void takeOwnership(T)(ref T[] _owner, ref T[] _ownee, ref size_t _index)
+void takeOwnership_util(T)(ref T[] _owner, ref T[] _ownee, ref size_t _index)
 {
     _owner[_index .. _index + _ownee.length] = _ownee[];
     _ownee = _owner[_index .. _index + _ownee.length];
@@ -495,107 +524,6 @@ unittest {
     assert(ind == 4);
     assert(v1 == [1000, 3]);
     assert(v2 == [5, 2000]);
-
-    writeln("Done.");
-}
-
-
-@safe @nogc pure
-void takeOwnership(T)(ref T[] _owner, ref Parameter _ownee, ref size_t _index)
-{
-    switch (_ownee.typeId)
-    {
-        case "Matrix":
-            takeOwnership!T(_owner, (cast(Matrix!T) _ownee).params, _index);
-            break;
-        case "ReflectionMatrix":
-            takeOwnership!T(_owner, (cast(ReflectionMatrix!T) _ownee).vec.v, _index);
-            break;
-        case "DiagonalMatrix":
-            takeOwnership!T(_owner, (cast(DiagonalMatrix!T) _ownee).params, _index);
-            break;
-        case "UnitaryMatrix":
-            // TODO: Only valid when UnitaryMatrix will be able to accept non-complex values;
-            break;
-        case "BlockMatrix":
-            foreach(tmp_block; (cast(BlockMatrix!T) _ownee).blocks){
-                auto tmp = cast(Parameter) tmp_block;
-                takeOwnership!T(_owner, tmp, _index);
-            }
-            break;
-        case "Vector":
-            takeOwnership!T(_owner, (cast(Vector!T) _ownee).v, _index);
-            break;
-        default:
-            break;
-    }
-}
-unittest {
-    write("                 takeOwnership (T[], Parameter, size_t) ... ");
-
-    {
-        auto v = new Vector!real([0.0, 0.0, 0.0, 0.0,
-                                  0.0, 0.0, 0.0, 0.0]);
-
-        auto m1 = new Matrix!real(4, 4, 0.0);
-        auto m2 = new Matrix!real(4, 4, 0.0);
-        auto bm = new BlockMatrix!real(8, 8, 4, [m1, m2]);
-
-        auto r = bm * v;
-
-        assert(r.norm!"L2" == 0.0);
-
-        real[] own = new real[8 + 4*4*2];
-
-        auto params = [v, bm];
-
-        size_t indexx = 0;
-
-        takeOwnership!real(own, params[0], indexx);
-        takeOwnership!real(own, params[1], indexx);
-
-        own[] = 1;
-
-        auto t = bm * v;
-
-        assert(t.norm!"min" == 4.0);
-        assert(t.norm!"max" == 4.0);
-    }
-
-    {
-        auto v = new Vector!(Complex!double)(4, 1.0);
-
-        auto m1 = new DiagonalMatrix!(Complex!double)(4, 1.0);
-        auto m2 = new ReflectionMatrix!(Complex!double)(4, 1.0);
-
-        auto params = [v, m1, m2];
-        Complex!(double)[] own = new Complex!(double)[4*3 + 4*7];
-
-        size_t _index = 0;
-        takeOwnership!(Complex!double)(own, params[0], _index);
-        takeOwnership!(Complex!double)(own, params[1], _index);
-        takeOwnership!(Complex!double)(own, params[2], _index);
-    
-        own[] = complex(1.0);
-
-        auto r1 = m1 * v;
-        auto r2 = m2 * v;
-        
-        foreach(i; 0 .. m1.params.length)
-            m1.params[i] = complex(1.0, 0.0);
-        foreach(i; 0 .. m2.vec.length)
-            m2.vec[i] = complex(1.0, 0.0);
-        
-        auto t1 = m1 * v;
-        auto t2 = m2 * v;
-        
-        t1 -= r1;
-        t2 -= r2;
-        
-        assert(t1.norm!"L2" <= 0.0001);
-        assert(t2.norm!"L2" <= 0.0001);
-    }
-
 
     writeln("Done.");
 }

@@ -11,6 +11,7 @@ import std.string : startsWith;
 
 import source.Matrix;
 import source.Parameter;
+import source.Utils;
 
 version(unittest)
 {
@@ -62,6 +63,7 @@ abstract class Layer(T)
     Parameter[] params = null;
 
     abstract Vector!T compute(Vector!T);
+    abstract void takeOwnership(ref T[], ref size_t);
 }
 
 /+ This layer implement a simple linear matrix transformation
@@ -144,6 +146,17 @@ class MatrixLayer(Mtype, T) : Layer!T
          in Tc _random_init=0)
     {
         this([_dim, _dim], _bias, _random_init);
+    }
+
+    override
+    @safe @nogc pure
+    void takeOwnership(ref T[] _owner, ref size_t _index)
+    {
+        if (params) {
+            takeOwnership_util_matrix!(Mtype, T)(_owner, cast(Mtype) this.params[0], _index);
+            if (params.length > 1)
+                takeOwnership_util!(T)(_owner, (cast(Vector!T) params[1]).v, _index);
+        }
     }
     
     override
