@@ -77,8 +77,23 @@ abstract class Layer(T)
  + (std.variant, enum, set ...).
  +
  +/
-class MatrixLayer(Mtype, T) : Layer!T
+class MatrixLayer(Mtype : M!T, alias M, T) : Layer!T
 {
+    // If M is BlockMatrix, T will be of the form N!U with N: matrixType and U: arithmetic type
+    static if (__traits(compiles, BlockMatrix!T)) {
+        mixin("alias TypeValue = "~T.stringof.split("(")[1][0 .. ($-1)]~";"); 
+        static if (is(TypeValue: Complex!TypeValue))
+            mixin("alias Tc = "~(TypeValue.stringof[8 .. $])~";");
+    }
+    else
+        alias TypeValue = T;
+
+    pragma(msg, Mtype.stringof);
+    pragma(msg, M.stringof);
+    pragma(msg, T.stringof);
+    pragma(msg, TypeValue.stringof);
+    pragma(msg, Tc.stringof);
+
     this()
     {
         // TODO: Add check to see if Mtype is a Matrix*!T
@@ -87,19 +102,25 @@ class MatrixLayer(Mtype, T) : Layer!T
     this(in Mtype _M)
     {
         this();
-        size = _M.rows * _M.cols;
+        static if (__traits(compiles, BlockMatrix!T))
+            size = size_blocks * size_blocks * num_blocks;
+        else
+            size = _M.rows * _M.cols;
         // We keep a duplicate of the matrix.
         params = new Parameter[1];
         params[0] = _M.dup;
     }
 
-    this(in Mtype _M, in Vector!T _v)
+    this(in Mtype _M, in Vector!TypeValue _v)
     {
         if (_v){
             this();
             enforce(_M.cols == _v.length, "Matrix / Bias dimensions mismatch.");
 
-            size = _M.rows * _M.cols + _v.length;
+            static if (Mtype.stringof[0 .. 5] == "Block")
+                size = size_blocks * size_blocks * num_blocks + _v.length;
+            else
+                size = _M.rows * _M.cols + _v.length;
 
             params = new Parameter[2];
             params[0] = _M.dup;
@@ -109,31 +130,30 @@ class MatrixLayer(Mtype, T) : Layer!T
             this(_M);
     }
 
-
     this(in size_t[2] _dim,
          in bool _bias=false,
          in Tc _random_init=0)
     {
         // Block matrix cannot be created automatically.
-        static if (Mtype.stringof[0 .. 5] == "Block")
+        static if (__traits(compiles, BlockMatrix!T))
             throw new Exception("Block matrix need to be created by the user.");
         else {
             // Create a bias vector if needed.
-            Vector!T v = null;
+            Vector!TypeValue v = null;
             if (_bias)
                 v = new Vector!T(_dim[0], _random_init);
 
             // Rectangular Random Matrices
-            static if (__traits(compiles, new Mtype!T(_dim[0], _dim[1], _random_init))) {
-                Mtype!T m = new Mtype!T(_dim[0], _dim[1], _random_init);
+            static if (__traits(compiles, new Mtype(_dim[0], _dim[1], _random_init))) {
+                Mtype m = new Mtype(_dim[0], _dim[1], _random_init);
             }
             // Random Matrices
-            else static if (__traits(compiles, new Mtype!T(_dim[0], _random_init))) {
-                Mtype!T m = new Mtype!T(_dim[0], _random_init);
+            else static if (__traits(compiles, new Mtype(_dim[0], _random_init))) {
+                Mtype m = new Mtype(_dim[0], _random_init);
             }
             // Others
-            else static if (__traits(compiles, new Mtype!T(_dim[0]))) {
-                Mtype!T m = new Mtype!T(_dim[0]);
+            else static if (__traits(compiles, new Mtype(_dim[0]))) {
+                Mtype m = new Mtype(_dim[0]);
             }
             else static assert(0, "Automatic creation of the matrix failed.");
 
@@ -150,25 +170,25 @@ class MatrixLayer(Mtype, T) : Layer!T
 
     override
     @safe @nogc pure
-    void takeOwnership(ref T[] _owner, ref size_t _index)
+    void takeOwnership(ref TypeValue[] _owner, ref size_t _index)
     {
         if (params) {
             auto tmp_params = cast(Mtype) this.params[0];
-            takeOwnership_util_matrix!(Mtype, T)(_owner, tmp_params, _index);
+            takeOwnership_util_matrix!(Mtype, TypeValue)(_owner, tmp_params, _index);
             if (params.length > 1)
-                takeOwnership_util!(T)(_owner, (cast(Vector!T) params[1]).v, _index);
+                takeOwnership_util!(TypeValue)(_owner, (cast(Vector!T) params[1]).v, _index);
         }
     }
     
     override
-    Vector!T compute(Vector!T _v)
+    Vector!TypeValue compute(Vector!TypeValue _v)
     {
         // Multiply the vector by the matrix first.
         auto res = (cast(Mtype) params[0]) * _v;
 
         // Add the bias vector if needed.
         if (params.length > 1)
-            res += cast(Vector!T) params[1];
+            res += cast(Vector!TypeValue) params[1];
         return res;
     }
 }
@@ -180,14 +200,12 @@ unittest {
     auto r = new ReflectionMatrix!(Complex!real)(2, 1.0);
     auto d = new DiagonalMatrix!(Complex!real)(2, 2.0);
     auto gm = new Matrix!(Complex!real)(2, 2.0);
-    auto b = new BlockMatrix!(Matrix!(Complex!real), Complex!real)(4, 4, 2, [gm, gm], true);
-
+    auto b = new BlockMatrix!(Matrix!(Complex!real))(4, 4, 2, [gm, gm], true);
     auto f = new FourierMatrix!(Complex!real)(4);
-
 
     // Fourier
     {
-        auto mf = new MatrixLayer!(FourierMatrix!(Complex!real), Complex!real)(4, true, 1.0);
+        auto mf = new MatrixLayer!(FourierMatrix!(Complex!real))(4, true, 1.0);
         auto p = cast(Vector!(Complex!real)) mf.params[1];
 
         auto res1 = mf.compute(v);
@@ -198,11 +216,10 @@ unittest {
         assert(p.norm!"L2" > 0.001);
         assert(res2.norm!"L2" <= 0.001);
     }
-
     // Matrix
     {
         auto vec = new Vector!double(4, 1.0);
-        auto mm = new MatrixLayer!(Matrix!double, double)([2, 4], false, 10.0);
+        auto mm = new MatrixLayer!(Matrix!double)([2, 4], false, 10.0);
         auto m = cast(Matrix!double) mm.params[0]; 
 
         auto res1 = mm.compute(vec);
@@ -212,12 +229,11 @@ unittest {
         assert(res2.norm!"L2" <= 0.001);
         assert(res2.length == 2);
     }
-
     // Block
     {
         auto p = new Vector!(Complex!real)(4, 3.1415926535);
-        auto mb = new MatrixLayer!(BlockMatrix!(Matrix!(Complex!real), Complex!real), Complex!real)(b, p);
-        auto m = cast(BlockMatrix!(Matrix!(Complex!real), Complex!real)) mb.params[0];
+        auto mb = new MatrixLayer!(BlockMatrix!(Matrix!(Complex!real)))(b, p);
+        auto m = cast(BlockMatrix!(Matrix!(Complex!real))) mb.params[0];
 
         auto res1 = mb.compute(v);
         auto res2 = m * v;
@@ -225,15 +241,13 @@ unittest {
         res2 -= res1;
 
         assert(res2.norm!"L2" <= 0.0001);
-        assertThrown(new MatrixLayer!(BlockMatrix!(Matrix!real, real), real)([2, 3], false, 10.0));
     }
-
     // Permutation
     {
         auto p = new PermutationMatrix!float(16);
         auto w = new Vector!float(16, 1010101.0);
 
-        auto mp = new MatrixLayer!(PermutationMatrix!float, float)(p);
+        auto mp = new MatrixLayer!(PermutationMatrix!float)(p);
 
         auto res1 = mp.compute(w);
         auto res2 = p * w;
@@ -242,17 +256,16 @@ unittest {
 
         assert(res1.norm!"L2" <= 0.0001);
 
-        mp = new MatrixLayer!(PermutationMatrix!float, float)(17);
+        mp = new MatrixLayer!(PermutationMatrix!float)(17);
         w = new Vector!float(17, 0.1);
 
         res1 = mp.compute(w);
 
         assert(abs(w.norm!"L2" - res1.norm!"L2") <= 0.001);
     }
-
     // Reflection
     {
-        auto mr = new MatrixLayer!(ReflectionMatrix!(Complex!real), Complex!real)(4, false, 0.001);
+        auto mr = new MatrixLayer!(ReflectionMatrix!(Complex!real))(4, false, 0.001);
         auto rm = new ReflectionMatrix!(Complex!real)(4, 5.0);
 
         mr.params[0] = rm.dup;
@@ -264,10 +277,9 @@ unittest {
 
         assert(res2.norm!"L2" <= 0.0001);
     }
-
     // Unitary
     {
-        auto mu = new MatrixLayer!(UnitaryMatrix!(Complex!real), Complex!real)(8, false, 1.0);
+        auto mu = new MatrixLayer!(UnitaryMatrix!(Complex!real))(8, false, 1.0);
         auto w = new Vector!(Complex!real)(8, 1.0);
 
         auto u = cast(UnitaryMatrix!(Complex!real)) mu.params[0];
@@ -277,13 +289,11 @@ unittest {
         
         w *= u;
         w -= res1;
-        assert(w.norm!"L2" <= 0.0001);
-        
+        assert(w.norm!"L2" <= 0.0001);  
     }
-
     // Diagonal
     {
-        auto md = new MatrixLayer!(DiagonalMatrix!(Complex!real), Complex!real)(2);
+        auto md = new MatrixLayer!(DiagonalMatrix!(Complex!real))(2);
         md.params[0] = d;
 
         auto w = new Vector!(Complex!real)(2, 100000000.0);
@@ -294,12 +304,10 @@ unittest {
         res -= w;
 
         assert(res.norm!"L2" <= 0.01);
-
     }
 
     write("Done.\n");
 }
-
 
 
 /+ This layer implement a simple linear matrix transformation

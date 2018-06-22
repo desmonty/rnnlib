@@ -86,7 +86,7 @@ unittest
  +      4 0 0
  +      0 5 0
  +/
-class BlockMatrix(Mtype, T) : Parameter {
+class BlockMatrix(Mtype : M!T, alias M, T) : Parameter {
     static if (is(Complex!T : T))
         mixin("alias Tc = "~(T.stringof[8 .. $])~";");
     else alias Tc = T;
@@ -151,9 +151,9 @@ class BlockMatrix(Mtype, T) : Parameter {
     }
 
     const @property
-    BlockMatrix!(Mtype, T) dup()
+    auto dup()
     {
-        auto res = new BlockMatrix!(Mtype, T)(size_in, size_out, size_blocks);
+        auto res = new BlockMatrix!(Mtype)(size_in, size_out, size_blocks);
         res.P = P.dup;
         res.Q = Q.dup;
         res.blocks = new Mtype[res.num_blocks];
@@ -256,7 +256,7 @@ unittest
     write("                  Block ... ");
 
     // create an empt BlockMatrix for the seek of coverage.
-    auto mtmp_blue_unused = new BlockMatrix!(UnitaryMatrix!real, real)();
+    auto mtmp_blue_unused = new BlockMatrix!(UnitaryMatrix!real)();
 
     auto len = 1024;
     
@@ -266,7 +266,7 @@ unittest
     auto m1_2 = new Matrix!float(len/4, 1.0);
     auto m1_3 = new Matrix!float(len/4, 1.0);
     auto m1_4 = new Matrix!float(len/4, 1.0);
-    auto b1 = new BlockMatrix!(Matrix!float, float)
+    auto b1 = new BlockMatrix!(Matrix!float)
                               (len, len/4, [m1_1, m1_2, m1_3, m1_4]);
     auto res1_1 = b1*vec1;
     auto res1_2 = vec1.dup();
@@ -283,7 +283,7 @@ unittest
     auto m2_2 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
     auto m2_3 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
     auto m2_4 = new PermutationMatrix!(Complex!float)(len/4, 1.0);
-    auto b2 = new BlockMatrix!(PermutationMatrix!(Complex!float), Complex!float)
+    auto b2 = new BlockMatrix!(PermutationMatrix!(Complex!float))
                               (len, len/2, len/4, [m2_1, m2_2, m2_3, m2_4]);
     auto res2_1 = b2*vec2;
     auto res2_2 = new Vector!(Complex!float)(len/2);
@@ -300,7 +300,7 @@ unittest
     auto m3_2 = new DiagonalMatrix!(Complex!real)(len/4, 1.0);
     auto m3_3 = new DiagonalMatrix!(Complex!real)(len/4, 1.0);
     auto m3_4 = new DiagonalMatrix!(Complex!real)(len/4, 1.0);
-    auto b3 = new BlockMatrix!(DiagonalMatrix!(Complex!real), Complex!real)
+    auto b3 = new BlockMatrix!(DiagonalMatrix!(Complex!real))
                               (len/2, len, len/4, [m3_1, m3_2, m3_3, m3_4]);
     auto res3_1 = b3*vec3;
     auto res3_2 = new Vector!(Complex!real)(len);
@@ -317,7 +317,7 @@ unittest
     auto m4_2 = new ReflectionMatrix!double(len/4, 1.0);
     auto m4_3 = new ReflectionMatrix!double(len/4, 1.0);
     auto m4_4 = new ReflectionMatrix!double(len/4, 1.0);
-    auto b4 = new BlockMatrix!(ReflectionMatrix!double, double)
+    auto b4 = new BlockMatrix!(ReflectionMatrix!double)
                               (len, len/4, [m4_1, m4_2, m4_3, m4_4]);
     auto res4_1 = b4*vec4;
     auto res4_2 = vec4.dup();
@@ -334,7 +334,7 @@ unittest
     auto m5_2 = new FourierMatrix!(Complex!double)(len/4);
     auto m5_3 = new FourierMatrix!(Complex!double)(len/4);
     auto m5_4 = new FourierMatrix!(Complex!double)(len/4);
-    auto b5 = new BlockMatrix!(FourierMatrix!(Complex!double), Complex!double)
+    auto b5 = new BlockMatrix!(FourierMatrix!(Complex!double))
                               (len, len/4, [m5_1, m5_2, m5_3, m5_4]);
     auto res5_1 = b5*vec5;
     auto res5_2 = vec5.dup();
@@ -346,8 +346,8 @@ unittest
     assert(res5_1.norm!"L2" <= 0.00001);
 
 
-    assertThrown(new BlockMatrix!(DiagonalMatrix!real, real)(4u, 4u, 3u));
-    assertThrown(new BlockMatrix!(DiagonalMatrix!real, real)(4u, 3u, 3u));
+    assertThrown(new BlockMatrix!(DiagonalMatrix!real)(4u, 4u, 3u));
+    assertThrown(new BlockMatrix!(DiagonalMatrix!real)(4u, 3u, 3u));
 
     write("Done.\n");
 }
