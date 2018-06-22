@@ -153,7 +153,8 @@ class MatrixLayer(Mtype, T) : Layer!T
     void takeOwnership(ref T[] _owner, ref size_t _index)
     {
         if (params) {
-            takeOwnership_util_matrix!(Mtype, T)(_owner, cast(Mtype) this.params[0], _index);
+            auto tmp_params = cast(Mtype) this.params[0];
+            takeOwnership_util_matrix!(Mtype, T)(_owner, tmp_params, _index);
             if (params.length > 1)
                 takeOwnership_util!(T)(_owner, (cast(Vector!T) params[1]).v, _index);
         }
@@ -323,6 +324,16 @@ class BiasLayer(T) : Layer!T
         res += to!(Vector!T)(params[0]);
         return res;
     }
+
+
+    override
+    @safe @nogc pure
+    void takeOwnership(ref T[] _owner, ref size_t _index)
+    {
+        if (params)
+            takeOwnership_util!(T)(_owner, (cast(Vector!T) params[0]).v, _index);
+    }
+    
 }
 unittest {
     write("                 Bias ... ");

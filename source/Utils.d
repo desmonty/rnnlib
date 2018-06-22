@@ -492,7 +492,7 @@ void takeOwnership_util_matrix(Mtype, T)(ref T[] _owner, ref Mtype _ownee, ref s
     else static if (Mtype.stringof.startsWith("BlockMatrix")) {
         mixin("alias BlockMatType = "~Mtype.stringof.split("!")[1][1 .. $]~"!T;");
         foreach(tmp_block; _ownee.blocks){
-            takeOwnership_util!(BlockMatType, T)(_owner, tmp_block, _index);
+            takeOwnership_util_matrix!(BlockMatType, T)(_owner, tmp_block, _index);
         }
     }
 }
