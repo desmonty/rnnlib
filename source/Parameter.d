@@ -609,7 +609,7 @@ unittest
         auto m2 = new Matrix!(Complex!float)(len/4, 3.0);
         auto m3 = new Matrix!(Complex!float)(len/4, 0.5);
         auto m4 = new Matrix!(Complex!float)(len/4, 4.0);
-        auto bm = new BlockMatrix!(Matrix!(Complex!float), Complex!float)(len, len/4, [m1,m2,m3,m4], false);
+        auto bm = new BlockMatrix!(Matrix!(Complex!float))(len, len/4, [m1,m2,m3,m4], false);
 
 
         auto v = new Vector!(Complex!float)(len, 0.1);

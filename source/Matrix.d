@@ -1188,7 +1188,6 @@ class ReflectionMatrix(T) : Parameter {
     else alias Tc = T;
 
     Vector!T vec;
-    real invSqNormVec2 = 1.0;
     
     size_t rows, cols;
 
@@ -1218,7 +1217,6 @@ class ReflectionMatrix(T) : Parameter {
             foreach(size_t i;0 .. size)
                vec[i] = uniform(-randomBound, randomBound, rnd);
         }
-        compute_invSqNormVec2();
     }
 
 
@@ -1229,7 +1227,6 @@ class ReflectionMatrix(T) : Parameter {
         this.rows = dupl.vec.length;
         this.cols = dupl.vec.length;
         vec = dupl.vec.dup;
-        invSqNormVec2 = dupl.invSqNormVec2;
     }
 
     /// Constructor from list.
@@ -1239,7 +1236,6 @@ class ReflectionMatrix(T) : Parameter {
         this.rows = valarr.length;
         this.cols = valarr.length;
         vec = new Vector!T(valarr);
-        compute_invSqNormVec2();
     }
     /// Constructor from Vector.
     pure @safe
@@ -1256,17 +1252,15 @@ class ReflectionMatrix(T) : Parameter {
         return new ReflectionMatrix(this);
     }
 
-    /// Compute the norm (n) of the reflection vector and store -2n^-2
-    pure @safe
-    void compute_invSqNormVec2()
-    {
-        invSqNormVec2 = -2*pow(vec.norm!"L2",-2);
-    }
-
     @property const pure @safe
     size_t length()
     {
         return rows;
+    }
+
+    @property const pure @safe @nogc
+    Tc invSqNormVec2() {
+        return -2*pow(vec.norm!"L2",-2);
     }
 
     /+ Vector multiplication.
@@ -1286,9 +1280,10 @@ class ReflectionMatrix(T) : Parameter {
     {
         enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
         T[] vres = v.dup;
+
         T s = vec.conjdot(v, vec);
         T[] tmp = vec.v.dup;
-        s *= invSqNormVec2;
+        s *= -2*pow(vec.norm!"L2",-2);
         foreach(i; 0 .. cols)
             tmp[i] = tmp[i] * s;
         vres[] += tmp[];
@@ -1311,7 +1306,7 @@ class ReflectionMatrix(T) : Parameter {
         T[] vres = v.dup;
         T s = vec.conjdot(v, vec);
         T[] tmp = vec.v.dup;
-        s *= invSqNormVec2;
+        s *= -2*pow(vec.norm!"L2",-2);
         foreach(i; 0 .. cols)
             tmp[i] = tmp[i] * s;
         vres[] += tmp[];
@@ -1324,7 +1319,7 @@ class ReflectionMatrix(T) : Parameter {
         auto res = new Matrix!T(rows, cols);
         T s;
         foreach(size_t i; 0 .. rows) {
-            s = vec[i]*invSqNormVec2;
+            s = vec[i]*(-2*pow(vec.norm!"L2",-2));
             foreach(size_t j; 0 .. cols){
                 static if (is(Complex!T : T))
                     res[i,j] = s*vec[j].conj;
