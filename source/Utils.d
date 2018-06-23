@@ -15,6 +15,23 @@ version(unittest) {
     import std.stdio: write, writeln;
 }
 
+bool isOneOf(string strKey, string[] strTable) {
+    foreach(key; strTable)
+        if(strKey == key)
+            return true;
+    return false;
+}
+unittest {
+    enum string[3] kafka = ["ae", "ry", "up"];
+    enum string k1 = "ar";
+    enum string k2 = "up";
+
+    static assert(!isOneOf(k1, kafka));
+    static assert(isOneOf(k2, kafka));
+    assert(!isOneOf(k1, kafka));
+    assert(isOneOf(k2, kafka));
+}
+
 /++ CellRange is used to get all the values inside a cell that
  +  will be reduced together.
  +  It allows us to let the user defines its own reducer in a very
@@ -169,7 +186,7 @@ struct FrameRange
     }
 }
 
-
+/++ TODO Make the function return a string at compile time ! Good luck !
 /++ Function that create a general pooling function
  +  See https://en.wikipedia.org/wiki/Convolutional_neural_network#Pooling_layer
  +  for description.
@@ -267,8 +284,6 @@ auto createPoolingFunction(T)(in size_t height, in size_t width,
             enforce(cut_height[tmp] < cut_height[++tmp],"cut_height cannot contains doublons");
     }
 
-
-    // TODO: test the magic formula
     size_t lenRetVec = (cut_height.length + 1)
                       *(cut_width.length  + 1)
                       *(1 + (height - frame_height) / stride_height)
@@ -462,7 +477,7 @@ unittest {
 
 
     writeln(" Done.");
-}
+}+/
 
 
 /++ A function that put the _ownee array inside the _owner array such that

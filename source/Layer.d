@@ -63,7 +63,7 @@ abstract class Layer(T)
     Parameter[] params = null;
 
     abstract Vector!T compute(Vector!T);
-    abstract void takeOwnership(ref T[], ref size_t);
+    abstract @safe @nogc pure void takeOwnership(ref T[], ref size_t);
 }
 
 /+ This layer implement a simple linear matrix transformation
@@ -87,12 +87,6 @@ class MatrixLayer(Mtype : M!T, alias M, T) : Layer!T
     }
     else
         alias TypeValue = T;
-
-    pragma(msg, Mtype.stringof);
-    pragma(msg, M.stringof);
-    pragma(msg, T.stringof);
-    pragma(msg, TypeValue.stringof);
-    pragma(msg, Tc.stringof);
 
     this()
     {
@@ -341,7 +335,6 @@ class BiasLayer(T) : Layer!T
         if (params)
             takeOwnership_util!(T)(_owner, (cast(Vector!T) params[0]).v, _index);
     }
-    
 }
 unittest {
     write("                 Bias ... ");
@@ -367,6 +360,7 @@ unittest {
     write("Done.\n");
 }
 
+/+
 /++ This layer can implement any function that take as input a
  +  Vector!T and return another Vector!T.
  +
@@ -381,187 +375,109 @@ unittest {
  +
  +  TODO: Add more functions ! The more, the merrier.
  +/
-class FunctionalLayer(T) : Layer!T
+class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
 {
-    private {
-        /// function applied to the vector.
-        Vector!T delegate(Vector!T, Parameter[]) func;
+    protected {
+        enum string[3] keywords_function = ["relu", "softmax", "modRelu", ""];
+        enum bool isKeyword = isOneOf!(strfunc, keywords_function);
     }
 
-    this(string easyfunc, in size_t size_in=0)
+    this() {
+    }
+
+    this(size_t[] size_parameters, Tc[] randomBound_parameters)
     {
-        switch (easyfunc)
-        {
-            case "relu":
-                // function that compute "max(x, 0)" for every x in the vector.
-                static if (!is(Complex!T : T)) {
-                    func =
-                        delegate(Vector!T _v, Parameter[] _p) {
-                            auto res = _v.dup;
-                            foreach(i; 0 .. _v.length)
-                                if (res[i] < 0) res[i] = 0;
-                            return res;
-                        };
-                    break;
-                }
-                // else with use modRelu by default.
-            case "modRelu":
-                // Complex equivalent of the "relu" function.
-                // It does, however, require a trainable bias vector.
-                static if (is(Complex!T : T)) {
-                    enforce(size_in != 0, "'size_in' must be greater than zero
-                                            when using 'modRelu'.");
-                    params = new Parameter[1];
-                    params[0] = new Vector!Tc(size_in, 1.0);
-                    size = size_in;
-                    
-                    func =
-                        delegate(Vector!T _v, Parameter[] _p) {
-
-                            static if (is(Complex!T : T)) {
-                                import std.complex: abs;
-                            }
-
-                            auto absv = _v[0].abs;
-                            auto tmp = absv;
-                            auto res = _v.dup;
-                            foreach(i; 0 .. _v.length) {
-                                absv = _v[i].abs;
-                                tmp = absv + (cast(Vector!Tc) _p[0])[i];
-                                if (tmp > 0) {
-                                    res[i] = tmp*_v[i]/absv;
-                                }
-                                else {
-                                    res[i] = complex(cast(_v.Tc) 0);
-                                }
-                            }
-                            return res;
-                        };
-                }
-                else
-                    throw new Exception("The 'modRelu' function can only
-                                         be used with complex number.");
-                break;
-            case "softmax":
-                // Basic softmax function, can be used to obtain a probability distribution. 
-                static if (!is(Complex!T : T))
-                    func =
-                        delegate(Vector!T _v, Parameter[] _p) {
-                            T s = 0;
-                            auto res = _v.dup;
-                            foreach(i; 0 .. _v.length) {
-                                res.v[i] = exp(_v[i]);
-                                s += res[i];
-                            }
-                            foreach(i; 0 .. _v.length)
-                                res.v[i] /= s;
-                            return res;
-                        };
-                else
-                    throw new Exception("You will have to define your own
-                                         complex-valued softmax.");
-                break;
-            default:
-                throw new Exception(easyfunc
-                                   ~ ": Unknown keyword. You can use one of the"
-                                   ~ " following:\n"
-                                   ~ " - 'relu' (for real-valued vectors)\n"
-                                   ~ " - 'modRelu' (for complex-valued vectors)\n"
-                                   ~ " - 'softmax' (for real-valued vectors)\n");
+        static if (!isKeyword) {
+            static foreach(i; 0 .. TypeParameter.length)
+                mixin("auto p"~i+1~" = new "~TypeParameter[i]~
+                      "(size_parameters[i], randomBound_parameters[i]);");
         }
+        assert(strfunc != "modRelu", "modRelu must be initialized using argument (size_t, "~Tc.stringof~").");
     }
 
-    // The function to apply to the vector. Can be anything. DELEGATE
-    @safe pure
-    this(Vector!T delegate(Vector!T) _func)
+    this(in size_t size_in, in Tc randomBound = 1.0)
     {
-        func = delegate(Vector!T _v, Parameter[] _p) {
-            return _func(_v);
-        };
-    }
+        static if(strfunc == "modRelu") {
+            assert(TypeParameter.length == 1, "The type of the learnable parameter 1 must be provided.");
+            assert(is(TypeParameter[0]: Vector!Tc), "The type of parameter 1 must be: Vector!" ~Tc.stringof);
 
-    // The function to apply to the vector. Can be anything. DELEGATE
-    @safe pure
-    this(Vector!T delegate(Vector!T, Parameter[]) _func)
-    {
-        func = delegate(Vector!T _v, Parameter[] _p) {
-            return _func(_v, _p);
-        };
-    }
+            enforce(size_in != 0, "'size_in' must be greater than zero when using 'modRelu'.");
 
-    // The function to apply to the vector. Can be anything. Function
-    pure
-    this(Vector!T function(Vector!T, Parameter[]) _func)
-    {
-        this(toDelegate(_func));
-    }
-
-    // The function to apply to the vector. Can be anything. FUNCTION
-    pure
-    this(Vector!T function(Vector!T) _func)
-    {
-        this(toDelegate(_func));
-    }
-
-    // Create an element-wise function that apply a provided
-    // function to a vector. DELEGATE
-    @safe pure
-    this(T delegate(T) _func)
-    {
-        func = delegate(Vector!T _v, Parameter[] _p) {
-            auto res = _v.dup;
-            foreach(i; 0 .. _v.length)
-                res[i] = _func(_v[i]);
-            return res;
-        };
-    }
-
-    // Create an element-wise function that apply a provided
-    // function to a vector. FUNCTION
-    pure
-    this(T function(T) _func)
-    {
-        this(toDelegate(_func));
-    }
-
-    @safe pure
-    this(in size_t size)
-    {
-        this(delegate(Vector!T _v) {
-                enforce(_v.length == size, "Size mismatch in FunctionalLayer:\n"
-                                          ~"Size of the FunctionalLayer: "
-                                          ~to!string(size)~"\n"
-                                          ~"Size of the Vector: "
-                                          ~to!string(_v.length)~"\n");
-                auto res = _v.dup;
-                return res;
-            }
-        );
+            params = new Parameter[1];
+            params[0] = new Vector!Tc(size_in, randomBound);
+            size = size_in;
+        }
+        else
+            assert(0, "This initialization is only for modRelu.");
     }
 
     override
     Vector!T compute(Vector!T _v)
     {
-        return func(_v, params);
+        static if (strfunc == keywords_function[0]) {
+            // function that compute "max(x, 0)" for every x in the vector.
+            static if (!is(Complex!T : T))
+                static assert(0, "Relu function cannot be use on Complex-valued vectors.");
+
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length)
+                if (res[i] < 0) res[i] = 0;
+            return res;
+        }
+        else static if(strfunc == keywords_function[1]) {
+            // Basic softmax function, can be used to obtain a probability distribution. 
+            static if (is(Complex!T : T))
+                static assert(0, "Softmax function cannot be used on Complex-valued vectors.");
+
+            T s = 0;
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length) {
+                res.v[i] = exp(_v[i]);
+                s += res[i];
+            }
+            foreach(i; 0 .. _v.length)
+                res.v[i] /= s;
+            return res;
+        }
+        else static if(strfunc == keywords_function[2]) {
+            static if (!is(Complex!T : T))
+                static assert(0, "modRelu function cannot be used on Real-valued vectors.");
+        
+            import std.complex: abs;
+
+            auto absv = _v[0].abs;
+            auto tmp = absv;
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length) {
+                absv = _v[i].abs;
+                tmp = absv + (cast(Vector!Tc) _p[0])[i];
+                if (tmp > 0) {
+                    res[i] = tmp*_v[i]/absv;
+                }
+                else {
+                    res[i] = complex(cast(_v.Tc) 0);
+                }
+            }
+            return res;
+        }
+        else static if(strfunc == "") return _v;
+        else mixin(strfunc);
     }
 }
 unittest {
     write("                 Functional ... ");
 
     alias Vec = Vector!(Complex!double);
-    alias Fl = FunctionalLayer!(Complex!double);
 
-    Vec blue(Vec _v) pure {
+    auto blue = "
+        auto res = _v.dup;
+        res.v[] *= p1[];
+        return res;";
+
+    auto ff = "
         auto res = _v.dup;
         res.v[] *= complex(4.0);
-        return res;
-    }
-
-    auto ff = function(Vec _v) pure {
-        auto res = _v.dup;
-        res.v[] *= complex(4.0);
-        return res;
-    };
+        return res;";
 
     uint len = 4;
     double pi = 3.1415923565;
@@ -569,35 +485,33 @@ unittest {
     auto v = new Vec([complex(0.0), complex(1.0), complex(pi), complex(-1.0)]);
     auto e = new Vec([complex(0.0)]);
 
-    // Length initialization.
-    auto f1 = new Fl(len);
+    // Empty functional is identity.
+    auto f1 = new FunctionalLayer!(Complex!double)();
     auto v1 = f1.compute(v);
     v1 -= v;
     assert(v1.norm!"L2" <= 0.001);
 
-    // Test how to use template function.
-    // Must compile;
-    auto f2 = new Fl(&cos!double);
-    auto v2 = f2.compute(v);
-
-    // Parameter-less function & delegate initialization.
-    auto f3 = new Fl(ff);
+    // More complex functional without learnable parameter.
+    auto f3 = new FunctionalLayer!(Complex!double, ff)();
     auto v3 = f3.compute(v);
-    auto f4 = new Fl(&blue);
+    auto v3_bis = v.dup;
+    v3_bis[] *= complex(4.0);
+    v3 -= v3_bis;
+    assert(v3.norm!"L2" <= 0.00001);
+
+    auto f4 = new FunctionalLayer!(Complex!double, blue, Vec)([len], [1.0]);
     auto v4 = f4.compute(v);
-
-    v3 -= v4;
-    assert(v3.norm!"L2" <= 0.001);
-
-    v4.v[] /= complex(4.0);
-    v4 -= v;
-    assert(v4.norm!"L2" <= 0.001);
+    auto v4_bis = v.dup();
+    auto f4_p1 = cast(Vec) f4.params[0];
+    v4_bis[] *= f4_p1[];
+    v4 -= v4_bis;
+    assert(v4.norm!"L2" <= 0.00001);
 
 
     // modRelu function.
     auto w = v.dup;
     w[2] = complex(0.5);
-    auto f5 = new Fl("modRelu", 4);
+    auto f5 = new FunctionalLayer!(Complex!double, "modRelu")(4);
     (cast(Vector!double) f5.params[0])[0] = -0.9;
     (cast(Vector!double) f5.params[0])[1] = -0.9;
     (cast(Vector!double) f5.params[0])[2] = -0.9;
@@ -607,30 +521,20 @@ unittest {
 
     // vector 'e' doesn't have the right length.
     assertThrown(f1.compute(e));
-    // modRelu must be given the vector's size to create parameters.
-    assertThrown(new Fl("modRelu"));
-    // relu takes only real-valued vectors.
-    assertThrown(new FunctionalLayer!(Complex!double)("relu"));
-    // softmax takes only real-valued vectors.
-    assertThrown(new FunctionalLayer!(Complex!double)("softmax"));
-    // modRelu takes only complex-valued vectors.
-    assertThrown(new FunctionalLayer!double("modRelu"));
-    // Incorrect function name.
-    assertThrown(new FunctionalLayer!real("this is incorrect."));
 
     auto vr = new Vector!double([0.0, 1.0, pi, -1.0]);
 
     // relu function.
-    auto f6 = new FunctionalLayer!double("relu");
+    auto f6 = new FunctionalLayer!(double, "relu");
     auto vr6 = f6.compute(vr);
     assert(abs(vr6.sum - 1.0 - pi) <= 0.01);
 
     // softmax function.
-    auto f7 = new FunctionalLayer!double("softmax");
+    auto f7 = new FunctionalLayer!(double, "softmax");
     auto vr7 = f7.compute(vr);
     assert(abs(vr7.sum - 1.0) <= 0.001);
 
     auto vv = new Vector!double(100, 0.2);
 
     write(" Done.\n");
-}
+}+/
