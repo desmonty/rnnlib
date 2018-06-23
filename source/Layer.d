@@ -326,6 +326,7 @@ unittest {
         res_4 -= m1 * v2;
         res_4.v[] -= 1.0;
         assert(res_4.norm!"L2" <= 0.00001);
+
     }
     write("Done.\n");
 }
@@ -394,20 +395,23 @@ unittest {
         auto b = new BlockMatrix!(Matrix!(Complex!real))(4, 4, 2, [gm, gm], true);
         auto f = new FourierMatrix!(Complex!real)(4);
 
-        // Block
-        {
-            auto p = new Vector!(Complex!real)(4, 3.1415926535);
-            auto mb = new MatrixLayer!(BlockMatrix!(Matrix!(Complex!real)))(b, p);
-            auto m = cast(BlockMatrix!(Matrix!(Complex!real))) mb.params[0];
+        auto p = new Vector!(Complex!real)(4, 3.1415926535);
+        auto mbp = new MatrixLayer!(BlockMatrix!(Matrix!(Complex!real)))(b, p);
+        auto mb = new MatrixLayer!(BlockMatrix!(Matrix!(Complex!real)))(b);
+        auto m = cast(BlockMatrix!(Matrix!(Complex!real))) (mb.params[0]);
 
-            auto res1 = mb.compute(v);
-            auto res2 = m * v;
-            res2 += p;
-            res2 -= res1;
+        auto res1p = mbp.compute(v);
+        auto res1 = mb.compute(v);
+        auto res2p = m * v;
+        auto res2 = res2p.dup;
+        res2p += p;
+        res2p -= res1p;
+        res2 -= res1;
 
-            assert(res2.norm!"L2" <= 0.0001);
-        }
+        assert(res2p.norm!"L2" <= 0.0001);
+        assert(res2.norm!"L2" <= 0.0001);
     }
+
     { // takeOwnership
         auto v = new Vector!real(4, 1.0);
         auto bias = new Vector!real(4, 1.0);
@@ -420,7 +424,7 @@ unittest {
 
         auto bml = new MatrixLayer!(BlockMatrix!(Matrix!real))(b, bias);
 
-        auto array_bouïlla = new real[4*2 + 4];
+        auto array_bouïlla = new real[10000];
         size_t indexouille = 0;
 
         bml.takeOwnership(array_bouïlla, indexouille);
@@ -490,10 +494,25 @@ unittest {
     assert(l.norm!"L2" <= 0.0001);
     assert(k.norm!"L2" <= 0.0001);
 
+
+    size_t indexx;
+    Complex!real ten = complex(10.0);
+    auto arr = new Complex!real[4];
+
+    b2.takeOwnership(arr, indexx);
+    foreach(i; 0 .. 4)
+        arr[i] = ten;
+
+    auto res = b2.compute(v);
+    res.v[] -= ten;
+    res -= v;
+
+    assert(res.norm!"L2" <= 0.00001);
+
     write("Done.\n");
 }
 
-/+
+
 /++ This layer can implement any function that take as input a
  +  Vector!T and return another Vector!T.
  +
@@ -511,8 +530,8 @@ unittest {
 class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
 {
     protected {
-        enum string[3] keywords_function = ["relu", "softmax", "modRelu", ""];
-        enum bool isKeyword = isOneOf!(strfunc, keywords_function);
+        enum string[4] keywords_function = ["relu", "softmax", "modRelu", ""];
+        enum bool isKeyword = strfunc.isOneOf(keywords_function);
     }
 
     this() {
@@ -521,8 +540,9 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
     this(size_t[] size_parameters, Tc[] randomBound_parameters)
     {
         static if (!isKeyword) {
+            params = new Parameter[TypeParameter.length];
             static foreach(i; 0 .. TypeParameter.length)
-                mixin("auto p"~i+1~" = new "~TypeParameter[i]~
+                mixin("params["~to!string(i)~"] = new "~TypeParameter[i].stringof~
                       "(size_parameters[i], randomBound_parameters[i]);");
         }
         assert(strfunc != "modRelu", "modRelu must be initialized using argument (size_t, "~Tc.stringof~").");
@@ -542,6 +562,24 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
         }
         else
             assert(0, "This initialization is only for modRelu.");
+    }
+
+    override
+    @safe @nogc pure
+    void takeOwnership(ref T[] _owner, ref size_t _index)
+    {
+        static if (strfunc == "modRelu") {
+            takeOwnership_util!(T)(_owner, (cast(Vector!Tc) params[0]).v, _index);
+        }
+        else static if(!isKeyword) {
+            static foreach(i; 0 .. TypeParameter.length) {
+                static if (is(TypeParameter[i] : Vector!T))
+                    takeOwnership_util!(T)(_owner, (cast(Vector!T) params[i]).v, _index);
+                else
+                    takeOwnership_util_matrix!(TypeParameter[i], T)
+                                              (_owner, cast(TypeParameter[i]) params[i], _index);
+            }
+        }
     }
 
     override
@@ -583,7 +621,7 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
             auto res = _v.dup;
             foreach(i; 0 .. _v.length) {
                 absv = _v[i].abs;
-                tmp = absv + (cast(Vector!Tc) _p[0])[i];
+                tmp = absv + (cast(Vector!Tc) params[0])[i];
                 if (tmp > 0) {
                     res[i] = tmp*_v[i]/absv;
                 }
@@ -602,12 +640,12 @@ unittest {
 
     alias Vec = Vector!(Complex!double);
 
-    auto blue = "
+    enum string blue = "
         auto res = _v.dup;
-        res.v[] *= p1[];
+        res.v[] *= p0.v[];
         return res;";
 
-    auto ff = "
+    enum string ff = "
         auto res = _v.dup;
         res.v[] *= complex(4.0);
         return res;";
@@ -628,7 +666,7 @@ unittest {
     auto f3 = new FunctionalLayer!(Complex!double, ff)();
     auto v3 = f3.compute(v);
     auto v3_bis = v.dup;
-    v3_bis[] *= complex(4.0);
+    v3_bis.v[] *= complex(4.0);
     v3 -= v3_bis;
     assert(v3.norm!"L2" <= 0.00001);
 
@@ -636,7 +674,7 @@ unittest {
     auto v4 = f4.compute(v);
     auto v4_bis = v.dup();
     auto f4_p1 = cast(Vec) f4.params[0];
-    v4_bis[] *= f4_p1[];
+    v4_bis.v[] *= f4_p1[];
     v4 -= v4_bis;
     assert(v4.norm!"L2" <= 0.00001);
 
@@ -670,4 +708,4 @@ unittest {
     auto vv = new Vector!double(100, 0.2);
 
     write(" Done.\n");
-}+/
+}

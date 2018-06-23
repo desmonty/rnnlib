@@ -154,8 +154,8 @@ class BlockMatrix(Mtype : M!T, alias M, T) : Parameter {
     auto dup()
     {
         auto res = new BlockMatrix!(Mtype)(size_in, size_out, size_blocks);
-        res.P = P.dup;
-        res.Q = Q.dup;
+        if (P) res.P = P.dup;
+        if (Q) res.Q = Q.dup;
         res.blocks = new Mtype[res.num_blocks];
 
         foreach(i; 0 .. res.num_blocks)
