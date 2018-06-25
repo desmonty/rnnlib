@@ -278,34 +278,6 @@ class NeuralNetwork(T) {
                         _in, _to);
     }
 
-    auto Function(Vector!T delegate(Vector!T) _function,
-                  in size_t _dim_out=0,
-                  in string _name=null,
-                  Vector!T _state=null,
-                  in string[] _in=null,
-                  in string[] _to=null)
-    {
-        return addLayer(_dim_out,
-                        new FunctionalLayer!T(_function),
-                        false, 0.0,
-                        _name, _state,
-                        _in, _to);
-    }
-
-    auto Function(Vector!T delegate(Vector!T, Parameter[]) _function,
-                  in size_t _dim_out=0,
-                  in string _name=null,
-                  Vector!T _state=null,
-                  in string[] _in=null,
-                  in string[] _to=null)
-    {
-        return addLayer(_dim_out,
-                        new FunctionalLayer!T(_function),
-                        false, 0.0,
-                        _name, _state,
-                        _in, _to);
-    }
-
     /++ Serialize all the parameters in the neural networks.
      +  This funciton should be called at the end of the construction of the neural network.
      +  It is a MANDATORY step for the optimization of the network.

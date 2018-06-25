@@ -523,9 +523,6 @@ unittest {
  +      -SoftMax
  +      -relu
  +      -modRelu
- + 
- +
- +  TODO: Add more functions ! The more, the merrier.
  +/
 class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
 {
@@ -569,7 +566,8 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
     void takeOwnership(ref T[] _owner, ref size_t _index)
     {
         static if (strfunc == "modRelu") {
-            takeOwnership_util!(T)(_owner, (cast(Vector!Tc) params[0]).v, _index);
+            // TODO: Can/Shall we take care of modRelu ?
+            //takeOwnership_util!(T)(_owner, (cast(Vector!Tc) params[0]).v, _index);
         }
         else static if(!isKeyword) {
             static foreach(i; 0 .. TypeParameter.length) {
@@ -585,9 +583,9 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
     override
     Vector!T compute(Vector!T _v)
     {
-        static if (strfunc == keywords_function[0]) {
+        static if (strfunc == "relu") {
             // function that compute "max(x, 0)" for every x in the vector.
-            static if (!is(Complex!T : T))
+            static if (is(Complex!T : T))
                 static assert(0, "Relu function cannot be use on Complex-valued vectors.");
 
             auto res = _v.dup;
@@ -595,7 +593,7 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
                 if (res[i] < 0) res[i] = 0;
             return res;
         }
-        else static if(strfunc == keywords_function[1]) {
+        else static if(strfunc == "softmax") {
             // Basic softmax function, can be used to obtain a probability distribution. 
             static if (is(Complex!T : T))
                 static assert(0, "Softmax function cannot be used on Complex-valued vectors.");
@@ -610,7 +608,7 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
                 res.v[i] /= s;
             return res;
         }
-        else static if(strfunc == keywords_function[2]) {
+        else static if(strfunc == "modRelu") {
             static if (!is(Complex!T : T))
                 static assert(0, "modRelu function cannot be used on Real-valued vectors.");
         
@@ -632,7 +630,11 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
             return res;
         }
         else static if(strfunc == "") return _v;
-        else mixin(strfunc);
+        else {
+            static foreach(i; 0 .. TypeParameter.length)
+                mixin("auto p"~to!string(i)~" = cast("~TypeParameter[i].stringof~") params["~to!string(i)~"];");
+            mixin(strfunc);
+        }
     }
 }
 unittest {
@@ -674,24 +676,22 @@ unittest {
     auto v4 = f4.compute(v);
     auto v4_bis = v.dup();
     auto f4_p1 = cast(Vec) f4.params[0];
-    v4_bis.v[] *= f4_p1[];
-    v4 -= v4_bis;
+    foreach(i; 0 .. v4.length) {
+        v4[i] -= v4_bis[i] * f4_p1[i];
+    }
     assert(v4.norm!"L2" <= 0.00001);
 
 
     // modRelu function.
     auto w = v.dup;
     w[2] = complex(0.5);
-    auto f5 = new FunctionalLayer!(Complex!double, "modRelu")(4);
+    auto f5 = new FunctionalLayer!(Complex!double, "modRelu", Vector!double)(4);
     (cast(Vector!double) f5.params[0])[0] = -0.9;
     (cast(Vector!double) f5.params[0])[1] = -0.9;
     (cast(Vector!double) f5.params[0])[2] = -0.9;
     (cast(Vector!double) f5.params[0])[3] = -0.9;
     auto v5 = f5.compute(w);
     assert(std.complex.abs(v5.sum) < 0.0001);
-
-    // vector 'e' doesn't have the right length.
-    assertThrown(f1.compute(e));
 
     auto vr = new Vector!double([0.0, 1.0, pi, -1.0]);
 
