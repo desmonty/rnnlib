@@ -192,7 +192,7 @@ class NeuralNetwork(T) {
             _dim_out = arr_dim_out[$-1];
 
         return addLayer(_dim_out,
-                        new MatrixLayer!(Mtype, T)([_dim_out, arr_dim_in[id]],
+                        new MatrixLayer!Mtype([_dim_out, arr_dim_in[id]],
                             _use_bias, _randomBound),
                         _use_bias, _randomBound,
                         _name, _state, _in, _to);
@@ -207,7 +207,7 @@ class NeuralNetwork(T) {
      +    redirection of its output towards the function layer (the recurrence).
      +
      +  Args:
-     +      _function (string, ="relu"): The name of the function to use as non-linearity.
+     +      strfunc (string, ="relu"): The name of the function to use as non-linearity.
      +      _randomBound (Tc, =1.0): Used for the generation of random values in the parameters.
      +      _name_in (string, =null): Name of the first layer for futur redirection.
      +      _name_to (string, =null): Name of the last layer for futur redirection.
@@ -216,13 +216,13 @@ class NeuralNetwork(T) {
      +                        inputs. If empty, the last known layer will be took.
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +/
-    auto Recurrent(Mtype = Matrix!T)(in string _function="relu",
-                           in Tc _randomBound=1.0,
-                           string _name_in=null,
-                           in string _name_to=null,
-                           Vector!T _state=null,
-                           in string[] _in=null,
-                           in string[] _to=null)
+    auto Recurrent(Mtype = Matrix!T, string strfunc="relu", TypeParameter...)
+                  (in Tc _randomBound=1.0,
+                   string _name_in=null,
+                   in string _name_to=null,
+                   Vector!T _state=null,
+                   in string[] _in=null,
+                   in string[] _to=null)
     {
         if (!_name_in)
             _name_in = "IN_RECURRENT_LAYER_" ~ to!string(id);
@@ -232,7 +232,7 @@ class NeuralNetwork(T) {
         if (!_state)
             _state = new Vector!T(arr_dim_out[$-1], _randomBound);
 
-        this.Function(_function,  // Function name.
+        this.Function!(strfunc),  // Function name.
                       0,          // dim out = dim in.
                       _name_in,   // name for futur reference in the recurrent layer.
                       null,       // no state vector.
@@ -250,10 +250,11 @@ class NeuralNetwork(T) {
         return this;
     }
 
+
     /++ Functional layer.
      +
      +  Args:
-     +      _function (string): The name of the function to use as non-linearity.
+     +      strfunc (string): The name of the function to use as non-linearity.
      +                          This can also be a (Vector!T delegate(Vector!T) )
      +                          and a (Vector!T delegate(Vector!T, Parameter[])).
      +      _dim_out (size_t, =0): Dimension of the resulting vector.
@@ -264,15 +265,18 @@ class NeuralNetwork(T) {
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +
      +/
-    auto Function(in string _function,
-                  in size_t _dim_out=0,
+    auto Function(string strfunc="", TypeParameter...)
+                 (in size_t _dim_out=0,
                   in string _name=null,
                   Vector!T _state=null,
                   in string[] _in=null,
-                  in string[] _to=null)
+                  in string[] _to=null,
+                  in size_t[] size_parameters=[],
+                  Tc[] randomBound_parameters=[])
     {
         return addLayer(_dim_out,
-                        new FunctionalLayer!T(_function, arr_dim_out[$-1]),
+                        new FunctionalLayer!(T, strfunc, TypeParameter)
+                                           (size_parameters, randomBound_parameters),
                         false, 0.0,
                         _name, _state,
                         _in, _to);
@@ -390,7 +394,8 @@ unittest {
         z_bis -= z;
         assert(z_bis.norm!"L2" <= 0.0001);
     }
-    
+  
+/+
     // Neural Network 1: Simple linear layer + softmax.
     // Neural Network 2: RNN: Linear + relu + Linear (+backlink) + Linear + softmax.
     {
@@ -465,7 +470,8 @@ unittest {
         assert(b_3.norm!"L2" <= 0.0001);
         assert(b_4.norm!"L2" <= 0.0001);
     }
-
++/
+/+
     // Neural Network 1: Linear + softmax
     // Neural Network 2: Linear + softmax + Linear + Recurrent + Linear + norm!"L2"^-1
     {
@@ -531,6 +537,6 @@ unittest {
 
         assert(true_res.norm!"L2" <= 0.0001);
     }
-
++/
     writeln("Done.");
 }
