@@ -222,7 +222,9 @@ class NeuralNetwork(T) {
                    in string _name_to=null,
                    Vector!T _state=null,
                    in string[] _in=null,
-                   in string[] _to=null)
+                   in string[] _to=null,
+                   in size_t[] size_parameters=[],
+                   in Tc[] randomBound_parameters=[])
     {
         if (!_name_in)
             _name_in = "IN_RECURRENT_LAYER_" ~ to!string(id);
@@ -232,12 +234,14 @@ class NeuralNetwork(T) {
         if (!_state)
             _state = new Vector!T(arr_dim_out[$-1], _randomBound);
 
-        this.Function!(strfunc),  // Function name.
-                      0,          // dim out = dim in.
-                      _name_in,   // name for futur reference in the recurrent layer.
-                      null,       // no state vector.
-                      _in,        // 'in' references. 
-                      null);      // no 'out' references.
+        this.Function!(strfunc, TypeParameter)  // Function name.
+                      (0,          // dim out = dim in.
+                       _name_in,   // name for futur reference in the recurrent layer.
+                       null,       // no state vector.
+                       _in,        // 'in' references. 
+                       null,       // no 'out' references.
+                       size_parameters,
+                       randomBound_parameters);
 
         this.Linear!(Mtype)(0,            // dim out = dim in.
                             false,        // no bias vector.
@@ -272,7 +276,7 @@ class NeuralNetwork(T) {
                   in string[] _in=null,
                   in string[] _to=null,
                   in size_t[] size_parameters=[],
-                  Tc[] randomBound_parameters=[])
+                  in Tc[] randomBound_parameters=[])
     {
         return addLayer(_dim_out,
                         new FunctionalLayer!(T, strfunc, TypeParameter)
@@ -395,7 +399,7 @@ unittest {
         assert(z_bis.norm!"L2" <= 0.0001);
     }
   
-/+
+
     // Neural Network 1: Simple linear layer + softmax.
     // Neural Network 2: RNN: Linear + relu + Linear (+backlink) + Linear + softmax.
     {
@@ -405,7 +409,7 @@ unittest {
         // NN1
         auto nn1 = new NeuralNetwork!real(5);
         nn1.Linear(5)
-           .Function("softmax", 5);
+           .Function!"softmax"(5);
 
 
         auto w = nn1.compute(vec);
@@ -418,17 +422,17 @@ unittest {
         nn2.Linear(5, true)
            .Recurrent()
            .Linear(5, true)
-           .Function("softmax");
+           .Function!"softmax"();
 
 
         auto s = nn2.results[3].dup; 
 
         auto nn3 = new NeuralNetwork!real(5);
         nn3.Linear(5, true, 1.0)
-           .Function("relu", 5, "Rec_in")
+           .Function!"relu"(5, "Rec_in")
            .Linear(5, false, 1.0, null, s, null, ["Rec_in"])
            .Linear(5, true)
-           .Function("softmax");
+           .Function!"softmax"();
 
 
         // put same parameters in the second nn.
@@ -470,14 +474,14 @@ unittest {
         assert(b_3.norm!"L2" <= 0.0001);
         assert(b_4.norm!"L2" <= 0.0001);
     }
-+/
-/+
+
+
     // Neural Network 1: Linear + softmax
     // Neural Network 2: Linear + softmax + Linear + Recurrent + Linear + norm!"L2"^-1
     {
         auto nn1 = new NeuralNetwork!real(4);
         nn1.Linear(4, true)
-           .Function("softmax")
+           .Function!"softmax"()
            .serialize;
 
         auto v = new Vector!real([1.0, -1.0, 0.0, 1.0]);
@@ -498,15 +502,14 @@ unittest {
 
         auto nn2 = new NeuralNetwork!real(4);
         nn2.Linear(5)
-           .Function("softmax")
+           .Function!"softmax"()
            .Linear(5)
            .Recurrent()
            .Linear(4)
-           .Function(delegate(Vector!real _v) {
+           .Function!"
                 auto res = _v.dup;
-                res /= res.norm!"L2";
-                return res;
-            })
+                res /= res.norm!\"L2\";
+                return res;"()
            .serialize;
 
         auto w = nn2.compute(v);
@@ -537,6 +540,6 @@ unittest {
 
         assert(true_res.norm!"L2" <= 0.0001);
     }
-+/
+
     writeln("Done.");
 }

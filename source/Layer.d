@@ -534,7 +534,7 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
     this() {
     }
 
-    this(size_t[] size_parameters, Tc[] randomBound_parameters)
+    this(in size_t[] size_parameters, in Tc[] randomBound_parameters)
     {
         static if (!isKeyword) {
             params = new Parameter[TypeParameter.length];
