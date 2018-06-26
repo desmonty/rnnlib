@@ -11,9 +11,33 @@ a rnn like vanishing/exploding gradients (e.g. see _[On the difficulty of traini
 One of the auxiliary goal of this project is to cut any dependencies between the evolutionary algorithms
 and the recurrent neural netwroks to enable anyone to use it independently.
 
-## Daily Todo
-* Think about parameters shared between layers: can the layer be different and share the same parameters ?
-* (optm) randclone weigths: serialized_data holds all weigths -> can be constructed using smaller array with random cloning.
+
+# Research Goals
+This library will be used to try to answer the following questions:
+
+* _Optimizations_
+  * How good are gradient free algorithms in training (r)nn ? Metrics: Training Time / Precision / Generalization
+  * Benchmark Several different algorithms against a set of problems.
+* _Weights Augmentation_
+  * Gradient-free optimizations algorithms can be much more time consuming than SGD. We could remove this issue by applying dimensionality augmentation technics to generate the weights of the NN with a small intial weigths vector (This can be compared to Genetic Algorithm). Hence the goal would be to test different technics to augment small vectors.
+  * Random Sampling
+  * Random Matrix
+  * Random NN
+  * Random * with constraint (e.g. distribution of final weigths).
+* _Sparsification_
+  * Weights augmentation allow us to work with potentially huge neural networks (Billion of weigths). The resulting efficiency is still to be studied but what we can be sure of is that it will be energy consuming to use a huge RNN or FFNN on ligthweigth device (iot, mobile, ...). Hence we would like to come up with a way to reduce drastically the number of nonzero element in every matrices. There is several ways to do this.
+    1) Spectral sparsification (between learning phase ?).
+    2) Use the fact we used weigths augmentation.
+    3) Train sparse matrix (e.g. block matrices).
+* _Connection Optimization_
+  * The use of gradient-free optimization allow us to optimize the way nodes in the neural networks are connected. Discussion: We could either want to modify the connection of the neural network viewed as a graph or the connection between computational component of the nn.  
+* _Scientific paper generation_
+  * Because why not ? And also this could be a nice POC that rnnlib works well for image generation (let's implement GANs).
+* _"Linear" Tropical Neural Networks_
+  * mult -> plus & plus -> max/min
+  * The use of gradient free optimizations algorithms allow us to train Neural Network defined over a tropical algebra. This could be nice because the dot product becomes a non-linear function of the weigths.
+  * Questions: Non-linear functions useful in this context ? Some theory possible ? Does the Universal Approximation Theorem stands here ? What can we do with a "Linear Tropical Neural Network" (only Matrix operation). 
+* _Compression_
 
 
 # TODO

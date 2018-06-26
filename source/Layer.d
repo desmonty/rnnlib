@@ -92,6 +92,7 @@ if (!__traits(compiles, BlockMatrix!T))
             size = size_blocks * size_blocks * num_blocks;
         else
             size = _M.rows * _M.cols;
+
         // We keep a duplicate of the matrix.
         params = new Parameter[1];
         params[0] = _M.dup;
@@ -102,6 +103,7 @@ if (!__traits(compiles, BlockMatrix!T))
         if (_v){
             this();
             enforce(_M.cols == _v.length, "Matrix / Bias dimensions mismatch.");
+
 
             static if (Mtype.stringof[0 .. 5] == "Block")
                 size = size_blocks * size_blocks * num_blocks + _v.length;
@@ -219,7 +221,6 @@ unittest {
             auto w = new Vector!float(16, 1010101.0);
 
             auto mp = new MatrixLayer!(PermutationMatrix!float)(p);
-
             auto res1 = mp.compute(w);
             auto res2 = p * w;
         
@@ -265,7 +266,6 @@ unittest {
             md.params[0] = d;
 
             auto w = new Vector!(Complex!real)(2, 100000000.0);
-
             auto res = md.compute(w);
             w *= d;
 
@@ -279,7 +279,6 @@ unittest {
         auto v2 = new Vector!real(2, 1.0);
         auto bias = new Vector!real(4, 1.0);
         auto bias2 = new Vector!real(2, 1.0);
-
 
         auto r = new ReflectionMatrix!real(4, 1.0);
         auto r1 = new ReflectionMatrix!real([1.0, 1.0, 1.0, 1.0]);
@@ -440,6 +439,8 @@ unittest {
     }
     write("Done.\n");
 }
+
+
 
 /+ This layer implement a simple linear matrix transformation
  + applied to the vector.

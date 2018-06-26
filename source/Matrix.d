@@ -156,6 +156,7 @@ class BlockMatrix(Mtype : M!T, alias M, T) : Parameter {
         auto res = new BlockMatrix!(Mtype)(size_in, size_out, size_blocks);
         if (P) res.P = P.dup;
         if (Q) res.Q = Q.dup;
+      
         res.blocks = new Mtype[res.num_blocks];
 
         foreach(i; 0 .. res.num_blocks)
@@ -257,7 +258,6 @@ unittest
 
     // create an empt BlockMatrix for the seek of coverage.
     auto mtmp_blue_unused = new BlockMatrix!(UnitaryMatrix!real)();
-
     auto len = 1024;
     
     // Matrix | in: len | out: len
@@ -345,10 +345,8 @@ unittest
     res5_1 -= res5_2;
     assert(res5_1.norm!"L2" <= 0.00001);
 
-
     assertThrown(new BlockMatrix!(DiagonalMatrix!real)(4u, 4u, 3u));
     assertThrown(new BlockMatrix!(DiagonalMatrix!real)(4u, 3u, 3u));
-
     write("Done.\n");
 }
 
