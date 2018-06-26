@@ -522,12 +522,11 @@ unittest {
  +  For convinence, some function are already implemented and more are to go:
  +      -SoftMax
  +      -relu
- +      -modRelu
  +/
 class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
 {
     protected {
-        enum string[4] keywords_function = ["relu", "softmax", "modRelu", ""];
+        enum string[4] keywords_function = ["relu", "softmax", ""];
         enum bool isKeyword = strfunc.isOneOf(keywords_function);
     }
 
@@ -542,34 +541,13 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
                 mixin("params["~to!string(i)~"] = new "~TypeParameter[i].stringof~
                       "(size_parameters[i], randomBound_parameters[i]);");
         }
-        assert(strfunc != "modRelu", "modRelu must be initialized using argument (size_t, "~Tc.stringof~").");
-    }
-
-    this(in size_t size_in, in Tc randomBound = 1.0)
-    {
-        static if(strfunc == "modRelu") {
-            assert(TypeParameter.length == 1, "The type of the learnable parameter 1 must be provided.");
-            assert(is(TypeParameter[0]: Vector!Tc), "The type of parameter 1 must be: Vector!" ~Tc.stringof);
-
-            enforce(size_in != 0, "'size_in' must be greater than zero when using 'modRelu'.");
-
-            params = new Parameter[1];
-            params[0] = new Vector!Tc(size_in, randomBound);
-            size = size_in;
-        }
-        else
-            assert(0, "This initialization is only for modRelu.");
     }
 
     override
     @safe @nogc pure
     void takeOwnership(ref T[] _owner, ref size_t _index)
     {
-        static if (strfunc == "modRelu") {
-            // TODO: Can/Shall we take care of modRelu ?
-            //takeOwnership_util!(T)(_owner, (cast(Vector!Tc) params[0]).v, _index);
-        }
-        else static if(!isKeyword) {
+        static if(!isKeyword) {
             static foreach(i; 0 .. TypeParameter.length) {
                 static if (is(TypeParameter[i] : Vector!T))
                     takeOwnership_util!(T)(_owner, (cast(Vector!T) params[i]).v, _index);
@@ -608,27 +586,6 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
                 res.v[i] /= s;
             return res;
         }
-        else static if(strfunc == "modRelu") {
-            static if (!is(Complex!T : T))
-                static assert(0, "modRelu function cannot be used on Real-valued vectors.");
-        
-            import std.complex: abs;
-
-            auto absv = _v[0].abs;
-            auto tmp = absv;
-            auto res = _v.dup;
-            foreach(i; 0 .. _v.length) {
-                absv = _v[i].abs;
-                tmp = absv + (cast(Vector!Tc) params[0])[i];
-                if (tmp > 0) {
-                    res[i] = tmp*_v[i]/absv;
-                }
-                else {
-                    res[i] = complex(cast(_v.Tc) 0);
-                }
-            }
-            return res;
-        }
         else static if(strfunc == "") return _v;
         else {
             static foreach(i; 0 .. TypeParameter.length)
@@ -640,72 +597,82 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
 unittest {
     write("                 Functional ... ");
 
-    alias Vec = Vector!(Complex!double);
+    {
+        alias Vec = Vector!(Complex!double);
 
-    enum string blue = "
-        auto res = _v.dup;
-        res.v[] *= p0.v[];
-        return res;";
+        enum string blue = "
+            auto res = _v.dup;
+            res.v[] *= p0.v[];
+            return res;";
 
-    enum string ff = "
-        auto res = _v.dup;
-        res.v[] *= complex(4.0);
-        return res;";
+        enum string ff = "
+            auto res = _v.dup;
+            res.v[] *= complex(4.0);
+            return res;";
 
-    uint len = 4;
-    double pi = 3.1415923565;
+        uint len = 4;
+        double pi = 3.1415923565;
 
-    auto v = new Vec([complex(0.0), complex(1.0), complex(pi), complex(-1.0)]);
-    auto e = new Vec([complex(0.0)]);
+        auto v = new Vec([complex(0.0), complex(1.0), complex(pi), complex(-1.0)]);
+        auto e = new Vec([complex(0.0)]);
 
-    // Empty functional is identity.
-    auto f1 = new FunctionalLayer!(Complex!double)();
-    auto v1 = f1.compute(v);
-    v1 -= v;
-    assert(v1.norm!"L2" <= 0.001);
+        // Empty functional is identity.
+        auto f1 = new FunctionalLayer!(Complex!double)();
+        auto v1 = f1.compute(v);
+        v1 -= v;
+        assert(v1.norm!"L2" <= 0.001);
 
-    // More complex functional without learnable parameter.
-    auto f3 = new FunctionalLayer!(Complex!double, ff)();
-    auto v3 = f3.compute(v);
-    auto v3_bis = v.dup;
-    v3_bis.v[] *= complex(4.0);
-    v3 -= v3_bis;
-    assert(v3.norm!"L2" <= 0.00001);
+        // More complex functional without learnable parameter.
+        auto f3 = new FunctionalLayer!(Complex!double, ff)();
+        auto v3 = f3.compute(v);
+        auto v3_bis = v.dup;
+        v3_bis.v[] *= complex(4.0);
+        v3 -= v3_bis;
+        assert(v3.norm!"L2" <= 0.00001);
 
-    auto f4 = new FunctionalLayer!(Complex!double, blue, Vec)([len], [1.0]);
-    auto v4 = f4.compute(v);
-    auto v4_bis = v.dup();
-    auto f4_p1 = cast(Vec) f4.params[0];
-    foreach(i; 0 .. v4.length) {
-        v4[i] -= v4_bis[i] * f4_p1[i];
+        auto f4 = new FunctionalLayer!(Complex!double, blue, Vec)([len], [1.0]);
+        auto v4 = f4.compute(v);
+        auto v4_bis = v.dup();
+        auto f4_p1 = cast(Vec) f4.params[0];
+        foreach(i; 0 .. v4.length) {
+            v4[i] -= v4_bis[i] * f4_p1[i];
+        }
+        assert(v4.norm!"L2" <= 0.00001);
+
+        auto vr = new Vector!double([0.0, 1.0, pi, -1.0]);
+
+        // relu function.
+        auto f6 = new FunctionalLayer!(double, "relu");
+        auto vr6 = f6.compute(vr);
+        assert(abs(vr6.sum - 1.0 - pi) <= 0.01);
+
+        // softmax function.
+        auto f7 = new FunctionalLayer!(double, "softmax");
+        auto vr7 = f7.compute(vr);
+        assert(abs(vr7.sum - 1.0) <= 0.001);
+
+        auto vv = new Vector!double(100, 0.2);
     }
-    assert(v4.norm!"L2" <= 0.00001);
 
+    { // takeOwnership
+        enum string strfunc = "auto res = _v.dup; res += p0; return res;";
+        auto f = new FunctionalLayer!(double, strfunc, Vector!double)([4UL], [10.0]);
+        auto v = new Vector!double([1.0, 2.0, 3.0, 4.0]);
 
-    // modRelu function.
-    auto w = v.dup;
-    w[2] = complex(0.5);
-    auto f5 = new FunctionalLayer!(Complex!double, "modRelu", Vector!double)(4);
-    (cast(Vector!double) f5.params[0])[0] = -0.9;
-    (cast(Vector!double) f5.params[0])[1] = -0.9;
-    (cast(Vector!double) f5.params[0])[2] = -0.9;
-    (cast(Vector!double) f5.params[0])[3] = -0.9;
-    auto v5 = f5.compute(w);
-    assert(std.complex.abs(v5.sum) < 0.0001);
+        auto a = new double[4];
+        auto s = new Vector!double([5.0, 5.0, 5.0, 5.0]);
+        auto i = 0UL;
 
-    auto vr = new Vector!double([0.0, 1.0, pi, -1.0]);
+        f.takeOwnership(a, i);
+        a[0] = 4.0;
+        a[1] = 3.0;
+        a[2] = 2.0;
+        a[3] = 1.0;
 
-    // relu function.
-    auto f6 = new FunctionalLayer!(double, "relu");
-    auto vr6 = f6.compute(vr);
-    assert(abs(vr6.sum - 1.0 - pi) <= 0.01);
-
-    // softmax function.
-    auto f7 = new FunctionalLayer!(double, "softmax");
-    auto vr7 = f7.compute(vr);
-    assert(abs(vr7.sum - 1.0) <= 0.001);
-
-    auto vv = new Vector!double(100, 0.2);
+        auto r = f.compute(v);
+        r -= s;
+        assert(r.norm!"L2" <= 0.000001);
+    }
 
     write(" Done.\n");
 }

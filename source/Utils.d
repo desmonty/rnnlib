@@ -38,45 +38,39 @@ unittest {
  +  -Yes ! It is worth it because it will allow us to do a simple
  +    "foreach" and get both...
  +/
-struct FrameRange
+struct FrameRange(size_t[] _arr, size_t _width)
 {
-    private {
-        const size_t[] arr;
-        const size_t width;
-    }
-
-    this(size_t[] _arr, size_t _width) {
-        arr = _arr;
-        width = _width;
-    }
+    enum size_t[] arr = _arr;
+    enum size_t width = _width;
 
     int opApply(scope int delegate(size_t, size_t) dg)
     {
 
         // if the cut_frame is empty, we do not cut the frame
         // and so we just return the first position with the width.
-        if (!arr)
+        static if (!arr)
             return dg(width, 0);
+        else {
+            int result;
+            size_t frame_len = arr[0];
 
-        int result;
-        size_t frame_len = arr[0];
-
-        result = dg(frame_len, 0);
-        if (result)
-            return result;
-
-        size_t len_1 = arr.length - 1;
-        foreach (index; 0 .. len_1) {
-            frame_len = arr[index+1] - arr[index];
-            result = dg(frame_len, arr[index]);
+            result = dg(frame_len, 0);
             if (result)
-                break;
+                return result;
+
+            enum size_t len_1 = arr.length - 1;
+            foreach (index; 0 .. len_1) {
+                frame_len = arr[index+1] - arr[index];
+                result = dg(frame_len, arr[index]);
+                if (result)
+                    break;
+            }
+
+            frame_len = width - arr[len_1];
+            result = dg(frame_len, arr[len_1]);
+
+            return result;
         }
-
-        frame_len = width - arr[len_1];
-        result = dg(frame_len, arr[len_1]);
-
-        return result;
     }
 }
 
@@ -158,7 +152,7 @@ auto createPoolingFunction(T, alias reducer, size_t height, size_t width,
            We continue until the frame cannot move to the right nor the bottom.
            The values computed during this process are added iteratively
            in a vector in a "Left-Right/Top-Left" fashion.
-     +/
+    +/
     static if (cut_width) {
         static assert(minElement(cut_width), "cut_width cannot contains '0'");
         static assert(maxElement(cut_width) < width, "max(cut_width) must be < width-1");
@@ -177,9 +171,9 @@ auto createPoolingFunction(T, alias reducer, size_t height, size_t width,
     }
 
     enum size_t lenRetVec = (cut_height.length + 1)
-                      *(cut_width.length  + 1)
-                      *(1 + (height - frame_height) / stride_height)
-                      *(1 + (width  - frame_width)  / stride_width);
+                          * (cut_width.length  + 1)
+                          * (1 + (height - frame_height) / stride_height)
+                          * (1 + (width  - frame_width)  / stride_width);
 
     return "
         auto res = new Vector! T("~to!string(lenRetVec)~", 0.1);
@@ -192,8 +186,8 @@ auto createPoolingFunction(T, alias reducer, size_t height, size_t width,
                pos_x, pos_y,
                shift, tmp_inner;
 
-        auto f_range_width = FrameRange("~to!string(cut_width)~", "~to!string(frame_width)~");
-        auto f_range_height = FrameRange("~to!string(cut_height)~", "~to!string(frame_height)~");
+        auto f_range_width = FrameRange!("~to!string(cut_width)~", "~to!string(frame_width)~")();
+        auto f_range_height = FrameRange!("~to!string(cut_height)~", "~to!string(frame_height)~")();
 
         // we move the starting point of the frame using the first two 'for'
         for (tmp_y = 0; tmp_y <= "~to!string(height)~" - "~to!string(frame_height)~"; tmp_y += "~to!string(stride_height)~") {
@@ -237,7 +231,7 @@ unittest {
     enum size_t[] valav = [0, 1, 3];
     enum size_t width = 5;
 
-    auto fr = FrameRange(av, width);
+    auto fr = FrameRange!(av, width)();
 
     size_t tmp_index = 0;
     foreach(a, b; fr){
@@ -274,11 +268,15 @@ unittest {
     // max pooling, stride 2, square frame, multi-cut
     enum auto tmp5 = createPoolingFunction!(double, (a, b) => "max("~a~", "~b~")", 10, 10, 2, 2, 10, 10, [2,7], [2,7]);
 
+    // max pooling, no stride, square frame, multi-cut
+    enum auto tmp6 = createPoolingFunction!(double, (a, b) => "max("~a~","~b~")", 10, 10, 10, 10, 10, 10, [2, 3, 4, 5, 6, 7], [2, 3, 4, 5, 6, 7]);
+
     auto layer1 = new FunctionalLayer!(double, tmp1);
     auto layer2 = new FunctionalLayer!(double, tmp2);
     auto layer3 = new FunctionalLayer!(double, tmp3);
     auto layer4 = new FunctionalLayer!(double, tmp4);
     auto layer5 = new FunctionalLayer!(double, tmp5);
+    auto layer6 = new FunctionalLayer!(double, tmp6);
 
     auto vec = new Vector!double([1.,0.,  0.,1.,  1.,0.,  0.,0.,  0.,5.,
                                   0.,0.,  0.,2.,  2.,3.,  4.,4.,  1.,2.,
@@ -355,7 +353,7 @@ unittest {
  +/
 
 
- @safe @nogc pure
+@safe @nogc pure
 void takeOwnership_util_matrix(Mtype, T)(ref T[] _owner, ref Mtype _ownee, ref size_t _index)
 {
     static if (is(Mtype : Matrix!T)) {
@@ -382,6 +380,7 @@ void takeOwnership_util_matrix(Mtype, T)(ref T[] _owner, ref Mtype _ownee, ref s
 }
 unittest {
     write("                 takeOwnership_util_matrix... ");
+
     auto v = new Vector!real(4, 1.0);
     auto v2 = new Vector!real(2, 1.0);
 
