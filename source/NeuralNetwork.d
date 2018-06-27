@@ -18,7 +18,7 @@ version(unittest)
     import std.stdio : writeln, write;
 }
 
-/++ The Neural Network class hold all the logic of the function approximator.
+/++ The Neural Network class hold all the logic of the func approximator.
  +  
  +  Args:
  +      T: Type of the element in the network.
@@ -30,7 +30,7 @@ version(unittest)
  +        you can, be smart.
  +
  +      - Adding layers in the network is done by the use of the "addLayer..."
- +        functions. These functions can all take a "_in" and a "_to" as
+ +        funcs. These funcs can all take a "_in" and a "_to" as
  +        parameter. They will be used to know how to inscribe the new layer in
  +        the network as explained below:
  +
@@ -166,7 +166,7 @@ class NeuralNetwork(T) {
     }
 
 
-    /++ Create a Linear Layer in the network and handle the logic for futur
+    /++ Create a linear Layer in the network and handle the logic for futur
      +  computation.
      +
      +  Args:
@@ -180,7 +180,7 @@ class NeuralNetwork(T) {
      +                        inputs. If empty, the last known layer will be took.
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +/
-    auto Linear(Mtype = Matrix!T)(size_t _dim_out=0,
+    auto linear(Mtype = Matrix!T)(size_t _dim_out=0,
                                in bool _use_bias=false,
                                in Tc _randomBound=1.0,
                                in string _name=null,
@@ -199,15 +199,15 @@ class NeuralNetwork(T) {
     }
 
 
-    /++ Recurrent Layer
+    /++ recurrent Layer
      +
      +  It is simply constructed by adding two layers:
-     +  - The first one is a FunctionLayer which input is the last layer's result
+     +  - The first one is a funcLayer which input is the last layer's result
      +  - The second one is a MatrixLayer takes its input from the first and add a
-     +    redirection of its output towards the function layer (the recurrence).
+     +    redirection of its output towards the func layer (the recurrence).
      +
      +  Args:
-     +      strfunc (string, ="relu"): The name of the function to use as non-linearity.
+     +      strfunc (string, ="relu"): The name of the func to use as non-linearity.
      +      _randomBound (Tc, =1.0): Used for the generation of random values in the parameters.
      +      _name_in (string, =null): Name of the first layer for futur redirection.
      +      _name_to (string, =null): Name of the last layer for futur redirection.
@@ -216,7 +216,7 @@ class NeuralNetwork(T) {
      +                        inputs. If empty, the last known layer will be took.
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +/
-    auto Recurrent(Mtype = Matrix!T, string strfunc="relu", TypeParameter...)
+    auto recurrent(Mtype = Matrix!T, string strfunc="relu", TypeParameter...)
                   (in Tc _randomBound=1.0,
                    string _name_in=null,
                    in string _name_to=null,
@@ -234,19 +234,19 @@ class NeuralNetwork(T) {
         if (!_state)
             _state = new Vector!T(arr_dim_out[$-1], _randomBound);
 
-        this.Function!(strfunc, TypeParameter)  // Function name.
-                      (0,          // dim out = dim in.
-                       _name_in,   // name for futur reference in the recurrent layer.
-                       null,       // no state vector.
-                       _in,        // 'in' references. 
-                       null,       // no 'out' references.
-                       size_parameters,
-                       randomBound_parameters);
+        this.func!(strfunc, TypeParameter)  // func name.
+                  (0,          // dim out = dim in.
+                   _name_in,   // name for futur reference in the recurrent layer.
+                   null,       // no state vector.
+                   _in,        // 'in' references. 
+                   null,       // no 'out' references.
+                   size_parameters,
+                   randomBound_parameters);
 
-        this.Linear!(Mtype)(0,            // dim out = dim in.
+        this.linear!(Mtype)(0,            // dim out = dim in.
                             false,        // no bias vector.
                             _randomBound, // random bound for the initialisation.
-                            _name_to,    // Name for futur references out of the recurrent layer.
+                            _name_to,     // Name for futur references out of the recurrent layer.
                             _state,       // intial state vector.
                             null,         // no 'in' references.
                             tmp_to);         // 'out' references.
@@ -258,7 +258,7 @@ class NeuralNetwork(T) {
     /++ Functional layer.
      +
      +  Args:
-     +      strfunc (string): The name of the function to use as non-linearity.
+     +      strfunc (string): The name of the func to use as non-linearity.
      +                          This can also be a (Vector!T delegate(Vector!T) )
      +                          and a (Vector!T delegate(Vector!T, Parameter[])).
      +      _dim_out (size_t, =0): Dimension of the resulting vector.
@@ -269,14 +269,14 @@ class NeuralNetwork(T) {
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +
      +/
-    auto Function(string strfunc="", TypeParameter...)
-                 (in size_t _dim_out=0,
-                  in string _name=null,
-                  Vector!T _state=null,
-                  in string[] _in=null,
-                  in string[] _to=null,
-                  in size_t[] size_parameters=[],
-                  in Tc[] randomBound_parameters=[])
+    auto func(string strfunc="", TypeParameter...)
+             (in size_t _dim_out=0,
+              in string _name=null,
+              Vector!T _state=null,
+              in string[] _in=null,
+              in string[] _to=null,
+              in size_t[] size_parameters=[],
+              in Tc[] randomBound_parameters=[])
     {
         return addLayer(_dim_out,
                         new FunctionalLayer!(T, strfunc, TypeParameter)
@@ -284,6 +284,45 @@ class NeuralNetwork(T) {
                         false, 0.0,
                         _name, _state,
                         _in, _to);
+    }
+
+
+    /++ Softmax layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto softmax(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"softmax"(_dim_out, _name, _state, _in, _to);
+    }
+
+    /++ Relu layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto relu(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"relu"(_dim_out, _name, _state, _in, _to);
     }
 
     /++ Serialize all the parameters in the neural networks.
@@ -353,7 +392,7 @@ unittest {
     
     {
         // Initialize the neural network.
-        // At this point, we have the identity function.
+        // At this point, we have the identity func.
         auto nn = new NeuralNetwork!float(4);
 
         // Vector of L2 norm = 1.
@@ -365,8 +404,8 @@ unittest {
 
         assert(w.norm!"L2" <= 0.0001);
 
-        // We add a Linear Layer of shape (6, 4).
-        nn.Linear!(Matrix!float)(6, false, 1.0, "L1");
+        // We add a linear Layer of shape (6, 4).
+        nn.linear!(Matrix!float)(6, false, 1.0, "L1");
         w = nn.compute(v);
 
         // Hence, the resulting vector should have length 6.
@@ -375,7 +414,7 @@ unittest {
         // We add some complexity: the layer take the user's input and the ouput of "L1"
         // and return its output to "L1" (And so create a rnn-like structure) and to
         // the output (by default, the result of the last layer).
-        nn.Linear!(Matrix!float)(4, false, 1.0, "L2", null, null, ["L1"]);
+        nn.linear!(Matrix!float)(4, false, 1.0, "L2", null, null, ["L1"]);
         w = nn.compute(v);
         auto z = nn.compute(v);
 
@@ -401,15 +440,15 @@ unittest {
   
 
     // Neural Network 1: Simple linear layer + softmax.
-    // Neural Network 2: RNN: Linear + relu + Linear (+backlink) + Linear + softmax.
+    // Neural Network 2: RNN: linear + relu + linear (+backlink) + linear + softmax.
     {
 
         auto vec = new Vector!real(5, 1.0);
 
         // NN1
         auto nn1 = new NeuralNetwork!real(5);
-        nn1.Linear(5)
-           .Function!"softmax"(5);
+        nn1.linear(5)
+           .softmax(5);
 
 
         auto w = nn1.compute(vec);
@@ -419,20 +458,20 @@ unittest {
 
         // NN2
         auto nn2 = new NeuralNetwork!real(5);
-        nn2.Linear(5, true)
-           .Recurrent()
-           .Linear(5, true)
-           .Function!"softmax"();
+        nn2.linear(5, true)
+           .recurrent()
+           .linear(5, true)
+           .softmax();
 
 
         auto s = nn2.results[3].dup; 
 
         auto nn3 = new NeuralNetwork!real(5);
-        nn3.Linear(5, true, 1.0)
-           .Function!"relu"(5, "Rec_in")
-           .Linear(5, false, 1.0, null, s, null, ["Rec_in"])
-           .Linear(5, true)
-           .Function!"softmax"();
+        nn3.linear(5, true, 1.0)
+           .relu(5, "Rec_in")
+           .linear(5, false, 1.0, null, s, null, ["Rec_in"])
+           .linear(5, true)
+           .softmax();
 
 
         // put same parameters in the second nn.
@@ -476,12 +515,12 @@ unittest {
     }
 
 
-    // Neural Network 1: Linear + softmax
-    // Neural Network 2: Linear + softmax + Linear + Recurrent + Linear + norm!"L2"^-1
+    // Neural Network 1: linear + softmax
+    // Neural Network 2: linear + softmax + linear + recurrent + linear + norm!"L2"^-1
     {
         auto nn1 = new NeuralNetwork!real(4);
-        nn1.Linear(4, true)
-           .Function!"softmax"()
+        nn1.linear(4, true)
+           .softmax()
            .serialize;
 
         auto v = new Vector!real([1.0, -1.0, 0.0, 1.0]);
@@ -501,12 +540,12 @@ unittest {
 
 
         auto nn2 = new NeuralNetwork!real(4);
-        nn2.Linear(5)
-           .Function!"softmax"()
-           .Linear(5)
-           .Recurrent()
-           .Linear(4)
-           .Function!"
+        nn2.linear(5)
+           .func!"softmax"()
+           .linear(5)
+           .recurrent()
+           .linear(4)
+           .func!"
                 auto res = _v.dup;
                 res /= res.norm!\"L2\";
                 return res;"()
@@ -525,13 +564,13 @@ unittest {
         
         // We then apply each step separately with weights 1 using the fact that v = [1, -1, 0, 1].
 
-        //Apply Linear(5): [1, 1, 1, 1, 1]
+        //Apply linear(5): [1, 1, 1, 1, 1]
 
         //Apply softmax: [0.2, 0.2, 0.2, 0.2, 0.2]
 
-        //Apply Recurrent (relu(1 + previous vector)): [1.2, 1.2, 1.2, 1.2, 1.2]
+        //Apply recurrent (relu(1 + previous vector)): [1.2, 1.2, 1.2, 1.2, 1.2]
 
-        //Linear(4): [4.8, 4.8, 4.8, 4.8]
+        //linear(4): [4.8, 4.8, 4.8, 4.8]
 
         //Divide by norm!"L2": [0.5, 0.5, 0.5, 0.5]
 

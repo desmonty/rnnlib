@@ -441,7 +441,6 @@ unittest {
 }
 
 
-
 /+ This layer implement a simple linear matrix transformation
  + applied to the vector.
  + 
