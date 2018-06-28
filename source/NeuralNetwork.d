@@ -254,7 +254,6 @@ class NeuralNetwork(T) {
         return this;
     }
 
-
     /++ Functional layer.
      +
      +  Args:
@@ -286,8 +285,7 @@ class NeuralNetwork(T) {
                         _in, _to);
     }
 
-
-    /++ Softmax layer.
+    /++ softmax layer.
      +
      +  Args:
      +      _dim_out (size_t, =0): Dimension of the resulting vector.
@@ -305,8 +303,7 @@ class NeuralNetwork(T) {
     {
         return this.func!"softmax"(_dim_out, _name, _state, _in, _to);
     }
-
-    /++ Relu layer.
+    /++ relu layer.
      +
      +  Args:
      +      _dim_out (size_t, =0): Dimension of the resulting vector.
@@ -317,12 +314,174 @@ class NeuralNetwork(T) {
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +/
     auto relu(in size_t _dim_out=0,
+              in string _name=null,
+              Vector!T _state=null,
+              in string[] _in=null,
+              in string[] _to=null)
+    {
+        return this.func!"relu"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ binary layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto binary(in size_t _dim_out=0,
                  in string _name=null,
                  Vector!T _state=null,
                  in string[] _in=null,
                  in string[] _to=null)
     {
-        return this.func!"relu"(_dim_out, _name, _state, _in, _to);
+        return this.func!"binary"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ logistic layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto logistic(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"logistic"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ identity layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto identity(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"identity"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ tanh layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto tanh(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"tanh"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ arctan layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto arctan(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"arctan"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ softsign layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto softsign(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"softsign"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ softplus layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto softplus(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"softplus"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ sin layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto sin(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"sin"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ gaussian layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto gaussian(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"gaussian"(_dim_out, _name, _state, _in, _to);
     }
 
     /++ Serialize all the parameters in the neural networks.
@@ -380,7 +539,6 @@ class NeuralNetwork(T) {
                 results[cur_id] = layers[cur_id].compute(tmp_vec);
             }
         }
-
         return results[$-1];
     }
 }
@@ -437,7 +595,6 @@ unittest {
         z_bis -= z;
         assert(z_bis.norm!"L2" <= 0.0001);
     }
-  
 
     // Neural Network 1: Simple linear layer + softmax.
     // Neural Network 2: RNN: linear + relu + linear (+backlink) + linear + softmax.
@@ -514,7 +671,6 @@ unittest {
         assert(b_4.norm!"L2" <= 0.0001);
     }
 
-
     // Neural Network 1: linear + softmax
     // Neural Network 2: linear + softmax + linear + recurrent + linear + norm!"L2"^-1
     {
@@ -536,8 +692,6 @@ unittest {
         res -= v;
 
         assert(res.norm!"L2" <= 0.0001);
-
-
 
         auto nn2 = new NeuralNetwork!real(4);
         nn2.linear(5)
@@ -578,6 +732,73 @@ unittest {
         true_res -= w;
 
         assert(true_res.norm!"L2" <= 0.0001);
+    }
+
+    // Neural Networks: relu / logistic / gaussian / identity
+    //                / tanh / arctan / softsign  / softplus / sin / binary 
+    {
+        auto vec = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        
+        auto nn_relu = new NeuralNetwork!real(4);
+        nn_relu.relu();
+        auto res_relu = new Vector!real([0.0, 0.0, 0.5, 1.0]);
+        res_relu -= vec;
+        assert(res_relu.norm!"L2" <= 0.000001);
+
+        auto nn_logistic = new NeuralNetwork!real(4);
+        nn_logistic.logistic();
+        auto res_logistic = new Vector!real([1.0/(1.0 + exp( 1.0)), 1.0/(1.0 + exp( 0.5)),
+                                             1.0/(1.0 + exp(-0.5)), 1.0/(1.0 + exp(-1.0))]);
+        res_logistic -= vec;
+        assert(res_logistic.norm!"L2" <= 0.000001);
+
+        auto nn_gaussian = new NeuralNetwork!real(4);
+        nn_gaussian.gaussian();
+        auto res_gaussian = new Vector!real([exp(-1.0), exp(-0.25), exp(-0.25), exp(-1.0)]);
+        res_gaussian -= vec;
+        assert(res_gaussian.norm!"L2" <= 0.000001);
+
+        auto nn_identity = new NeuralNetwork!real(4);
+        nn_identity.identity();
+        auto res_identity = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        res_identity -= vec;
+        assert(res_identity.norm!"L2" <= 0.000001);
+
+        auto nn_tanh = new NeuralNetwork!real(4);
+        nn_tanh.tanh();
+        auto res_tanh = new Vector!real([tanh(-1.0), tanh(-0.5), tanh(0.5), tanh(1.0)]);
+        res_tanh -= vec;
+        assert(res_tanh.norm!"L2" <= 0.000001);
+
+        auto nn_arctan = new NeuralNetwork!real(4);
+        nn_arctan.arctan();
+        auto res_arctan = new Vector!real([atan(-1.0), atan(-0.5), atan(0.5), atan(1.0)]);
+        res_arctan -= vec;
+        assert(res_arctan.norm!"L2" <= 0.000001);
+
+        auto nn_softsign = new NeuralNetwork!real(4);
+        nn_softsign.softsign();
+        auto res_softsign = new Vector!real([-0.5, -0.6666666, 0.66666666, 1.0]);
+        res_softsign -= vec;
+        assert(res_softsign.norm!"L2" <= 0.000001);
+
+        auto nn_softplus = new NeuralNetwork!real(4);
+        nn_softplus.softplus();
+        auto res_softplus = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        res_softplus -= vec;
+        assert(res_softplus.norm!"L2" <= 0.000001);
+
+        auto nn_sin = new NeuralNetwork!real(4);
+        nn_sin.sin();
+        auto res_sin = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        res_sin -= vec;
+        assert(res_sin.norm!"L2" <= 0.000001);
+
+        auto nn_binary = new NeuralNetwork!real(4);
+        nn_binary.binary();
+        auto res_binary = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        res_binary -= vec;
+        assert(res_binary.norm!"L2" <= 0.000001);
     }
 
     writeln("Done.");

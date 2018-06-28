@@ -19,7 +19,11 @@ version(unittest)
     import core.exception;
 }
 
-
+/// Activation Functions Handled by the Functional layer.
+enum string[12] keywords_function = ["relu", "softmax", "binary",
+                                     "logistic", "identity", "tanh",
+                                     "arctan", "softsign", "softplus",
+                                     "sin", "gaussian",""];
 
 /++ The layers of the Neural Networks.
  +
@@ -526,7 +530,6 @@ unittest {
 class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
 {
     protected {
-        enum string[4] keywords_function = ["relu", "softmax", ""];
         enum bool isKeyword = strfunc.isOneOf(keywords_function);
     }
 
@@ -584,6 +587,78 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
             }
             foreach(i; 0 .. _v.length)
                 res.v[i] /= s;
+            return res;
+        }
+        else static if(strfunc == "binary") {
+            static if (is(Complex!T : T))
+                static assert(0, "'binary' function undefined for Complex-valued vectors.");
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length){
+                if (res[i] < 0) 
+                    res[i] = 0.0;
+                else
+                    res[i] = 1.0;
+            }
+            return res;
+        }
+        else static if(strfunc == "logistic") {
+            static if (is(Complex!T : T))
+                static assert(0, "'logistic' function undefined for Complex-valued vectors.");
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length)
+                res[i] = 1.0 / (1.0 + exp(-res[i]));
+            return res;
+        }
+        else static if(strfunc == "identity") {
+            auto res = _v.dup;
+            return res;
+        }
+        else static if(strfunc == "tanh") {
+            static if (is(Complex!T : T))
+                static assert(0, "'tanh' function undefined for Complex-valued vectors.");
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length)
+                res[i] = tanh(res[i]);
+            return res;
+        }
+        else static if(strfunc == "arctan") {
+            static if (is(Complex!T : T))
+                static assert(0, "'arctan' function undefined for Complex-valued vectors.");
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length)
+                res[i] = atan(res[i]);
+            return res;
+        }
+        else static if(strfunc == "softsign") {
+            static if (is(Complex!T : T))
+                static assert(0, "'softsign' function undefined for Complex-valued vectors.");
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length)
+                res[i] = res[i] / (1.0 + abs(res[i]));
+            return res;
+        }
+        else static if(strfunc == "softplus") {
+            static if (is(Complex!T : T))
+                static assert(0, "'softplus' function undefined for Complex-valued vectors.");
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length)
+                res[i] = log(1 + exp(res[i]));
+            return res;
+        }
+        else static if(strfunc == "sin") {
+            static if (is(Complex!T : T))
+                static assert(0, "'sin' function undefined for Complex-valued vectors.");
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length)
+                res[i] = sin(res[i]);
+            return res;
+        }
+        else static if(strfunc == "gaussian") {
+            static if (is(Complex!T : T))
+                static assert(0, "'gaussian' function undefined for Complex-valued vectors.");
+            auto res = _v.dup;
+            foreach(i; 0 .. _v.length)
+                res[i] = exp(-pow(res[i], 2));
             return res;
         }
         else static if(strfunc == "") return _v;
