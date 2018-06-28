@@ -784,19 +784,19 @@ unittest {
 
         auto nn_softplus = new NeuralNetwork!real(4);
         nn_softplus.softplus();
-        auto res_softplus = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        auto res_softplus = new Vector!real([log(1+exp(-1.0)), log(1+exp(-0.5)), log(1 + exp(0.5)), log(1 + exp(1.0))]);
         res_softplus -= vec;
         assert(res_softplus.norm!"L2" <= 0.000001);
 
         auto nn_sin = new NeuralNetwork!real(4);
         nn_sin.sin();
-        auto res_sin = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        auto res_sin = new Vector!real([sin(-1.0), sin(-0.5), sin(0.5), sin(1.0)]);
         res_sin -= vec;
         assert(res_sin.norm!"L2" <= 0.000001);
 
         auto nn_binary = new NeuralNetwork!real(4);
         nn_binary.binary();
-        auto res_binary = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        auto res_binary = new Vector!real([0.0, 0.0, 1.0, 1.0]);
         res_binary -= vec;
         assert(res_binary.norm!"L2" <= 0.000001);
     }
