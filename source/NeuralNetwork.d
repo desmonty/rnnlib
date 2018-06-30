@@ -13,9 +13,10 @@ import source.Utils;
 version(unittest)
 {
     import core.exception;
+    import std.exception: assertThrown;
 
-    import std.math: abs;
     import std.stdio : writeln, write;
+    import std.math;
 }
 
 /++ The Neural Network class hold all the logic of the func approximator.
@@ -742,64 +743,81 @@ unittest {
         auto nn_relu = new NeuralNetwork!real(4);
         nn_relu.relu();
         auto res_relu = new Vector!real([0.0, 0.0, 0.5, 1.0]);
-        res_relu -= vec;
+        res_relu -= nn_relu.compute(vec);
         assert(res_relu.norm!"L2" <= 0.000001);
 
         auto nn_logistic = new NeuralNetwork!real(4);
         nn_logistic.logistic();
         auto res_logistic = new Vector!real([1.0/(1.0 + exp( 1.0)), 1.0/(1.0 + exp( 0.5)),
                                              1.0/(1.0 + exp(-0.5)), 1.0/(1.0 + exp(-1.0))]);
-        res_logistic -= vec;
+        res_logistic -= nn_logistic.compute(vec);
         assert(res_logistic.norm!"L2" <= 0.000001);
 
         auto nn_gaussian = new NeuralNetwork!real(4);
         nn_gaussian.gaussian();
         auto res_gaussian = new Vector!real([exp(-1.0), exp(-0.25), exp(-0.25), exp(-1.0)]);
-        res_gaussian -= vec;
+        res_gaussian -= nn_gaussian.compute(vec);
         assert(res_gaussian.norm!"L2" <= 0.000001);
 
         auto nn_identity = new NeuralNetwork!real(4);
         nn_identity.identity();
         auto res_identity = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
-        res_identity -= vec;
+        res_identity -= nn_identity.compute(vec);
         assert(res_identity.norm!"L2" <= 0.000001);
 
         auto nn_tanh = new NeuralNetwork!real(4);
         nn_tanh.tanh();
         auto res_tanh = new Vector!real([tanh(-1.0), tanh(-0.5), tanh(0.5), tanh(1.0)]);
-        res_tanh -= vec;
+        res_tanh -= nn_tanh.compute(vec);
         assert(res_tanh.norm!"L2" <= 0.000001);
 
         auto nn_arctan = new NeuralNetwork!real(4);
         nn_arctan.arctan();
         auto res_arctan = new Vector!real([atan(-1.0), atan(-0.5), atan(0.5), atan(1.0)]);
-        res_arctan -= vec;
+        res_arctan -= nn_arctan.compute(vec);
         assert(res_arctan.norm!"L2" <= 0.000001);
 
         auto nn_softsign = new NeuralNetwork!real(4);
         nn_softsign.softsign();
-        auto res_softsign = new Vector!real([-0.5, -0.6666666, 0.66666666, 1.0]);
-        res_softsign -= vec;
+        auto res_softsign = new Vector!real([-0.5, -1.0/3.0, 1.0/3.0, 0.5]);
+        res_softsign -= nn_softsign.compute(vec);
         assert(res_softsign.norm!"L2" <= 0.000001);
 
         auto nn_softplus = new NeuralNetwork!real(4);
         nn_softplus.softplus();
         auto res_softplus = new Vector!real([log(1+exp(-1.0)), log(1+exp(-0.5)), log(1 + exp(0.5)), log(1 + exp(1.0))]);
-        res_softplus -= vec;
+        res_softplus -= nn_softplus.compute(vec);
         assert(res_softplus.norm!"L2" <= 0.000001);
 
         auto nn_sin = new NeuralNetwork!real(4);
         nn_sin.sin();
         auto res_sin = new Vector!real([sin(-1.0), sin(-0.5), sin(0.5), sin(1.0)]);
-        res_sin -= vec;
+        res_sin -= nn_sin.compute(vec);
         assert(res_sin.norm!"L2" <= 0.000001);
 
         auto nn_binary = new NeuralNetwork!real(4);
         nn_binary.binary();
         auto res_binary = new Vector!real([0.0, 0.0, 1.0, 1.0]);
-        res_binary -= vec;
+        res_binary -= nn_binary.compute(vec);
         assert(res_binary.norm!"L2" <= 0.000001);
     }
+
+    // Neural Network: Diamond structure with identity function only => implement f(x) = 2*x !
+    {
+        auto nn = new NeuralNetwork!real(6);
+        nn.identity(0, "top")
+          .identity(0, "bottom", null, ["input"])
+          .identity(0, "output", null, ["bottom", "top"]);
+
+        auto vec = new Vector!real(6, 1.0);
+        auto res = nn.compute(vec);
+        vec += vec;
+        res -= vec;
+        assert(res.norm!"L2" <= 0.000001);
+    }
+
+    // Bad naming of layers
+    assertThrown((new NeuralNetwork!real(5).linear(0, false, 1.0, "blue").linear(7, true, 2.0, "blue")));
 
     writeln("Done.");
 }

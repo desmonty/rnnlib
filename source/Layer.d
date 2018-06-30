@@ -3,8 +3,7 @@ module source.Layer;
 import std.algorithm;
 import std.complex;
 import std.conv: to;
-import std.exception: assertThrown, enforce;
-import std.functional: toDelegate;
+import std.exception: enforce;
 import std.math;
 import std.range;
 import std.string : startsWith;
@@ -17,6 +16,7 @@ version(unittest)
 {
     import std.stdio : writeln, write;
     import core.exception;
+    import std.exception: assertThrown;
 }
 
 /// Activation Functions Handled by the Functional layer.
