@@ -696,7 +696,7 @@ unittest {
 
         auto nn2 = new NeuralNetwork!real(4);
         nn2.linear(5)
-           .func!"softmax"()
+           .softmax()
            .linear(5)
            .recurrent()
            .linear(4)

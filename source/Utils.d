@@ -12,7 +12,7 @@ import source.Matrix;
 import source.Parameter;
 
 version(unittest) {
-    import std.complex;
+    import std. complex;
     import std.stdio: write, writeln;
 }
 
@@ -21,7 +21,7 @@ bool isOneOf(string strKey, string[] strTable) {
         if(strKey == key)
             return true;
     return false;
-}
+    }
 unittest {
     enum string[3] kafka = ["ae", "ry", "up"];
     enum string k1 = "ar";

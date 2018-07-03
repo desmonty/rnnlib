@@ -374,6 +374,153 @@ unittest
  +              and inverse fourier transform,
  +            P is a permutation matrix.
  +/
+ 
+/+
+class UnitaryMatrix(T) : Parameter
+{
+    /// Apply permutation inverse on array based on the type of the matrix.
+
+
+
+
+    T[] opBinary(string op)(in T[] v)
+    if (op=="*")
+    {
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
+
+        static if (!is(Complex!T : T)) {
+            T[] res = new T[v.length << 1];
+        }
+        else {
+            T[] res = new T[v.length];
+        }
+
+        multiply(v, res);
+        return res;
+    }
+
+    Vector!T opBinaryRight(string op)(in Vector!T v)
+    if (op=="/")
+    {
+        return new Vector!T(v.v / this);
+    }
+
+    T[] opBinaryRight(string op)(in T[] v)
+    if (op=="/")
+    {
+        static if (!is(Complex!T : T)) {
+            T[] res = new T[v.length << 1];
+        }
+        else {
+            T[] res = new T[v.length];
+        }
+
+        divide(v, res);
+        return res;
+    }
+
+    auto multiply(in Vector!T v, ref Vector!T b)
+    {
+        multiply(v.v, b.v);
+    }
+
+    auto multiply(in T[] v, ref T[] b)
+    {
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
+
+        static if (!is(Complex!T : T)) {
+            b[0 .. v.length] = v[];
+            b[v.length .. $] = 0;
+        }
+        else {
+            b[] = v[];
+        }
+
+        this.applyDiagonal(b, 0);
+
+        static if(is(Complex!T : T)) {
+            tmp_vector[] = b[];
+            fourier.multiply(tmp_vector, b);
+        }
+        else {
+            tmp_vector[0 .. ($ >> 1)] = b[];
+            fourier.multiply(b, tmp_vector);
+            b[] = tmp_vector[0 .. ($ >> 1)][];
+        }
+
+        this.applyReflection(b, 0);
+        this.permMult(b);
+        this.applyDiagonal(b, 1);
+
+        static if(is(Complex!T : T)) {
+            tmp_vector[] = b[];
+            fourier.divide(tmp_vector, b);
+        }
+        else {
+            tmp_vector[0 .. ($ >> 1)] = b[];
+            fourier.divide(b, tmp_vector);
+            b[] = tmp_vector[0 .. ($ >> 1)][];
+        }
+
+        this.applyReflection(b, 1);
+        this.applyDiagonal(b, 2);
+
+        static if (!is(Complex!T: T))
+            b = b[0 .. ($ >> 1)][];
+    }
+
+    auto divide(in Vector!T v, ref Vector!T b)
+    {
+        divide(v.v, b.v);
+    }
+
+    auto divide(in T[] v, ref T[] b)
+    {
+        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
+
+        static if (!is(Complex!T : T)) {
+            b[0 .. v.length] = v[];
+            b[v.length .. $] = 0;
+        }
+        else {
+            b[] = v[];
+        }
+
+        this.applyDiagonalInv(b, 2);
+        this.applyReflection(b, 1);
+
+        static if(is(Complex!T : T)) {
+            tmp_vector[] = b[];
+            fourier.multiply(tmp_vector, b);
+        }
+        else {
+            tmp_vector[0 .. ($ >> 1)] = b[];
+            fourier.multiply(b, tmp_vector);
+            b[] = tmp_vector[0 .. ($ >> 1)][];
+        }
+
+        this.applyDiagonalInv(b, 1);
+        this.permInv(b);
+        this.applyReflection(b, 0);
+
+        static if(is(Complex!T : T)) {
+            tmp_vector[] = b[];
+            fourier.divide(tmp_vector, b);
+        }
+        else {
+            tmp_vector[0 .. ($ >> 1)] = b[];
+            fourier.divide(b, tmp_vector);
+            b[] = tmp_vector[0 .. ($ >> 1)][];
+        }
+        
+        this.applyDiagonalInv(b, 0);
+
+        static if (!is(Complex!T: T))
+            return b[0 .. ($ >> 1)][];
+        else
+            return b;
+    }
+}+/
 class UnitaryMatrix(T) : Parameter
 {
     static if (is(Complex!T : T))
@@ -385,10 +532,9 @@ class UnitaryMatrix(T) : Parameter
     PermutationMatrix!T perm;
     FourierMatrix!T fourier;
     Tc[] params;
+
     // used to save temporary values during the calculation to avoid mem alloc.
-    
-    static if (!is(Complex!T: T)) mixin("Tc[] tmp_vector;");
-    else mixin("T[] tmp_vector;");
+    T[] tmp_vector;
 
     /+ The params vector include in the following order:
        + 3 diagonal unitary complex matrices.
@@ -415,7 +561,7 @@ class UnitaryMatrix(T) : Parameter
         params = new Tc[7*size];
         
         static if (!is(Complex!T : T)) {
-            tmp_vector = new Tc[4*size];
+            tmp_vector = new T[4*size];
         }
         else {
             tmp_vector = new T[size];
@@ -513,7 +659,7 @@ class UnitaryMatrix(T) : Parameter
     }
 
     /// Apply the "num"th reflection matrix on the given vector.
-    // TODO pure @safe
+    pure @safe
     auto applyReflection(ref T[] v, in size_t num)
     {
         size_t start_index = (2*num + 3)*rows;
@@ -563,11 +709,12 @@ class UnitaryMatrix(T) : Parameter
 
     /// Apply permutation multiplication on array based on the type of the matrix.
     @safe pure
-    T[] permMult(T[] tmp_v)
+    auto permMult(ref T[] tmp_v)
     {
         // Complex valued vector
         static if (is(Complex!T : T)) {
-            return this.perm * tmp_v;
+            this.perm.multiply(tmp_v, tmp_vector);
+            tmp_v[] = tmp_vector[];
         }
         // Real valued vector
         else {
@@ -583,11 +730,12 @@ class UnitaryMatrix(T) : Parameter
 
     /// Apply permutation inverse on array based on the type of the matrix.
     @safe pure
-    T[] permInv(T[] tmp_v)
+    auto permInv(ref T[] tmp_v)
     {
         // Complex valued vector
         static if (is(Complex!T : T)) {
-            return tmp_v / this.perm;
+            this.perm.divide(tmp_v, tmp_vector);
+            tmp_v[] = tmp_vector[];
         }
         // Real valued vector
         else {
@@ -597,7 +745,6 @@ class UnitaryMatrix(T) : Parameter
                 tmp_v[this.perm.perm[i]] = tmp_vector[i];
                 tmp_v[this.perm.perm[i] + tmp_len] = tmp_vector[i + tmp_len];
             }
-            return tmp_v;
         }
     }
 
@@ -622,14 +769,32 @@ class UnitaryMatrix(T) : Parameter
         }
 
         this.applyDiagonal(res, 0);
-
-        res = fourier * res;
+        
+        static if(is(Complex!T : T)) {
+            tmp_vector[] = res[];
+            fourier.multiply(tmp_vector, res);
+        }
+        else {
+            tmp_vector[0 .. ($ >> 1)] = res[];
+            auto tmp_slice = tmp_vector[0 .. ($ >> 1)];
+            fourier.multiply(res, tmp_slice);
+            res[] = tmp_slice[];
+        }
 
         this.applyReflection(res, 0);
-        res = this.permMult(res);
+        this.permMult(res);
         this.applyDiagonal(res, 1);
 
-        res = res / fourier;
+        static if(is(Complex!T : T)) {
+            tmp_vector[] = res[];
+            fourier.divide(tmp_vector, res);
+        }
+        else {
+            tmp_vector[0 .. ($ >> 1)] = res[];
+            tmp_slice = tmp_vector[0 .. ($ >> 1)];
+            fourier.divide(res, tmp_slice);
+            res[] = tmp_slice[];
+        }
 
         this.applyReflection(res, 1);
         this.applyDiagonal(res, 2);
@@ -662,15 +827,33 @@ class UnitaryMatrix(T) : Parameter
 
         this.applyDiagonalInv(res, 2);
         this.applyReflection(res, 1);
-        
-        res = fourier * res;
+
+        static if(is(Complex!T : T)) {
+            tmp_vector[] = res[];
+            fourier.multiply(tmp_vector, res);
+        }
+        else {
+            tmp_vector[0 .. ($ >> 1)] = res[];
+            auto tmp_slice = tmp_vector[0 .. ($ >> 1)];
+            fourier.multiply(res, tmp_slice);
+            res[] = tmp_slice[];
+        }
 
         this.applyDiagonalInv(res, 1);
-        res = this.permInv(res);
+        this.permInv(res);
         this.applyReflection(res, 0);
         
-        res = res / fourier;
-        
+        static if(is(Complex!T : T)) {
+            tmp_vector[] = res[];
+            fourier.divide(tmp_vector, res);
+        }
+        else {
+            tmp_vector[0 .. ($ >> 1)] = res[];
+            tmp_slice = tmp_vector[0 .. ($ >> 1)];
+            fourier.divide(res, tmp_slice);
+            res[] = tmp_slice[];
+        }
+
         this.applyDiagonalInv(res, 0);
 
         static if (!is(Complex!T: T))
@@ -781,7 +964,6 @@ class FourierMatrix(T) : Parameter
 
         tmp_vector = new Complex!T[size];
         tmp_result = new Complex!T[size];
-        return_vector_real = new T[size << 1];
     };
     
     this(in FourierMatrix M)
@@ -806,6 +988,7 @@ class FourierMatrix(T) : Parameter
     {
         static if (!is(Complex!T : T)) {
             enforce((v.length >> 1) == cols, "Matrix-Vector divison: dimensions mismatch.");
+            auto return_vector_real = new T[rows << 1];
             foreach(i; 0 .. v.length >> 1)
             {
                 tmp_vector[i] = complex(v[i], v[i+($>>1)]);
@@ -820,9 +1003,10 @@ class FourierMatrix(T) : Parameter
         }
         else {
             enforce(v.length == cols, "Matrix-Vector divison: dimensions mismatch.");
-            objFFT.fft(v, tmp_vector);
-            tmp_result[] = tmp_vector[];
-            return tmp_result;
+
+            auto result = new Complex!T[rows];
+            objFFT.fft(v, result);
+            return result;
         }
     }
 
@@ -837,6 +1021,7 @@ class FourierMatrix(T) : Parameter
     {
         static if (!is(Complex!T : T)) {
             enforce((v.length >> 1) == cols, "Matrix-Vector divison: dimensions mismatch.");
+            auto return_vector_real = new T[rows << 1];
             foreach(i; 0 .. v.length >> 1)
             {
                 tmp_vector[i] = complex(v[i], v[i+($>>1)]);
@@ -851,9 +1036,64 @@ class FourierMatrix(T) : Parameter
         }
         else {
             enforce(v.length == cols, "Matrix-Vector divison: dimensions mismatch.");
-            objFFT.inverseFft(v, tmp_vector);
-            tmp_result[] = tmp_vector[];
-            return tmp_result;
+            auto result = new Complex!T[rows];
+            objFFT.inverseFft(v, result);
+            return result;
+        }
+    }
+
+
+
+    auto multiply(in Vector!T v, ref Vector!T b)
+    {
+        multiply(v.v, b.v);
+    }
+
+    auto multiply(in T[] v, ref T[] b)
+    {
+        static if (!is(Complex!T : T)) {
+            enforce((v.length >> 1) == cols, "Matrix-Vector divison: dimensions mismatch.");
+            foreach(i; 0 .. v.length >> 1)
+            {
+                tmp_vector[i] = complex(v[i], v[i+($>>1)]);
+            }
+            objFFT.fft(tmp_vector, tmp_result);
+            foreach(i, c; tmp_result)
+            {
+                b[i] = c.re;
+                b[i + ($ >> 1)] = c.im;
+            }
+        }
+        else {
+            enforce(v.length == cols, "Matrix-Vector divison: dimensions mismatch.");
+            objFFT.fft(v, b);
+        }
+    }
+
+    auto divide(in Vector!T v, ref Vector!T b)
+    {
+        divide(v.v, b.v);
+    }
+
+    auto divide(in T[] v, ref T[] b)
+    {
+        static if (!is(Complex!T : T)) {
+            enforce((v.length >> 1) == cols, "Matrix-Vector divison: dimensions mismatch.");
+            foreach(i; 0 .. v.length >> 1)
+            {
+                tmp_vector[i] = complex(v[i], v[i+($>>1)]);
+            }
+            objFFT.inverseFft(tmp_vector, tmp_result);
+            foreach(i, c; tmp_result)
+            {
+                b[i] = c.re;
+                b[i + ($ >> 1)] = c.im;
+            }
+            return b;
+        }
+        else {
+            enforce(v.length == cols, "Matrix-Vector divison: dimensions mismatch.");
+            objFFT.inverseFft(v, b);
         }
     }
 }
@@ -886,7 +1126,6 @@ unittest
             assert(std.complex.abs(r1[i] - r1[i]) <= 0.0001);
         }
     }
-
     // Real
     {
         alias Fourier = FourierMatrix!real;
@@ -913,6 +1152,38 @@ unittest
         r -= r1;
 
         assert(r.norm!"L2" <= 0.0001);
+    }
+    { //Real buffer op
+        auto r = new FourierMatrix!real(16);
+        auto v = new Vector!real(32, 1.0);
+        auto b = new Vector!real(32);
+
+        auto res = r * v;
+
+        r.multiply(v, b);
+        res -= b;
+        assert(res.norm!"L2" <= 0.00001);
+
+        auto d = b.dup;
+        r.divide(d, b);
+        b -= v;
+        assert(b.norm!"L2" <= 0.000001);
+    }
+    {//Complex buffer op
+        auto r = new FourierMatrix!(Complex!real)(16);
+        auto v = new Vector!(Complex!real)(16, 1.0);
+        auto b = new Vector!(Complex!real)(16);
+
+        auto res = r * v;
+
+        r.multiply(v, b);
+        res -= b;
+        assert(res.norm!"L2" <= 0.00001);
+
+        auto d = b.dup;
+        r.divide(d, b);
+        b -= v;
+        assert(b.norm!"L2" <= 0.000001);
     }
 
     write("Done.\n");
@@ -1070,6 +1341,36 @@ class DiagonalMatrix(T) : Parameter {
         return res;
     }
 
+    const pure @safe
+    auto multiply(in Vector!T v, ref Vector!T b)
+    {
+        multiply(v.v, b.v);
+    }
+
+    const pure @safe
+    auto multiply(in T[] v, ref T[] b)
+    {
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
+        enforce(v.length == b.length, "Vector Buffer: Dimensions mismatch.");
+        foreach(i;0 .. rows)
+            b[i] = params[i] * v[i];
+    }
+
+    const pure @safe
+    auto divide(in Vector!T v, ref Vector!T b)
+    {
+        divide(v.v, b.v);
+    }
+
+    const pure @safe
+    auto divide(in T[] v, ref T[] b)
+    {
+        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
+        enforce(v.length == b.length, "Vector Buffer: Dimensions mismatch.");
+        foreach(i;0 .. rows)
+            b[i] = v[i] / params[i];
+    }
+
     /// Operation +-*/ on Matrix.
     const pure @safe
     Matrix!T opBinary(string op)(in Matrix!T M)
@@ -1157,6 +1458,22 @@ unittest
 
         m1[1, 2] = complex(10000.0);
         assert(m3[1, 1] == m1[1]);
+    }
+    {
+        auto r = new DiagonalMatrix!real(16, 1.0);
+        auto v = new Vector!real(16, 1.0);
+        auto b = new Vector!real(16);
+
+        auto res = r * v;
+
+        r.multiply(v, b);
+        res -= b;
+        assert(res.norm!"L2" <= 0.00001);
+
+        auto d = b.dup;
+        r.divide(d, b);
+        b -= v;
+        assert(b.norm!"L2" <= 0.000001);
     }
 
     assertThrown(new DiagonalMatrix!float(4, -6.0));
@@ -1299,16 +1616,41 @@ class ReflectionMatrix(T) : Parameter {
     T[] opBinaryRight(string op)(in T[] v)
     if (op=="/")
     {
-        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
-        // The inverse of a reflection is the very same reflection.
-        T[] vres = v.dup;
+        return this * v;
+    }
+
+    const pure @safe
+    auto multiply(in Vector!T v, ref Vector!T b)
+    {
+        multiply(v.v, b.v);
+    }
+
+    const pure @safe
+    auto multiply(in T[] v, ref T[] b)
+    {
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
+        enforce(v.length == b.length, "Vector Buffer: dimensions mismatch.");
+
+        b[] = v[];
+
         T s = vec.conjdot(v, vec);
         T[] tmp = vec.v.dup;
         s *= -2*pow(vec.norm!"L2",-2);
         foreach(i; 0 .. cols)
             tmp[i] = tmp[i] * s;
-        vres[] += tmp[];
-        return vres;
+        b[] += tmp[];
+    }
+
+    const pure @safe
+    auto divide(in Vector!T v, ref Vector!T b)
+    {
+        divide(v.v, b.v);
+    }
+
+    const pure @safe
+    auto divide(in T[] v, ref T[] b)
+    {
+        multiply(v, b);
     }
 
     const pure @safe
@@ -1373,6 +1715,23 @@ unittest
 
         assert(r1.length == 100);
         
+    }
+
+    {
+        auto r = new ReflectionMatrix!real(16, 1.0);
+        auto v = new Vector!real(16, 1.0);
+        auto b = new Vector!real(16);
+
+        auto res = r * v;
+
+        r.multiply(v, b);
+        res -= b;
+        assert(res.norm!"L2" <= 0.00001);
+
+        auto d = b.dup;
+        r.divide(d, b);
+        b -= v;
+        assert(b.norm!"L2" <= 0.000001);
     }
 
     assertThrown(new ReflectionMatrix!(Complex!real)(10, 0.0));
@@ -1466,6 +1825,19 @@ class PermutationMatrix(T) : Parameter {
             vres[i] = v[perm[i]];
         return vres;
     }
+    const pure @safe
+    auto multiply(in Vector!T v, ref Vector!T b)
+    {
+        multiply(v.v, b.v);
+    }
+    const pure @safe
+    auto multiply(in T[] v, ref T[] b)
+    {
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
+        enforce(v.length == b.length, "Vector and Buffer: dimensions mismatch.");
+        foreach(i; 0 .. v.length)
+            b[i] = v[perm[i]];
+    }
 
     const pure @safe
     Vector!T opBinaryRight(string op)(in Vector!T v)
@@ -1484,22 +1856,50 @@ class PermutationMatrix(T) : Parameter {
             vres[perm[i]] = v[i];
         return vres;
     }
+    const pure @safe
+    auto divide(in Vector!T v, ref Vector!T b)
+    {
+        divide(v.v, b.v);
+    }
+    const pure @safe
+    auto divide(in T[] v, ref T[] b)
+    {
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
+        enforce(v.length == b.length, "Vector and Buffer: dimensions mismatch.");
+        foreach(i; 0 .. v.length)
+            b[perm[i]] = v[i];
+    }
 }
 unittest
 {
     write("                  Permutation ... ");
-    
-    alias Perm = PermutationMatrix!float;
-    
-    auto p = new Perm(1_000, 3);
-    auto o = p.dup;
+    {
+        alias Perm = PermutationMatrix!float;
+        
+        auto p = new Perm(1_000, 3);
+        auto o = p.dup;
 
-    assert(p.perm[4] < p.perm.length);
-    p.perm[] -= o.perm[];
-    assert(p.perm.sum == 0);
+        assert(p.perm[4] < p.perm.length);
+        p.perm[] -= o.perm[];
+        assert(p.perm.sum == 0);
 
-    assert(p.length == 1_000);
-    
+        assert(p.length == 1_000);
+    }
+    {
+        auto p = new PermutationMatrix!real(100, 3);
+        auto vec = new Vector!real(100, 3.0);
+        auto buffer = new Vector!real(100);
+
+        auto res = p * vec;
+        p.multiply(vec, buffer);
+        res -= buffer;
+        assert(res.norm!"L2" <= 0.00001);
+
+        auto b_dup = buffer.dup;
+        p.divide(b_dup, buffer);
+        buffer -= vec;
+        assert(buffer.norm!"L2" <= 0.000001);
+    }
     write("Done.\n");
 }
 
@@ -1508,7 +1908,7 @@ unittest
  +  A class that implement a general matrix (with rows*cols parameter).
  +
  +  Note: Contrary to most of the others matrix, this class doesn't implement
- +  	  the division operator (multiplication by the inverse).
+ +        the division operator (multiplication by the inverse).
  +
  +/
 class Matrix(T) : Parameter {
@@ -1636,6 +2036,7 @@ class Matrix(T) : Parameter {
         }
         return res;
     }
+    
 
     const pure @safe
     auto opBinary(string op)(in Vector!T v)
@@ -1648,7 +2049,7 @@ class Matrix(T) : Parameter {
     auto opBinary(string op)(in T[] v)
     if (op=="*")
     {
-        enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
         auto res = new T[rows];
         foreach(size_t i; 0 .. rows){
             T s = params[i*cols]*v[0];
@@ -1658,48 +2059,79 @@ class Matrix(T) : Parameter {
         }
         return res;
     }
+
+    const pure @safe
+    auto multiply(in T[] v, ref T[] buffer)
+    {
+        enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
+        enforce(v.length == buffer.length, "Vector and Buffer: dimensions mismatch.");
+        T s;
+        foreach(size_t i; 0 .. rows){
+            s = params[i*cols]*v[0];
+            foreach(size_t j; 1 .. cols)
+                s += params[i*cols + j]*v[j];
+            buffer[i] = s;
+        }
+    }
+    const pure @safe
+    auto multiply(in Vector!T v, ref Vector!T buffer)
+    {
+        multiply(v.v, buffer.v);
+    }
 }
 unittest
 {
     write("                  Matrix ... ");
-    auto m1 = new Matrix!(Complex!float)(10, 30, 5.0f);
-    auto m2 = m1.dup;
-    auto m3 = new Matrix!(Complex!float)(30, 5, 10.0f);
-    auto m4 = new Matrix!real(100, 1.0);
-    auto m5 = new Matrix!real(100);
-    m5.params = m4.params.dup;
-
-    m2 -= m1;
-    assert(std.complex.abs(m2.params.sum) < 0.1);
-
-    m5 -= m4;
-    assert(m5.params.sum.abs < 0.1);
-
-    m2 += m1;
-    auto m6 = m1 * m3;
-    assert(m6.length == m1.length);
-
-    bool isFailed = false;
-    try
     {
-        auto m7 = m3 * m1;
+        auto m1 = new Matrix!(Complex!float)(10, 30, 5.0f);
+        auto m2 = m1.dup;
+        auto m3 = new Matrix!(Complex!float)(30, 5, 10.0f);
+        auto m4 = new Matrix!real(100, 1.0);
+        auto m5 = new Matrix!real(100);
+        m5.params = m4.params.dup;
+
+        m2 -= m1;
+        assert(std.complex.abs(m2.params.sum) < 0.1);
+
+        m5 -= m4;
+        assert(m5.params.sum.abs < 0.1);
+
+        m2 += m1;
+        auto m6 = m1 * m3;
+        assert(m6.length == m1.length);
+
+        bool isFailed = false;
+        try
+        {
+            auto m7 = m3 * m1;
+        }
+        catch (Exception e)
+        {
+            isFailed = true;
+        }
+        assert(isFailed);
+
+        assertThrown(new Matrix!float(5, -0.5));
+
+        auto m = new Matrix!float(7, 2, 0.0);
+
+        auto v = new Vector!float(2, 1.0);
+
+        v *= m;
+
+        assert(v.length == 7);
+        assert(v.norm!"L2" <= 0.0001);
     }
-    catch (Exception e)
     {
-        isFailed = true;
+        auto m = new Matrix!real(5, 1.0);
+        auto v = new Vector!real(5, 1.0);
+        auto b = new Vector!real(5);
+
+        auto r = m * v;
+        m.multiply(v, b);
+        r -= b;
+        assert(r.norm!"L2" <= 0.00001);
     }
-    assert(isFailed);
-
-    assertThrown(new Matrix!float(5, -0.5));
-
-    auto m = new Matrix!float(7, 2, 0.0);
-
-    auto v = new Vector!float(2, 1.0);
-
-    v *= m;
-
-    assert(v.length == 7);
-    assert(v.norm!"L2" <= 0.0001);
 
     writeln("Done.");
 }
