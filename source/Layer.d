@@ -183,6 +183,18 @@ if (!__traits(compiles, BlockMatrix!T))
             res += cast(Vector!T) params[1];
         return res;
     }
+    
+    auto compute(in Vector!T _v, ref Vector!T b)
+    {
+        static if (!is(Mtype: UnitaryMatrix!T)) {
+            // Multiply the vector by the matrix first.
+            (cast(Mtype) params[0]).multiply(_v, b);
+
+            // Add the bias vector if needed.
+            if (params.length > 1)
+                b.v[] += (cast(Vector!T) params[1]).v[];
+        }
+    }
 }
 unittest {
     write("Unittest: Layer: Matrix ... ");
@@ -467,7 +479,12 @@ class BiasLayer(T) : Layer!T
         res += to!(Vector!T)(params[0]);
         return res;
     }
-
+    
+    auto compute(in Vector!T _v, ref Vector!T b)
+    {
+        b.v[] = _v.v[];
+        b.v[] += (cast(Vector!T) params[1]).v[];
+    }
 
     override
     @safe @nogc pure
@@ -515,7 +532,6 @@ unittest {
 
     write("Done.\n");
 }
-
 
 /++ This layer can implement any function that take as input a
  +  Vector!T and return another Vector!T.
@@ -660,6 +676,102 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
             foreach(i; 0 .. _v.length)
                 res[i] = exp(-pow(res[i], 2));
             return res;
+        }
+        else static if(strfunc == "") return _v;
+        else {
+            static foreach(i; 0 .. TypeParameter.length)
+                mixin("auto p"~to!string(i)~" = cast("~TypeParameter[i].stringof~") params["~to!string(i)~"];");
+            mixin(strfunc);
+        }
+    }
+    
+    auto compute(in Vector!T _v, ref Vector!T b)
+    {
+        static if (strfunc == "relu") {
+            // function that compute "max(x, 0)" for every x in the vector.
+            static if (is(Complex!T : T))
+                static assert(0, "Relu function cannot be use on Complex-valued vectors.");
+
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length)
+                if (b[i] < 0) b[i] = 0;
+        }
+        else static if(strfunc == "softmax") {
+            // Basic softmax function, can be used to obtain a probability distribution. 
+            static if (is(Complex!T : T))
+                static assert(0, "Softmax function cannot be used on Complex-valued vectors.");
+
+            T s = 0;
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length) {
+                b.v[i] = exp(_v[i]);
+                s += b[i];
+            }
+            foreach(i; 0 .. _v.length)
+                b.v[i] /= s;
+        }
+        else static if(strfunc == "binary") {
+            static if (is(Complex!T : T))
+                static assert(0, "'binary' function undefined for Complex-valued vectors.");
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length){
+                if (b[i] < 0) 
+                    b[i] = 0.0;
+                else
+                    b[i] = 1.0;
+            }
+        }
+        else static if(strfunc == "logistic") {
+            static if (is(Complex!T : T))
+                static assert(0, "'logistic' function undefined for Complex-valued vectors.");
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length)
+                b[i] = 1.0 / (1.0 + exp(-b[i]));
+        }
+        else static if(strfunc == "identity") {
+            b.v[] = v.v[];
+        }
+        else static if(strfunc == "tanh") {
+            static if (is(Complex!T : T))
+                static assert(0, "'tanh' function undefined for Complex-valued vectors.");
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length)
+                b[i] = tanh(b[i]);
+        }
+        else static if(strfunc == "arctan") {
+            static if (is(Complex!T : T))
+                static assert(0, "'arctan' function undefined for Complex-valued vectors.");
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length)
+                b[i] = atan(b[i]);
+        }
+        else static if(strfunc == "softsign") {
+            static if (is(Complex!T : T))
+                static assert(0, "'softsign' function undefined for Complex-valued vectors.");
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length)
+                b[i] = b[i] / (1.0 + abs(b[i]));
+        }
+        else static if(strfunc == "softplus") {
+            static if (is(Complex!T : T))
+                static assert(0, "'softplus' function undefined for Complex-valued vectors.");
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length)
+                b[i] = log(1 + exp(b[i]));
+        }
+        else static if(strfunc == "sin") {
+            static if (is(Complex!T : T))
+                static assert(0, "'sin' function undefined for Complex-valued vectors.");
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length)
+                b[i] = sin(b[i]);
+        }
+        else static if(strfunc == "gaussian") {
+            static if (is(Complex!T : T))
+                static assert(0, "'gaussian' function undefined for Complex-valued vectors.");
+            b.v[] = v.v[];
+            foreach(i; 0 .. _v.length)
+                b[i] = exp(-pow(b[i], 2));
         }
         else static if(strfunc == "") return _v;
         else {
