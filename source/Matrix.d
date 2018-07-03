@@ -1351,7 +1351,7 @@ class DiagonalMatrix(T) : Parameter {
     auto multiply(in T[] v, ref T[] b)
     {
         enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
-        enforce(v.length == b.length, "Vector Buffer: Dimensions mismatch.");
+        enforce(rows == b.length, "Buffer - Result: Dimensions mismatch.");
         foreach(i;0 .. rows)
             b[i] = params[i] * v[i];
     }
@@ -1366,7 +1366,7 @@ class DiagonalMatrix(T) : Parameter {
     auto divide(in T[] v, ref T[] b)
     {
         enforce(v.length == cols, "Matrix-Vector division: dimensions mismatch.");
-        enforce(v.length == b.length, "Vector Buffer: Dimensions mismatch.");
+        enforce(rows == b.length, "Buffer - Result: Dimensions mismatch.");
         foreach(i;0 .. rows)
             b[i] = v[i] / params[i];
     }
@@ -1629,7 +1629,7 @@ class ReflectionMatrix(T) : Parameter {
     auto multiply(in T[] v, ref T[] b)
     {
         enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
-        enforce(v.length == b.length, "Vector Buffer: dimensions mismatch.");
+        enforce(rows == b.length, "Buffer - Result: dimensions mismatch.");
 
         b[] = v[];
 
@@ -1834,7 +1834,7 @@ class PermutationMatrix(T) : Parameter {
     auto multiply(in T[] v, ref T[] b)
     {
         enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
-        enforce(v.length == b.length, "Vector and Buffer: dimensions mismatch.");
+        enforce(rows == b.length, "Buffer - Result: dimensions mismatch.");
         foreach(i; 0 .. v.length)
             b[i] = v[perm[i]];
     }
@@ -1865,7 +1865,7 @@ class PermutationMatrix(T) : Parameter {
     auto divide(in T[] v, ref T[] b)
     {
         enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
-        enforce(v.length == b.length, "Vector and Buffer: dimensions mismatch.");
+        enforce(rows == b.length, "Buffer - Result: dimensions mismatch.");
         foreach(i; 0 .. v.length)
             b[perm[i]] = v[i];
     }
@@ -2061,22 +2061,22 @@ class Matrix(T) : Parameter {
     }
 
     const pure @safe
-    auto multiply(in T[] v, ref T[] buffer)
+    auto multiply(in T[] v, ref T[] b)
     {
         enforce(v.length == cols, "Matrix-Vector multiplication: dimensions mismatch.");
-        enforce(v.length == buffer.length, "Vector and Buffer: dimensions mismatch.");
+        enforce(rows == b.length, "Buffer - Result: dimensions mismatch.");
         T s;
         foreach(size_t i; 0 .. rows){
             s = params[i*cols]*v[0];
             foreach(size_t j; 1 .. cols)
                 s += params[i*cols + j]*v[j];
-            buffer[i] = s;
+            b[i] = s;
         }
     }
     const pure @safe
-    auto multiply(in Vector!T v, ref Vector!T buffer)
+    auto multiply(in Vector!T v, ref Vector!T b)
     {
-        multiply(v.v, buffer.v);
+        multiply(v.v, b.v);
     }
 }
 unittest

@@ -184,7 +184,7 @@ if (!__traits(compiles, BlockMatrix!T))
         return res;
     }
     
-    auto compute(in Vector!T _v, ref Vector!T b)
+    auto apply(in Vector!T _v, ref Vector!T b)
     {
         static if (!is(Mtype: UnitaryMatrix!T)) {
             // Multiply the vector by the matrix first.
@@ -211,38 +211,51 @@ unittest {
         { // Fourier
             auto mf = new MatrixLayer!(FourierMatrix!(Complex!real))(4, true, 1.0);
             auto p = cast(Vector!(Complex!real)) mf.params[1];
+            auto buf = new Vector!(Complex!real)(4);
 
             auto res1 = mf.compute(v);
             auto res2 = f * v;
+            mf.apply(v, buf);
             res2 += p;
             res2 -= res1;
+            buf -= res1;
 
             assert(p.norm!"L2" > 0.001);
             assert(res2.norm!"L2" <= 0.001);
+            assert(buf.norm!"L2" <= 0.000001);
         }
         { // Matrix
-            auto vec = new Vector!double(4, 1.0);
             auto mm = new MatrixLayer!(Matrix!double)([2, 4], false, 10.0);
-            auto m = cast(Matrix!double) mm.params[0]; 
+            auto m = cast(Matrix!double) mm.params[0];
+            auto vec = new Vector!double(4, 1.0); 
+            auto buf = new Vector!double(2); 
 
             auto res1 = mm.compute(vec);
             auto res2 = m * vec;
+            mm.apply(vec, buf);
             res2 -= res1;
+            buf -= res1;
 
-            assert(res2.norm!"L2" <= 0.001);
+            assert(res2.norm!"L2" <= 0.00001);
+            assert(buf.norm!"L2" <= 0.00001);
             assert(res2.length == 2);
         }
         { // Permutation
             auto p = new PermutationMatrix!float(16);
             auto w = new Vector!float(16, 1010101.0);
+            auto buf = new Vector!float(16, 0.1);
 
             auto mp = new MatrixLayer!(PermutationMatrix!float)(p);
             auto res1 = mp.compute(w);
+            mp.apply(w, buf);
             auto res2 = p * w;
         
             res1 -= res2;
+            buf -= res2;
+
 
             assert(res1.norm!"L2" <= 0.0001);
+            assert(buf.norm!"L2" <= 0.0001);
 
             mp = new MatrixLayer!(PermutationMatrix!float)(17);
             w = new Vector!float(17, 0.1);
@@ -254,15 +267,21 @@ unittest {
         { // Reflection
             auto mr = new MatrixLayer!(ReflectionMatrix!(Complex!real))(4, false, 0.001);
             auto rm = new ReflectionMatrix!(Complex!real)(4, 5.0);
+            auto buf = new Vector!(Complex!real)(4);
 
             mr.params[0] = rm.dup;
             
             auto res1 = mr.compute(v);
             auto res2 = rm * res1; // res2 should return to v.
+            mr.apply(v, buf);
+            auto tmp = buf.dup;
+            mr.apply(tmp, buf);
 
             res2 -= v;
+            buf -= v;
 
             assert(res2.norm!"L2" <= 0.0001);
+            assert(buf.norm!"L2" <= 0.0001);
         }
         { // Unitary
             auto mu = new MatrixLayer!(UnitaryMatrix!(Complex!real))(8, false, 1.0);
@@ -275,19 +294,25 @@ unittest {
             
             w *= u;
             w -= res1;
-            assert(w.norm!"L2" <= 0.0001);  
+
+            assert(w.norm!"L2" <= 0.0001);
         }
         { // Diagonal
             auto md = new MatrixLayer!(DiagonalMatrix!(Complex!real))(2);
             md.params[0] = d;
 
             auto w = new Vector!(Complex!real)(2, 100000000.0);
+            auto buf = new Vector!(Complex!real)(2, 100000000.0);
+            
             auto res = md.compute(w);
+            md.apply(w, buf);
             w *= d;
 
             res -= w;
+            buf -= w;
 
             assert(res.norm!"L2" <= 0.01);
+            assert(buf.norm!"L2" <= 0.01);
         }
     }
     { // takeOwnership
@@ -480,10 +505,10 @@ class BiasLayer(T) : Layer!T
         return res;
     }
     
-    auto compute(in Vector!T _v, ref Vector!T b)
+    auto apply(in Vector!T _v, ref Vector!T b)
     {
         b.v[] = _v.v[];
-        b.v[] += (cast(Vector!T) params[1]).v[];
+        b.v[] += (cast(Vector!T) params[0]).v[];
     }
 
     override
@@ -497,38 +522,53 @@ class BiasLayer(T) : Layer!T
 unittest {
     write("                 Bias ... ");
 
-    auto v = new Vector!(Complex!real)(4, 0.5);
+    {
+        auto v = new Vector!(Complex!real)(4, 0.5);
 
-    auto b1 = new BiasLayer!(Complex!real)(4, 0);
-    auto b2 = new BiasLayer!(Complex!real)(4, 1.0);
+        auto b1 = new BiasLayer!(Complex!real)(4, 0);
+        auto b2 = new BiasLayer!(Complex!real)(4, 1.0);
 
-    auto b = to!(Vector!(Complex!real))(b2.params[0]);
+        auto b = to!(Vector!(Complex!real))(b2.params[0]);
 
-    auto w = v.dup;
-    w += b;
-    auto k = b1.compute(v);
-    auto l = b2.compute(v);
+        auto w = v.dup;
+        w += b;
+        auto k = b1.compute(v);
+        auto l = b2.compute(v);
 
-    l -= w;
-    k -= v;
+        l -= w;
+        k -= v;
 
-    assert(l.norm!"L2" <= 0.0001);
-    assert(k.norm!"L2" <= 0.0001);
+        assert(l.norm!"L2" <= 0.0001);
+        assert(k.norm!"L2" <= 0.0001);
 
 
-    size_t indexx;
-    Complex!real ten = complex(10.0);
-    auto arr = new Complex!real[4];
+        size_t indexx;
+        Complex!real ten = complex(10.0);
+        auto arr = new Complex!real[4];
 
-    b2.takeOwnership(arr, indexx);
-    foreach(i; 0 .. 4)
-        arr[i] = ten;
+        b2.takeOwnership(arr, indexx);
+        foreach(i; 0 .. 4)
+            arr[i] = ten;
 
-    auto res = b2.compute(v);
-    res.v[] -= ten;
-    res -= v;
+        auto res = b2.compute(v);
+        res.v[] -= ten;
+        res -= v;
 
-    assert(res.norm!"L2" <= 0.00001);
+        assert(res.norm!"L2" <= 0.00001);
+    }
+
+    {
+        auto bias_layer = new BiasLayer!real(17, 6.67);
+        auto buf = new Vector!real(17);
+        auto vec = new Vector!real(17, 7.99);
+
+        auto res = bias_layer.compute(vec);
+        bias_layer.apply(vec, buf);
+
+        buf -= res;
+
+        assert(buf.norm!"L2" <= 0.0001);
+    }
 
     write("Done.\n");
 }
@@ -679,20 +719,22 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
         }
         else static if(strfunc == "") return _v;
         else {
+            auto b = new Vector!T(1); // This is here to make it compile when we use a buffer
             static foreach(i; 0 .. TypeParameter.length)
                 mixin("auto p"~to!string(i)~" = cast("~TypeParameter[i].stringof~") params["~to!string(i)~"];");
             mixin(strfunc);
+            return b;
         }
     }
     
-    auto compute(in Vector!T _v, ref Vector!T b)
+    auto apply(in Vector!T _v, ref Vector!T b)
     {
         static if (strfunc == "relu") {
             // function that compute "max(x, 0)" for every x in the vector.
             static if (is(Complex!T : T))
                 static assert(0, "Relu function cannot be use on Complex-valued vectors.");
 
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length)
                 if (b[i] < 0) b[i] = 0;
         }
@@ -702,7 +744,7 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
                 static assert(0, "Softmax function cannot be used on Complex-valued vectors.");
 
             T s = 0;
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length) {
                 b.v[i] = exp(_v[i]);
                 s += b[i];
@@ -713,7 +755,7 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
         else static if(strfunc == "binary") {
             static if (is(Complex!T : T))
                 static assert(0, "'binary' function undefined for Complex-valued vectors.");
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length){
                 if (b[i] < 0) 
                     b[i] = 0.0;
@@ -724,56 +766,56 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
         else static if(strfunc == "logistic") {
             static if (is(Complex!T : T))
                 static assert(0, "'logistic' function undefined for Complex-valued vectors.");
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length)
                 b[i] = 1.0 / (1.0 + exp(-b[i]));
         }
         else static if(strfunc == "identity") {
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
         }
         else static if(strfunc == "tanh") {
             static if (is(Complex!T : T))
                 static assert(0, "'tanh' function undefined for Complex-valued vectors.");
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length)
                 b[i] = tanh(b[i]);
         }
         else static if(strfunc == "arctan") {
             static if (is(Complex!T : T))
                 static assert(0, "'arctan' function undefined for Complex-valued vectors.");
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length)
                 b[i] = atan(b[i]);
         }
         else static if(strfunc == "softsign") {
             static if (is(Complex!T : T))
                 static assert(0, "'softsign' function undefined for Complex-valued vectors.");
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length)
                 b[i] = b[i] / (1.0 + abs(b[i]));
         }
         else static if(strfunc == "softplus") {
             static if (is(Complex!T : T))
                 static assert(0, "'softplus' function undefined for Complex-valued vectors.");
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length)
                 b[i] = log(1 + exp(b[i]));
         }
         else static if(strfunc == "sin") {
             static if (is(Complex!T : T))
                 static assert(0, "'sin' function undefined for Complex-valued vectors.");
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length)
                 b[i] = sin(b[i]);
         }
         else static if(strfunc == "gaussian") {
             static if (is(Complex!T : T))
                 static assert(0, "'gaussian' function undefined for Complex-valued vectors.");
-            b.v[] = v.v[];
+            b.v[] = _v.v[];
             foreach(i; 0 .. _v.length)
                 b[i] = exp(-pow(b[i], 2));
         }
-        else static if(strfunc == "") return _v;
+        else static if(strfunc == "") b.v[] = _v.v[];
         else {
             static foreach(i; 0 .. TypeParameter.length)
                 mixin("auto p"~to!string(i)~" = cast("~TypeParameter[i].stringof~") params["~to!string(i)~"];");
@@ -859,6 +901,123 @@ unittest {
         auto r = f.compute(v);
         r -= s;
         assert(r.norm!"L2" <= 0.000001);
+    }
+
+    {
+        auto f_relu = new FunctionalLayer!(real, "relu")();
+        auto vec = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        auto b = new Vector!real(4);
+        
+        auto nn_relu = new FunctionalLayer!(real, "relu")();
+        auto res_relu = new Vector!real([0.0, 0.0, 0.5, 1.0]);
+        nn_relu.apply(vec, b);
+        b -= nn_relu.compute(vec);
+        res_relu -= nn_relu.compute(vec);
+        assert(res_relu.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_logistic = new FunctionalLayer!(real, "logistic")();
+        auto res_logistic = new Vector!real([1.0/(1.0 + exp( 1.0)), 1.0/(1.0 + exp( 0.5)),
+                                             1.0/(1.0 + exp(-0.5)), 1.0/(1.0 + exp(-1.0))]);
+        nn_logistic.apply(vec, b);
+        b -= nn_logistic.compute(vec);
+        res_logistic -= nn_logistic.compute(vec);
+        assert(res_logistic.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_gaussian = new FunctionalLayer!(real, "gaussian")();
+        auto res_gaussian = new Vector!real([exp(-1.0), exp(-0.25), exp(-0.25), exp(-1.0)]);
+        nn_gaussian.apply(vec, b);
+        b -= nn_gaussian.compute(vec);
+        res_gaussian -= nn_gaussian.compute(vec);
+        assert(res_gaussian.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_identity = new FunctionalLayer!(real, "identity")();
+        auto res_identity = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        nn_identity.apply(vec, b);
+        b -= nn_identity.compute(vec);
+        res_identity -= nn_identity.compute(vec);
+        assert(res_identity.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_tanh = new FunctionalLayer!(real, "tanh")();
+        auto res_tanh = new Vector!real([tanh(-1.0), tanh(-0.5), tanh(0.5), tanh(1.0)]);
+        nn_tanh.apply(vec, b);
+        b -= nn_tanh.compute(vec);
+        res_tanh -= nn_tanh.compute(vec);
+        assert(res_tanh.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_arctan = new FunctionalLayer!(real, "arctan")();
+        auto res_arctan = new Vector!real([atan(-1.0), atan(-0.5), atan(0.5), atan(1.0)]);
+        nn_arctan.apply(vec, b);
+        b -= nn_arctan.compute(vec);
+        res_arctan -= nn_arctan.compute(vec);
+        assert(res_arctan.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_softsign = new FunctionalLayer!(real, "softsign")();
+        auto res_softsign = new Vector!real([-0.5, -1.0/3.0, 1.0/3.0, 0.5]);
+        nn_softsign.apply(vec, b);
+        b -= nn_softsign.compute(vec);
+        res_softsign -= nn_softsign.compute(vec);
+        assert(res_softsign.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_softplus = new FunctionalLayer!(real, "softplus")();
+        auto res_softplus = new Vector!real([log(1+exp(-1.0)), log(1+exp(-0.5)), log(1 + exp(0.5)), log(1 + exp(1.0))]);
+        nn_softplus.apply(vec, b);
+        b -= nn_softplus.compute(vec);
+        res_softplus -= nn_softplus.compute(vec);
+        assert(res_softplus.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_sin = new FunctionalLayer!(real, "sin")();
+        auto res_sin = new Vector!real([sin(-1.0), sin(-0.5), sin(0.5), sin(1.0)]);
+        nn_sin.apply(vec, b);
+        b -= nn_sin.compute(vec);
+        res_sin -= nn_sin.compute(vec);
+        assert(res_sin.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_binary = new FunctionalLayer!(real, "binary")();
+        auto res_binary = new Vector!real([0.0, 0.0, 1.0, 1.0]);
+        nn_binary.apply(vec, b);
+        b -= nn_binary.compute(vec);
+        res_binary -= nn_binary.compute(vec);
+        assert(res_binary.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_softmax = new FunctionalLayer!(real, "softmax")();
+        auto res_softmax = new Vector!real([0.06887305, 0.11355246, 0.3086676, 0.508906]);
+        nn_softmax.apply(vec, b);
+        b -= nn_softmax.compute(vec);
+        res_softmax -= nn_softmax.compute(vec);
+        assert(res_softmax.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+        auto nn_nothing = new FunctionalLayer!(real, "")();
+        auto res_nothing = vec.dup;
+        nn_nothing.apply(vec, b);
+        b -= nn_nothing.compute(vec);
+        res_nothing -= nn_nothing.compute(vec);
+        assert(res_nothing.norm!"L2" <= 0.000001);
+        assert(b.norm!"L2" <= 0.000001);
+
+
+        enum string strfunc = "b.v[]=_v.v[]; foreach(i; 0 .. b.length) {b.v[i] += p0.v[i];}";
+        auto nn_weird = new FunctionalLayer!(real, strfunc, Vector!real)([17UL], [1.0]);
+        auto ver = new Vector!real(17, 1.0);
+        auto buf = new Vector!real(17);
+
+        auto bias = (cast(Vector!real) nn_weird.params[0]).dup;
+        
+        nn_weird.apply(ver, buf);
+        ver += bias;
+        buf -= ver;
+
+        assert(buf.norm!"L2" <= 0.000001);
     }
 
     write(" Done.\n");

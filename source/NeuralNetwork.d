@@ -709,7 +709,7 @@ unittest {
         auto w = nn2.compute(v);
 
         // Test if the delegate works as needed.
-        assert(abs(1 - w.norm!"L2") <= 0.0001);
+        enforce(abs(1 - w.norm!"L2") <= 0.0001, "Norm of "~to!string(w.v)~" is not 1.0");
 
         // We set each weights to one.
         foreach(i; 0 .. nn2.serialized_data.length)
