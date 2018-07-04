@@ -176,8 +176,6 @@ auto createPoolingFunction(T, alias reducer, size_t height, size_t width,
                           * (1 + (width  - frame_width)  / stride_width);
 
     return "
-        auto res = new Vector! T("~to!string(lenRetVec)~", 0.1);
-
         size_t tmp_fr_x, tmp_fr_y,
                cell_h, cell_w,
                tmp_y, tmp_x,
@@ -207,9 +205,9 @@ auto createPoolingFunction(T, alias reducer, size_t height, size_t width,
                         for (pos_y = 0; pos_y <= (cell_h-1); ++pos_y) {
                             for (pos_x = 0; pos_x <= (cell_w-1); ++pos_x) {
                                 if (cur_pos == tmp_inner)
-                                    res[index] = _v[tmp_inner];
+                                    b[index] = _v[tmp_inner];
                                 else
-                                    res[index] = "~reducer("res[index]","_v[tmp_inner]")~";
+                                    b[index] = "~reducer("b[index]","_v[tmp_inner]")~";
                                 tmp_inner += 1;
                             }
                             tmp_inner += shift;
@@ -219,8 +217,6 @@ auto createPoolingFunction(T, alias reducer, size_t height, size_t width,
                 }
             }
         }
-
-        return res;
     ";
 }
 unittest {
@@ -295,11 +291,16 @@ unittest {
                                  ]);
 
 
-    auto res = layer1.compute(vec);
-    auto re2 = layer2.compute(vec);
-    auto re3 = layer3.compute(vec);
-    auto re4 = layer4.compute(vec);
-    auto re5 = layer5.compute(vec);
+    auto res = new Vector!double(64);
+    layer1.apply(vec, res);
+    auto re2 = new Vector!double(16);
+    layer2.apply(vec, re2);
+    auto re3 = new Vector!double(12);
+    layer3.apply(vec, re3);
+    auto re4 = new Vector!double(25);
+    layer4.apply(vec, re4);
+    auto re5 = new Vector!double(9);
+    layer5.apply(vec, re5);
 
     auto s = [ 1, 2, 6, 7, 2, 3, 7, 8,
                3, 4, 8, 9, 4, 5, 9, 0,

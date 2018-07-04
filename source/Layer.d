@@ -67,6 +67,7 @@ abstract class Layer(T)
     Parameter[] params = null;
 
     abstract Vector!T compute(Vector!T);
+    abstract void apply(in Vector!T, ref Vector!T);
     abstract @safe @nogc pure void takeOwnership(ref T[], ref size_t);
 }
 
@@ -184,7 +185,8 @@ if (!__traits(compiles, BlockMatrix!T))
         return res;
     }
     
-    auto apply(in Vector!T _v, ref Vector!T b)
+    override
+    void apply(in Vector!T _v, ref Vector!T b)
     {
         static if (!is(Mtype: UnitaryMatrix!T)) {
             // Multiply the vector by the matrix first.
@@ -422,6 +424,18 @@ class MatrixLayer(Mtype : BlockMatrix!(M!T), alias M, T) : Layer!T
             res += cast(Vector!T) params[1];
         return res;
     }
+
+    override
+    void apply(in Vector!T _v, ref Vector!T b)
+    {
+        // Multiply the vector by the matrix first.
+        auto res = (cast(Mtype) params[0]) * _v;
+
+        // Add the bias vector if needed.
+        if (params.length > 1)
+            res += cast(Vector!T) params[1];
+        b.v[] = res.v[];
+    }
 }
 unittest {
     write("Unittest: Layer: BlockMatrix ... ");
@@ -505,7 +519,8 @@ class BiasLayer(T) : Layer!T
         return res;
     }
     
-    auto apply(in Vector!T _v, ref Vector!T b)
+    override
+    void apply(in Vector!T _v, ref Vector!T b)
     {
         b.v[] = _v.v[];
         b.v[] += (cast(Vector!T) params[0]).v[];
@@ -727,7 +742,8 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
         }
     }
     
-    auto apply(in Vector!T _v, ref Vector!T b)
+    override
+    void apply(in Vector!T _v, ref Vector!T b)
     {
         static if (strfunc == "relu") {
             // function that compute "max(x, 0)" for every x in the vector.
@@ -830,14 +846,12 @@ unittest {
         alias Vec = Vector!(Complex!double);
 
         enum string blue = "
-            auto res = _v.dup;
-            res.v[] *= p0.v[];
-            return res;";
+            b.v[] = _v.v[];
+            b.v[] *= p0.v[];";
 
         enum string ff = "
-            auto res = _v.dup;
-            res.v[] *= complex(4.0);
-            return res;";
+            b.v[] = _v.v[];
+            b.v[] *= complex(4.0);";
 
         uint len = 4;
         double pi = 3.1415923565;
@@ -853,14 +867,16 @@ unittest {
 
         // More complex functional without learnable parameter.
         auto f3 = new FunctionalLayer!(Complex!double, ff)();
-        auto v3 = f3.compute(v);
+        auto v3 = v.dup;
+        f3.apply(v, v3);
         auto v3_bis = v.dup;
         v3_bis.v[] *= complex(4.0);
         v3 -= v3_bis;
         assert(v3.norm!"L2" <= 0.00001);
 
         auto f4 = new FunctionalLayer!(Complex!double, blue, Vec)([len], [1.0]);
-        auto v4 = f4.compute(v);
+        auto v4 = v.dup;
+        f4.apply(v, v4);
         auto v4_bis = v.dup();
         auto f4_p1 = cast(Vec) f4.params[0];
         foreach(i; 0 .. v4.length) {
@@ -872,7 +888,8 @@ unittest {
 
         // relu function.
         auto f6 = new FunctionalLayer!(double, "relu");
-        auto vr6 = f6.compute(vr);
+        auto vr6 = vr.dup;
+        f6.apply(vr, vr6);
         assert(abs(vr6.sum - 1.0 - pi) <= 0.01);
 
         // softmax function.
@@ -884,7 +901,7 @@ unittest {
     }
 
     { // takeOwnership
-        enum string strfunc = "auto res = _v.dup; res += p0; return res;";
+        enum string strfunc = "b.v[] = _v.v[]; b += p0;";
         auto f = new FunctionalLayer!(double, strfunc, Vector!double)([4UL], [10.0]);
         auto v = new Vector!double([1.0, 2.0, 3.0, 4.0]);
 
@@ -898,7 +915,8 @@ unittest {
         a[2] = 2.0;
         a[3] = 1.0;
 
-        auto r = f.compute(v);
+        auto r = v.dup;
+        f.apply(v, r);
         r -= s;
         assert(r.norm!"L2" <= 0.000001);
     }
