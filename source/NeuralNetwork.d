@@ -79,6 +79,10 @@ class NeuralNetwork(T) {
         // Map the id of the layer to its name.
         string[size_t] id_to_name;
 
+        /// Used to know wether the layer must hold a state for other to compute
+        /// e.g. a Recurrent Neural Network.
+        bool[] has_state;
+
         // Give access to all the learnable parameter of the neural network.
         T[] serialized_data;
     }
@@ -88,6 +92,7 @@ class NeuralNetwork(T) {
         // We set the first elements of these arrays to null because
         // the first layer is the "Input".
         layers = [null];
+        has_state = [false];
         results = [new Vector!T(_dim_in)];
         buffers = [new Vector!T(_dim_in)];
         input_layers = [null];
@@ -119,49 +124,53 @@ class NeuralNetwork(T) {
                   in string[] _to)
     {
         // If a name was given and if it is already used.
-        if (_name && (_name in name_to_id))
+        if (_name && (_name in this.name_to_id))
             throw new Exception("NeuralNetwork: Error: "~_name~" is already used as a name.");
 
         // If a specific name is given, we remember its id to be able to retreive it.
         if (_name) {
-            id_to_name[id] = _name;
-            name_to_id[_name] = id;
+            this.id_to_name[id] = _name;
+            this.name_to_id[_name] = id;
         }
 
         // If the inputs are not given, we assume it is the last defined layer.
         size_t[] _inputs = [id - 1];
         if (_in)
-            _inputs = _in.map!(a => name_to_id[a]).array();
+            _inputs = _in.map!(a => this.name_to_id[a]).array();
 
-        input_layers ~= _inputs;
+        this.input_layers ~= _inputs;
 
         // If the dimension of the output vector is zero, set it to the input dimension.
         if (!_dim_out)
-            _dim_out = arr_dim_out[_inputs[0]];
+            _dim_out = this.arr_dim_out[_inputs[0]];
 
         // Result will be filled by NeuralNetwork.compute.
         if (_state)
-            results ~= _state.dup;
+            this.results ~= _state.dup;
         else {
             if (_to)
-                results ~= new Vector!T(_dim_out, _randomBound);
+                this.results ~= new Vector!T(_dim_out, _randomBound);
             else
-                results ~= new Vector!T(_dim_out);
+                this.results ~= new Vector!T(_dim_out);
         }
-        buffers ~= new Vector!T(arr_dim_out[_inputs[0]]);
+        this.buffers ~= new Vector!T(this.arr_dim_out[_inputs[0]]);
 
         // If the layer points to other layers, we add it to their inputs.
         // And we initialize the state vector if this is not already done.
         if (_to) {
             foreach(tmp_id; _to) {
-                enforce(tmp_id in name_to_id, tmp_id~": name not found.");
-                input_layers[name_to_id[tmp_id]] ~= id;
+                enforce(tmp_id in this.name_to_id, tmp_id~": name not found.");
+                this.input_layers[this.name_to_id[tmp_id]] ~= id;
             }
+            this.has_state ~= true;
+        }
+        else {
+            this.has_state ~= false;
         }
 
         // Update dimension arrays.
-        arr_dim_in ~= arr_dim_out[_inputs[0]];
-        arr_dim_out ~= _dim_out;
+        this.arr_dim_in ~= this.arr_dim_out[_inputs[0]];
+        this.arr_dim_out ~= _dim_out;
 
         // Add the layer to the network.
         layers ~= _create_layer();
@@ -508,18 +517,24 @@ class NeuralNetwork(T) {
         // First we want to know the size of the total array.
         // We sum the size of each layer.
         size_t total_size = 0;
-        foreach(tmp_l; layers)
-            if (!(tmp_l is null))
-                total_size += tmp_l.size;
+        foreach(i; 0 .. this.layers.length)
+            if (!(this.layers[i] is null)) {
+                total_size += this.layers[i].size;
+                if (this.has_state[i])
+                    total_size += this.arr_dim_out[i];
+            }
 
         serialized_data = new T[total_size];
 
         // We copy the values in the new array and replace the old
         // ones by a reference to the new array. 
         size_t _index = 0;
-        foreach(tmp_l; layers)
-            if (!(tmp_l is null))
-                tmp_l.takeOwnership(serialized_data, _index);
+        foreach(i; 0 .. layers.length)
+            if (!(layers[i] is null)){
+                layers[i].takeOwnership(serialized_data, _index);
+                if (this.has_state[i])
+                    takeOwnership_util!T(serialized_data, results[i].v, _index);
+            }
     }
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
