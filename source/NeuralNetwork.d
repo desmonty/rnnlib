@@ -143,9 +143,12 @@ class NeuralNetwork(T) {
         if (_state)
             results ~= _state.dup;
         else {
-            results ~= new Vector!T(_dim_out);
+            if (_to)
+                results ~= new Vector!T(_dim_out, _randomBound);
+            else
+                results ~= new Vector!T(_dim_out);
         }
-        buffers ~= new Vector!T(_dim_out);
+        buffers ~= new Vector!T(arr_dim_out[_inputs[0]]);
 
         // If the layer points to other layers, we add it to their inputs.
         // And we initialize the state vector if this is not already done.
@@ -154,9 +157,6 @@ class NeuralNetwork(T) {
                 enforce(tmp_id in name_to_id, tmp_id~": name not found.");
                 input_layers[name_to_id[tmp_id]] ~= id;
             }
-
-            if (results[$-1] is null)
-                results[$-1] = new Vector!T(_dim_out, 0);
         }
 
         // Update dimension arrays.
@@ -526,7 +526,6 @@ class NeuralNetwork(T) {
     Vector!T compute(in Vector!T _v)
     {
         buffers[0].v[] = _v.v[];
-
         results[0].v[] = _v.v[];
 
         foreach(cur_id; 1 .. id)
@@ -545,7 +544,32 @@ class NeuralNetwork(T) {
                 layers[cur_id].apply(buffers[cur_id], results[cur_id]);
             }
         }
-        return results[$-1];
+        return new Vector!T(results[$-1].dup);
+    }
+
+    /// Apply the NeuralNetwork to the vector and change the NN state if needed.
+    void apply(in Vector!T _v, ref Vector!T _b)
+    {
+        buffers[0].v[] = _v.v[];
+        results[0].v[] = _v.v[];
+
+        foreach(cur_id; 1 .. id)
+        {
+            // If there is only one input,
+            // we just pass it to the layer for computation. 
+            if (input_layers[cur_id].length == 1)
+                layers[cur_id].apply(results[input_layers[cur_id][0]], results[cur_id]);
+            else {
+                // Else we need to create a temporary vector to sum all the inputs.
+                buffers[cur_id].v[] = to!T(0);
+                foreach(tmp_id; input_layers[cur_id])
+                    buffers[cur_id] += results[tmp_id];
+
+                // Finally, we compute the tmp vector using the layer.
+                layers[cur_id].apply(buffers[cur_id], results[cur_id]);
+            }
+        }
+        _b.v[] = results[$-1].v[];
     }
 }
 unittest {
@@ -553,8 +577,6 @@ unittest {
 
     // Neural Network 1: Simple linear layer neural network.
     // Neural Network 2: Two linear layer with a recurrence.
-    
-    writeln("A");
     {
         // Initialize the neural network.
         // At this point, we have the identity func.
@@ -574,7 +596,6 @@ unittest {
         nn.linear!(Matrix!float)(6, false, 1.0, "L1");
         w = nn.compute(v);
 
-        writeln("A3");
         // Hence, the resulting vector should have length 6.
         assert(w.length == 6);
 
@@ -582,34 +603,32 @@ unittest {
         // and return its output to "L1" (And so create a rnn-like structure) and to
         // the output (by default, the result of the last layer).
         nn.linear!(Matrix!float)(4, false, 1.0, "L2", null, null, ["L1"]);
-        writeln("A3a");
+        auto blue_state_tmp = nn.results[3].dup; // Copy the state.
         w = nn.compute(v);
-        writeln("A3b");
         auto z = nn.compute(v);
-        writeln("A4");
 
         // Now we reconstruct what we think the neural network should compute.
         // w
-        auto w_bis = (cast(Matrix!float) nn.layers[1].params[0]) * v;
-        w_bis *= (cast(Matrix!float) nn.layers[2].params[0]);
+        blue_state_tmp += v;
+        auto w_bis = (cast(Matrix!float) nn.layers[nn.name_to_id["L1"]].params[0]) * blue_state_tmp;
+        w_bis *= (cast(Matrix!float) nn.layers[nn.name_to_id["L2"]].params[0]);
 
         auto hidden = w_bis.dup;
+
         w_bis -= w;
 
         assert(w_bis.norm!"L2" <= 0.0001);
 
-        writeln("A5");
         // z
         auto z_bis = hidden;
         z_bis += v;
-        z_bis = (cast(Matrix!float) nn.layers[1].params[0]) * z_bis;
-        z_bis = (cast(Matrix!float) nn.layers[2].params[0]) * z_bis;
+        z_bis = (cast(Matrix!float) nn.layers[nn.name_to_id["L1"]].params[0]) * z_bis;
+        z_bis = (cast(Matrix!float) nn.layers[nn.name_to_id["L2"]].params[0]) * z_bis;
         
         z_bis -= z;
         assert(z_bis.norm!"L2" <= 0.0001);
     }
 
-    writeln("B");
     // Neural Network 1: Simple linear layer + softmax.
     // Neural Network 2: RNN: linear + relu + linear (+backlink) + linear + softmax.
     {
@@ -685,7 +704,6 @@ unittest {
         assert(b_4.norm!"L2" <= 0.0001);
     }
 
-    writeln("C");
     // Neural Network 1: linear + softmax
     // Neural Network 2: linear + softmax + linear + recurrent + linear + norm!"L2"^-1
     {
@@ -748,7 +766,6 @@ unittest {
         assert(true_res.norm!"L2" <= 0.0001);
     }
 
-    writeln("D");
     // Neural Networks: relu / logistic / gaussian / identity
     //                / tanh / arctan / softsign  / softplus / sin / binary 
     {
@@ -816,7 +833,6 @@ unittest {
         assert(res_binary.norm!"L2" <= 0.000001);
     }
 
-    writeln("E");
     // Neural Network: Diamond structure with identity function only => implement f(x) = 2*x !
     {
         auto nn = new NeuralNetwork!real(6);
@@ -826,9 +842,13 @@ unittest {
 
         auto vec = new Vector!real(6, 1.0);
         auto res = nn.compute(vec);
+        auto buf = new Vector!real(6);
+        nn.apply(vec, buf);
         vec += vec;
+        buf -= vec;
         res -= vec;
         assert(res.norm!"L2" <= 0.000001);
+        assert(buf.norm!"L2" <= 0.000001);
     }
 
     // Bad naming of layers
