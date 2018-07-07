@@ -58,6 +58,9 @@ class NeuralNetwork(T) {
         // Save the result of the computation of a layer. Allow its multiple use.
         Vector!T[] results;
 
+        // Save the buffers used to handle layer. Allow its multiple use.
+        Vector!T[] buffers;
+
         // Used to know which layers to ask for the input of a specific layer.
         size_t[][] input_layers;
         
@@ -76,6 +79,10 @@ class NeuralNetwork(T) {
         // Map the id of the layer to its name.
         string[size_t] id_to_name;
 
+        /// Used to know wether the layer must hold a state for other to compute
+        /// e.g. a Recurrent Neural Network.
+        bool[] has_state;
+
         // Give access to all the learnable parameter of the neural network.
         T[] serialized_data;
     }
@@ -85,7 +92,9 @@ class NeuralNetwork(T) {
         // We set the first elements of these arrays to null because
         // the first layer is the "Input".
         layers = [null];
-        results = [null];
+        has_state = [false];
+        results = [new Vector!T(_dim_in)];
+        buffers = [new Vector!T(_dim_in)];
         input_layers = [null];
         id = 1;
 
@@ -115,49 +124,53 @@ class NeuralNetwork(T) {
                   in string[] _to)
     {
         // If a name was given and if it is already used.
-        if (_name && (_name in name_to_id))
-            throw new Exception(_name~" is already used as a name.");
+        if (_name && (_name in this.name_to_id))
+            throw new Exception("NeuralNetwork: Error: "~_name~" is already used as a name.");
 
         // If a specific name is given, we remember its id to be able to retreive it.
         if (_name) {
-            id_to_name[id] = _name;
-            name_to_id[_name] = id;
-        }
-
-        // Result will be filled by NeuralNetwork.compute.
-        if (_state)
-            results ~= _state.dup;
-        else {
-            results ~= null;
+            this.id_to_name[id] = _name;
+            this.name_to_id[_name] = id;
         }
 
         // If the inputs are not given, we assume it is the last defined layer.
         size_t[] _inputs = [id - 1];
         if (_in)
-            _inputs = _in.map!(a => name_to_id[a]).array();
+            _inputs = _in.map!(a => this.name_to_id[a]).array();
 
-        input_layers ~= _inputs;
-
+        this.input_layers ~= _inputs;
 
         // If the dimension of the output vector is zero, set it to the input dimension.
         if (!_dim_out)
-            _dim_out = arr_dim_out[_inputs[0]];
+            _dim_out = this.arr_dim_out[_inputs[0]];
+
+        // Result will be filled by NeuralNetwork.compute.
+        if (_state)
+            this.results ~= _state.dup;
+        else {
+            if (_to)
+                this.results ~= new Vector!T(_dim_out, _randomBound);
+            else
+                this.results ~= new Vector!T(_dim_out);
+        }
+        this.buffers ~= new Vector!T(this.arr_dim_out[_inputs[0]]);
 
         // If the layer points to other layers, we add it to their inputs.
-        // And we initialize the state vecotr if this is not already done.
+        // And we initialize the state vector if this is not already done.
         if (_to) {
             foreach(tmp_id; _to) {
-                enforce(tmp_id in name_to_id, tmp_id~": name not found.");
-                input_layers[name_to_id[tmp_id]] ~= id;
+                enforce(tmp_id in this.name_to_id, tmp_id~": name not found.");
+                this.input_layers[this.name_to_id[tmp_id]] ~= id;
             }
-
-            if (results[$-1] is null)
-                results[$-1] = new Vector!T(_dim_out, 0);
+            this.has_state ~= true;
+        }
+        else {
+            this.has_state ~= false;
         }
 
         // Update dimension arrays.
-        arr_dim_in ~= arr_dim_out[_inputs[0]];
-        arr_dim_out ~= _dim_out;
+        this.arr_dim_in ~= this.arr_dim_out[_inputs[0]];
+        this.arr_dim_out ~= _dim_out;
 
         // Add the layer to the network.
         layers ~= _create_layer();
@@ -504,43 +517,74 @@ class NeuralNetwork(T) {
         // First we want to know the size of the total array.
         // We sum the size of each layer.
         size_t total_size = 0;
-        foreach(tmp_l; layers)
-            if (!(tmp_l is null))
-                total_size += tmp_l.size;
+        foreach(i; 0 .. this.layers.length)
+            if (!(this.layers[i] is null)) {
+                total_size += this.layers[i].size;
+                if (this.has_state[i])
+                    total_size += this.arr_dim_out[i];
+            }
 
         serialized_data = new T[total_size];
 
         // We copy the values in the new array and replace the old
         // ones by a reference to the new array. 
         size_t _index = 0;
-        foreach(tmp_l; layers)
-            if (!(tmp_l is null))
-                tmp_l.takeOwnership(serialized_data, _index);
+        foreach(i; 0 .. layers.length)
+            if (!(layers[i] is null)){
+                layers[i].takeOwnership(serialized_data, _index);
+                if (this.has_state[i])
+                    takeOwnership_util!T(serialized_data, results[i].v, _index);
+            }
     }
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
     Vector!T compute(in Vector!T _v)
     {
-        results[0] = _v.dup;
-        Vector!T tmp_vec;
+        buffers[0].v[] = _v.v[];
+        results[0].v[] = _v.v[];
 
         foreach(cur_id; 1 .. id)
         {
             // If there is only one input,
             // we just pass it to the layer for computation. 
             if (input_layers[cur_id].length == 1)
-                results[cur_id] = layers[cur_id].compute(results[input_layers[cur_id][0]]);
+                layers[cur_id].apply(results[input_layers[cur_id][0]], results[cur_id]);
             else {
                 // Else we need to create a temporary vector to sum all the inputs.
-                tmp_vec = new Vector!T(arr_dim_in[cur_id], 0);
+                buffers[cur_id].v[] = to!T(0);
                 foreach(tmp_id; input_layers[cur_id])
-                    tmp_vec += results[tmp_id];
+                    buffers[cur_id] += results[tmp_id];
 
                 // Finally, we compute the tmp vector using the layer.
-                results[cur_id] = layers[cur_id].compute(tmp_vec);
+                layers[cur_id].apply(buffers[cur_id], results[cur_id]);
             }
         }
-        return results[$-1];
+        return new Vector!T(results[$-1].dup);
+    }
+
+    /// Apply the NeuralNetwork to the vector and change the NN state if needed.
+    void apply(in Vector!T _v, ref Vector!T _b)
+    {
+        buffers[0].v[] = _v.v[];
+        results[0].v[] = _v.v[];
+
+        foreach(cur_id; 1 .. id)
+        {
+            // If there is only one input,
+            // we just pass it to the layer for computation. 
+            if (input_layers[cur_id].length == 1)
+                layers[cur_id].apply(results[input_layers[cur_id][0]], results[cur_id]);
+            else {
+                // Else we need to create a temporary vector to sum all the inputs.
+                buffers[cur_id].v[] = to!T(0);
+                foreach(tmp_id; input_layers[cur_id])
+                    buffers[cur_id] += results[tmp_id];
+
+                // Finally, we compute the tmp vector using the layer.
+                layers[cur_id].apply(buffers[cur_id], results[cur_id]);
+            }
+        }
+        _b.v[] = results[$-1].v[];
     }
 }
 unittest {
@@ -548,11 +592,11 @@ unittest {
 
     // Neural Network 1: Simple linear layer neural network.
     // Neural Network 2: Two linear layer with a recurrence.
-    
     {
         // Initialize the neural network.
         // At this point, we have the identity func.
         auto nn = new NeuralNetwork!float(4);
+        nn.identity;
 
         // Vector of L2 norm = 1.
         auto v = new Vector!float([0.5, 0.0, -0.5, 0.7071068]);
@@ -574,15 +618,18 @@ unittest {
         // and return its output to "L1" (And so create a rnn-like structure) and to
         // the output (by default, the result of the last layer).
         nn.linear!(Matrix!float)(4, false, 1.0, "L2", null, null, ["L1"]);
+        auto blue_state_tmp = nn.results[3].dup; // Copy the state.
         w = nn.compute(v);
         auto z = nn.compute(v);
 
         // Now we reconstruct what we think the neural network should compute.
         // w
-        auto w_bis = (cast(Matrix!float) nn.layers[1].params[0]) * v;
-        w_bis *= (cast(Matrix!float) nn.layers[2].params[0]);
+        blue_state_tmp += v;
+        auto w_bis = (cast(Matrix!float) nn.layers[nn.name_to_id["L1"]].params[0]) * blue_state_tmp;
+        w_bis *= (cast(Matrix!float) nn.layers[nn.name_to_id["L2"]].params[0]);
 
         auto hidden = w_bis.dup;
+
         w_bis -= w;
 
         assert(w_bis.norm!"L2" <= 0.0001);
@@ -590,8 +637,8 @@ unittest {
         // z
         auto z_bis = hidden;
         z_bis += v;
-        z_bis = (cast(Matrix!float) nn.layers[1].params[0]) * z_bis;
-        z_bis = (cast(Matrix!float) nn.layers[2].params[0]) * z_bis;
+        z_bis = (cast(Matrix!float) nn.layers[nn.name_to_id["L1"]].params[0]) * z_bis;
+        z_bis = (cast(Matrix!float) nn.layers[nn.name_to_id["L2"]].params[0]) * z_bis;
         
         z_bis -= z;
         assert(z_bis.norm!"L2" <= 0.0001);
@@ -696,20 +743,19 @@ unittest {
 
         auto nn2 = new NeuralNetwork!real(4);
         nn2.linear(5)
-           .func!"softmax"()
+           .softmax()
            .linear(5)
            .recurrent()
            .linear(4)
            .func!"
-                auto res = _v.dup;
-                res /= res.norm!\"L2\";
-                return res;"()
+                b.v[] = _v.v[];
+                b /= b.norm!\"L2\";"()
            .serialize;
 
         auto w = nn2.compute(v);
 
         // Test if the delegate works as needed.
-        assert(abs(1 - w.norm!"L2") <= 0.0001);
+        enforce(abs(1 - w.norm!"L2") <= 0.0001, "Norm of "~to!string(w.v)~" is not 1.0");
 
         // We set each weights to one.
         foreach(i; 0 .. nn2.serialized_data.length)
@@ -811,9 +857,13 @@ unittest {
 
         auto vec = new Vector!real(6, 1.0);
         auto res = nn.compute(vec);
+        auto buf = new Vector!real(6);
+        nn.apply(vec, buf);
         vec += vec;
+        buf -= vec;
         res -= vec;
         assert(res.norm!"L2" <= 0.000001);
+        assert(buf.norm!"L2" <= 0.000001);
     }
 
     // Bad naming of layers
