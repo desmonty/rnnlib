@@ -82,10 +82,12 @@ class NeuralNetwork(T) {
         /// Used to know wether the layer must hold a state for other to compute
         /// e.g. a Recurrent Neural Network.
         bool[] has_state;
-
+    }
+    public {
         // Give access to all the learnable parameter of the neural network.
         T[] serialized_data;
     }
+
     @safe pure
     this(in size_t _dim_in)
     {
@@ -747,6 +749,7 @@ unittest {
            .linear(5)
            .recurrent()
            .linear(4)
+           .func!"b.v[] = _v.v[]; b.v[] += 1.0;"()
            .func!"
                 b.v[] = _v.v[];
                 b /= b.norm!\"L2\";"()
@@ -772,6 +775,8 @@ unittest {
         //Apply recurrent (relu(1 + previous vector)): [1.2, 1.2, 1.2, 1.2, 1.2]
 
         //linear(4): [4.8, 4.8, 4.8, 4.8]
+
+        //bias: [5.8, 5.8, 5.8, 5.8]
 
         //Divide by norm!"L2": [0.5, 0.5, 0.5, 0.5]
 
