@@ -539,6 +539,16 @@ class NeuralNetwork(T) {
             }
     }
 
+    @nogc pure
+    void set_parameters(in Vector!T _v) {
+        this.set_parameters(_v.v);
+    }
+
+    @nogc pure
+    void set_parameters(in T[] _v) {
+        this.serialized_data[] = _v[];
+    }
+
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
     Vector!T compute(in Vector!T _v)
     {

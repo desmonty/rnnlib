@@ -181,52 +181,9 @@ unittest {
         write(100*succes/num,"% ");
     }
 
-    { // train a very small neural network on linear function
-        size_t len = 6;
-        size_t num_points = 6;
-        
-        // Create Data points.
-        auto m = new Matrix!float(len, 1.0);
-
-        Vector!float[] x_train = new Vector!float[num_points];
-        Vector!float[] y_train = new Vector!float[num_points];
-        Vector!float[] y_tilde = new Vector!float[num_points];
-
-        foreach(i; 0 .. num_points) {
-            x_train[i] = new Vector!float(len, 1.0);
-            y_tilde[i] = new Vector!float(len, 1.0);
-            y_train[i] = m * x_train[i];
-        }
-
-        // Create Neural Network.
-        auto nn = new NeuralNetwork!float(len);
-        nn.linear.serialize();
-
-        float loss_function(in Vector!float _v) {
-            float loss_value = 0.0;
-
-            // We equipe the neural network with the weigth given in parameters.
-            nn.serialized_data[] = _v.v[];
-
-            // We loop over all data points and compute the sum of squared errors.
-            foreach(i; 0 .. num_points) {
-                nn.apply(x_train[i], y_tilde[i]);
-                y_tilde[i] -= y_train[i];
-                loss_value += y_tilde[i].norm!"L2";
-            }
-
-            return loss_value/num_points;
-        }
-
-        auto sol = new Vector!float(nn.serialized_data.length, 0.0);
-        auto res = random_search!float(sol, &loss_function, 1_000_000_000, 2000);
-
-        writeln(res);
-    }+/
-
     { // train a very small neural network on dot product function
         size_t len = 100;
-        size_t num_points = 100;
+        size_t num_points = 200;
         
         // Create Data points.
         auto m = new Matrix!float(1, len, 1.0);
@@ -263,6 +220,52 @@ unittest {
 
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
         auto res = random_search!float(sol, &loss_function, 1_000_000_000, 5000);
+
+        writeln(res);
+    }+/
+
+    { // train a very small neural network on linear function
+        size_t len = 20;
+        size_t num_points = 1000000;
+        size_t size_batch = 100;
+
+        // Create Data points.
+        auto m = new Matrix!float(len, 1.0);
+
+        Vector!float[] x_train = new Vector!float[num_points];
+        Vector!float[] y_train = new Vector!float[num_points];
+        Vector!float[] y_tilde = new Vector!float[num_points];
+
+        foreach(i; 0 .. num_points) {
+            x_train[i] = new Vector!float(len, 1.0);
+            y_tilde[i] = new Vector!float(len, 1.0);
+            y_train[i] = m * x_train[i];
+        }
+
+        // Create Neural Network.
+        auto nn = new NeuralNetwork!float(len);
+        nn.linear.serialize();
+
+        float loss_function(in Vector!float _v) {
+            float loss_value = 0.0;
+
+            // We equipe the neural network with the weigth given in parameters.
+            nn.set_parameters(_v);
+
+            size_t j;
+            // We loop over all data points and compute the sum of squared errors.
+            foreach(i; 0 .. size_batch) {
+                j = uniform!"[)"(0, num_points);
+                nn.apply(x_train[j], y_tilde[j]);
+                y_tilde[j] -= y_train[j];
+                loss_value += y_tilde[j].norm!"L2";
+            }
+
+            return loss_value/size_batch;
+        }
+
+        auto sol = new Vector!float(nn.serialized_data.length, 0.0);
+        auto res = random_search!float(sol, &loss_function, 10_000_000, 1000);
 
         writeln(res);
     }
