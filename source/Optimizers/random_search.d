@@ -133,6 +133,30 @@ T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 unittest {
     write("Unittest: random_search ... ");
 
+    {// Three-hump camel function -  dimensions
+        auto v = new Vector!real(2);
+
+        real f3hc(in Vector!real _v) {
+            real x = _v[0];
+            real y = _v[1];
+            return 2*x*x - 1.05*x*x*x*x + x*x*x*x*x*x/6.0 + x*y + y*y;
+        }
+
+        size_t num = 25;
+        real succes = 0;
+        auto l_b = new Vector!real([-5.0, -5.0]);
+        auto u_b = new Vector!real([5.0, 5.0]);
+
+        foreach(i; 0 .. num)
+        {
+            auto res = random_search!real(v, &f3hc, 100_000, 10000);
+
+            if ((abs(res) <= 0.01) && (v.norm!"L2" <= 0.01))
+                succes++;
+        }
+        assert((succes/num) >= 0.95, "Only " ~ to!string(100*(succes/num)) ~ "% success.");
+    }
+
     {// Sphere function - 100 dimensions
         auto v = new Vector!real(100);
 
@@ -189,7 +213,7 @@ void random_search_tests() {
 
     { // train a very small neural network on linear + relu function
         size_t len = 10;
-        size_t num_points = 2000;
+        size_t num_points = 500;
         
         // Create Data points.
         auto true_nn = new NeuralNetwork!float(len);
@@ -231,7 +255,7 @@ void random_search_tests() {
         }
 
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
-        auto res = random_search!float(sol, &loss_function_linRel, 100_000_000, 1000);
+        auto res = random_search!float(sol, &loss_function_linRel, 100_000_000, 500);
 
         write("Optimizers: Random_search: Linear.Relu: ");
         if (res < 1e-3)
