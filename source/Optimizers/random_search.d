@@ -135,21 +135,21 @@ unittest {
 
     {// Three-hump camel function -  dimensions
         auto v = new Vector!real(2);
-
+        
+        import std.math: cos, exp;
+        
         real f3hc(in Vector!real _v) {
             real x = _v[0];
             real y = _v[1];
-            return 2*x*x - 1.05*x*x*x*x + x*x*x*x*x*x/6.0 + x*y + y*y;
+            return 1 - cos(x) * cos(y) * exp(- (x*x + y*y));
         }
 
-        size_t num = 25;
+        size_t num = 100;
         real succes = 0;
-        auto l_b = new Vector!real([-5.0, -5.0]);
-        auto u_b = new Vector!real([5.0, 5.0]);
 
         foreach(i; 0 .. num)
         {
-            auto res = random_search!real(v, &f3hc, 100_000, 10000);
+            auto res = random_search!real(v, &f3hc, 100_000_000, 100000);
 
             if ((abs(res) <= 0.01) && (v.norm!"L2" <= 0.01))
                 succes++;
