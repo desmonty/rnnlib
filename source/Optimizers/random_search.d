@@ -20,9 +20,7 @@ version(unittest) {
 
 T random_search(T)(ref Vector!T _v, T function(in Vector!T) _func,
                    in size_t _num_iterations=50UL,
-                   in size_t _patience=5UL,
-                   in Vector!T _lower_bound=null,
-                   in Vector!T _upper_bound=null) {
+                   in size_t _patience=5UL) {
     return random_search!T(_v, toDelegate(_func), _num_iterations,
                             _patience, _lower_bound, _upper_bound);
 }
@@ -30,8 +28,6 @@ T random_search(T)(ref Vector!T _v, T function(in Vector!T) _func,
 T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                    in size_t _num_iterations=50UL,
                    in size_t _patience=5UL,
-                   in Vector!T _lower_bound=null,
-                   in Vector!T _upper_bound=null,
                    in T _exponential_factor_radius=0.5,
                    in T _lower_bound_radius=1e-6) {
     /+
@@ -45,32 +41,14 @@ T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
      +
      +  - _patience (size_t): Reduce hypersphere radius if _patience itertations
      +                        has been executed without improvement.
-     +
-     +  - _lower_bound (Vector!T): Lower bound of the search space. nan is no bound.
-     +
-     +  - _upper_bound (Vector!T): Upper bound of the search space. nan is no bound.
      +/
 
     /// Initialization
     immutable T default_upper_bound = to!T( 1); 
     immutable T default_lower_bound = to!T(-1); 
 
-    T tmp_lower_bound;
-    T tmp_upper_bound;
-
-    foreach(i; 0 .. _v.length) {
-        if (_lower_bound && !isnan(_lower_bound[i]))
-            tmp_lower_bound = _lower_bound[i];
-        else
-            tmp_lower_bound = default_lower_bound;
-
-        if (_upper_bound && !isnan(_upper_bound[i]))
-            tmp_upper_bound = _upper_bound[i];
-        else
-            tmp_upper_bound = default_upper_bound;
-
-        _v[i] = uniform(tmp_lower_bound, tmp_upper_bound);
-    }
+    foreach(i; 0 .. _v.length)
+        _v[i] = uniform(default_lower_bound, default_upper_bound);
 
     auto current_value = _func(_v);
     auto current_iteration = 0UL;
@@ -99,18 +77,6 @@ T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         
         // move neighbour near the xurrent solution.
         neighbour += _v;
-
-        // Make sure the vector doesn't go out of the box.
-        if (_lower_bound) {
-            foreach(i; 0 .. _lower_bound.length)
-                if (!isnan(_lower_bound[i]) && neighbour.v[i] < _lower_bound[i])
-                    neighbour.v[i] -= 2*(neighbour.v[i] - _lower_bound[i]);
-        }
-        if (_upper_bound) {
-            foreach(i; 0 .. _upper_bound.length)
-                if (!isnan(_upper_bound[i]) && neighbour.v[i] < _upper_bound[i])
-                    neighbour.v[i] -= 2*(neighbour.v[i] - _upper_bound[i]);
-        }
 
         /// Compute new value.
         neighbour_value = _func(neighbour);
