@@ -1,6 +1,6 @@
 module source.NeuralNetwork;
 
-import std.algorithm: map;
+import std.algorithm: map, sum;
 import std.array: array;
 import std.conv: to;
 import std.exception: enforce;
@@ -8,16 +8,18 @@ import std.exception: enforce;
 import source.Layer;
 import source.Matrix;
 import source.Parameter;
+import source.Utils;
 
 version(unittest)
 {
     import core.exception;
+    import std.exception: assertThrown;
 
-    import std.math: abs;
     import std.stdio : writeln, write;
+    import std.math;
 }
 
-/++ The Neural Network class hold all the logic of the function approximator.
+/++ The Neural Network class hold all the logic of the func approximator.
  +  
  +  Args:
  +      T: Type of the element in the network.
@@ -29,7 +31,7 @@ version(unittest)
  +        you can, be smart.
  +
  +      - Adding layers in the network is done by the use of the "addLayer..."
- +        functions. These functions can all take a "_in" and a "_to" as
+ +        funcs. These funcs can all take a "_in" and a "_to" as
  +        parameter. They will be used to know how to inscribe the new layer in
  +        the network as explained below:
  +
@@ -56,6 +58,9 @@ class NeuralNetwork(T) {
         // Save the result of the computation of a layer. Allow its multiple use.
         Vector!T[] results;
 
+        // Save the buffers used to handle layer. Allow its multiple use.
+        Vector!T[] buffers;
+
         // Used to know which layers to ask for the input of a specific layer.
         size_t[][] input_layers;
         
@@ -74,16 +79,24 @@ class NeuralNetwork(T) {
         // Map the id of the layer to its name.
         string[size_t] id_to_name;
 
+        /// Used to know wether the layer must hold a state for other to compute
+        /// e.g. a Recurrent Neural Network.
+        bool[] has_state;
+    }
+    public {
         // Give access to all the learnable parameter of the neural network.
         T[] serialized_data;
     }
 
+    @safe pure
     this(in size_t _dim_in)
     {
         // We set the first elements of these arrays to null because
         // the first layer is the "Input".
         layers = [null];
-        results = [null];
+        has_state = [false];
+        results = [new Vector!T(_dim_in)];
+        buffers = [new Vector!T(_dim_in)];
         input_layers = [null];
         id = 1;
 
@@ -113,49 +126,53 @@ class NeuralNetwork(T) {
                   in string[] _to)
     {
         // If a name was given and if it is already used.
-        if (_name && (_name in name_to_id))
-            throw new Exception(_name~" is already used as a name.");
+        if (_name && (_name in this.name_to_id))
+            throw new Exception("NeuralNetwork: Error: "~_name~" is already used as a name.");
 
         // If a specific name is given, we remember its id to be able to retreive it.
         if (_name) {
-            id_to_name[id] = _name;
-            name_to_id[_name] = id;
-        }
-
-        // Result will be filled by NeuralNetwork.compute.
-        if (_state)
-            results ~= _state.dup;
-        else {
-            results ~= null;
+            this.id_to_name[id] = _name;
+            this.name_to_id[_name] = id;
         }
 
         // If the inputs are not given, we assume it is the last defined layer.
         size_t[] _inputs = [id - 1];
         if (_in)
-            _inputs = _in.map!(a => name_to_id[a]).array();
+            _inputs = _in.map!(a => this.name_to_id[a]).array();
 
-        input_layers ~= _inputs;
-
+        this.input_layers ~= _inputs;
 
         // If the dimension of the output vector is zero, set it to the input dimension.
         if (!_dim_out)
-            _dim_out = arr_dim_out[_inputs[0]];
+            _dim_out = this.arr_dim_out[_inputs[0]];
+
+        // Result will be filled by NeuralNetwork.compute.
+        if (_state)
+            this.results ~= _state.dup;
+        else {
+            if (_to)
+                this.results ~= new Vector!T(_dim_out, _randomBound);
+            else
+                this.results ~= new Vector!T(_dim_out);
+        }
+        this.buffers ~= new Vector!T(this.arr_dim_out[_inputs[0]]);
 
         // If the layer points to other layers, we add it to their inputs.
-        // And we initialize the state vecotr if this is not already done.
+        // And we initialize the state vector if this is not already done.
         if (_to) {
             foreach(tmp_id; _to) {
-                enforce(tmp_id in name_to_id, tmp_id~": name not found.");
-                input_layers[name_to_id[tmp_id]] ~= id;
+                enforce(tmp_id in this.name_to_id, tmp_id~": name not found.");
+                this.input_layers[this.name_to_id[tmp_id]] ~= id;
             }
-
-            if (results[$-1] is null)
-                results[$-1] = new Vector!T(_dim_out, 0);
+            this.has_state ~= true;
+        }
+        else {
+            this.has_state ~= false;
         }
 
         // Update dimension arrays.
-        arr_dim_in ~= arr_dim_out[_inputs[0]];
-        arr_dim_out ~= _dim_out;
+        this.arr_dim_in ~= this.arr_dim_out[_inputs[0]];
+        this.arr_dim_out ~= _dim_out;
 
         // Add the layer to the network.
         layers ~= _create_layer();
@@ -165,7 +182,7 @@ class NeuralNetwork(T) {
     }
 
 
-    /++ Create a Linear Layer in the network and handle the logic for futur
+    /++ Create a linear Layer in the network and handle the logic for futur
      +  computation.
      +
      +  Args:
@@ -179,7 +196,7 @@ class NeuralNetwork(T) {
      +                        inputs. If empty, the last known layer will be took.
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +/
-    auto Linear(Mtype = Matrix!T)(size_t _dim_out=0,
+    auto linear(Mtype = Matrix!T)(size_t _dim_out=0,
                                in bool _use_bias=false,
                                in Tc _randomBound=1.0,
                                in string _name=null,
@@ -191,22 +208,22 @@ class NeuralNetwork(T) {
             _dim_out = arr_dim_out[$-1];
 
         return addLayer(_dim_out,
-                        new MatrixLayer!(Mtype, T)([_dim_out, arr_dim_in[id]],
+                        new MatrixLayer!Mtype([_dim_out, arr_dim_in[id]],
                             _use_bias, _randomBound),
                         _use_bias, _randomBound,
                         _name, _state, _in, _to);
     }
 
 
-    /++ Recurrent Layer
+    /++ recurrent Layer
      +
      +  It is simply constructed by adding two layers:
-     +  - The first one is a FunctionLayer which input is the last layer's result
+     +  - The first one is a funcLayer which input is the last layer's result
      +  - The second one is a MatrixLayer takes its input from the first and add a
-     +    redirection of its output towards the function layer (the recurrence).
+     +    redirection of its output towards the func layer (the recurrence).
      +
      +  Args:
-     +      _function (string, ="relu"): The name of the function to use as non-linearity.
+     +      strfunc (string, ="relu"): The name of the func to use as non-linearity.
      +      _randomBound (Tc, =1.0): Used for the generation of random values in the parameters.
      +      _name_in (string, =null): Name of the first layer for futur redirection.
      +      _name_to (string, =null): Name of the last layer for futur redirection.
@@ -215,13 +232,15 @@ class NeuralNetwork(T) {
      +                        inputs. If empty, the last known layer will be took.
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +/
-    auto Recurrent(Mtype = Matrix!T)(in string _function="relu",
-                           in Tc _randomBound=1.0,
-                           string _name_in=null,
-                           in string _name_to=null,
-                           Vector!T _state=null,
-                           in string[] _in=null,
-                           in string[] _to=null)
+    auto recurrent(Mtype = Matrix!T, string strfunc="relu", TypeParameter...)
+                  (in Tc _randomBound=1.0,
+                   string _name_in=null,
+                   in string _name_to=null,
+                   Vector!T _state=null,
+                   in string[] _in=null,
+                   in string[] _to=null,
+                   in size_t[] size_parameters=[],
+                   in Tc[] randomBound_parameters=[])
     {
         if (!_name_in)
             _name_in = "IN_RECURRENT_LAYER_" ~ to!string(id);
@@ -231,17 +250,19 @@ class NeuralNetwork(T) {
         if (!_state)
             _state = new Vector!T(arr_dim_out[$-1], _randomBound);
 
-        this.Function(_function,  // Function name.
-                      0,          // dim out = dim in.
-                      _name_in,   // name for futur reference in the recurrent layer.
-                      null,       // no state vector.
-                      _in,        // 'in' references. 
-                      null);      // no 'out' references.
+        this.func!(strfunc, TypeParameter)  // func name.
+                  (0,          // dim out = dim in.
+                   _name_in,   // name for futur reference in the recurrent layer.
+                   null,       // no state vector.
+                   _in,        // 'in' references. 
+                   null,       // no 'out' references.
+                   size_parameters,
+                   randomBound_parameters);
 
-        this.Linear!(Mtype)(0,            // dim out = dim in.
+        this.linear!(Mtype)(0,            // dim out = dim in.
                             false,        // no bias vector.
                             _randomBound, // random bound for the initialisation.
-                            _name_to,    // Name for futur references out of the recurrent layer.
+                            _name_to,     // Name for futur references out of the recurrent layer.
                             _state,       // intial state vector.
                             null,         // no 'in' references.
                             tmp_to);         // 'out' references.
@@ -252,7 +273,7 @@ class NeuralNetwork(T) {
     /++ Functional layer.
      +
      +  Args:
-     +      _function (string): The name of the function to use as non-linearity.
+     +      strfunc (string): The name of the func to use as non-linearity.
      +                          This can also be a (Vector!T delegate(Vector!T) )
      +                          and a (Vector!T delegate(Vector!T, Parameter[])).
      +      _dim_out (size_t, =0): Dimension of the resulting vector.
@@ -263,72 +284,319 @@ class NeuralNetwork(T) {
      +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
      +
      +/
-    auto Function(in string _function,
-                  in size_t _dim_out=0,
-                  in string _name=null,
-                  Vector!T _state=null,
-                  in string[] _in=null,
-                  in string[] _to=null)
+    auto func(string strfunc="", TypeParameter...)
+             (in size_t _dim_out=0,
+              in string _name=null,
+              Vector!T _state=null,
+              in string[] _in=null,
+              in string[] _to=null,
+              in size_t[] size_parameters=[],
+              in Tc[] randomBound_parameters=[])
     {
         return addLayer(_dim_out,
-                        new FunctionalLayer!T(_function, arr_dim_out[$-1]),
+                        new FunctionalLayer!(T, strfunc, TypeParameter)
+                                           (size_parameters, randomBound_parameters),
                         false, 0.0,
                         _name, _state,
                         _in, _to);
     }
 
-    auto Function(Vector!T delegate(Vector!T) _function,
-                  in size_t _dim_out=0,
-                  in string _name=null,
-                  Vector!T _state=null,
-                  in string[] _in=null,
-                  in string[] _to=null)
+    /++ softmax layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto softmax(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
     {
-        return addLayer(_dim_out,
-                        new FunctionalLayer!T(_function),
-                        false, 0.0,
-                        _name, _state,
-                        _in, _to);
+        return this.func!"softmax"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ relu layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto relu(in size_t _dim_out=0,
+              in string _name=null,
+              Vector!T _state=null,
+              in string[] _in=null,
+              in string[] _to=null)
+    {
+        return this.func!"relu"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ binary layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto binary(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"binary"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ logistic layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto logistic(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"logistic"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ identity layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto identity(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"identity"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ tanh layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto tanh(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"tanh"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ arctan layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto arctan(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"arctan"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ softsign layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto softsign(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"softsign"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ softplus layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto softplus(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"softplus"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ sin layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto sin(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"sin"(_dim_out, _name, _state, _in, _to);
+    }
+    /++ gaussian layer.
+     +
+     +  Args:
+     +      _dim_out (size_t, =0): Dimension of the resulting vector.
+     +      _name (string, =null): Name of the layer for futur redirection.
+     +      _state (Vector!T, =null): Initial state of the result vector.
+     +      _in (size_t[], =null): A list of layers' name for the layer to take its
+     +                        inputs. If empty, the last known layer will be took.
+     +      _to (size_t[], =null): A list of the layers which will take their input from this layer.
+     +/
+    auto gaussian(in size_t _dim_out=0,
+                 in string _name=null,
+                 Vector!T _state=null,
+                 in string[] _in=null,
+                 in string[] _to=null)
+    {
+        return this.func!"gaussian"(_dim_out, _name, _state, _in, _to);
     }
 
-    auto Function(Vector!T delegate(Vector!T, Parameter[]) _function,
-                  in size_t _dim_out=0,
-                  in string _name=null,
-                  Vector!T _state=null,
-                  in string[] _in=null,
-                  in string[] _to=null)
+    /++ Serialize all the parameters in the neural networks.
+     +  This funciton should be called at the end of the construction of the neural network.
+     +  It is a MANDATORY step for the optimization of the network.
+     +
+     +  This method will create an array of type 'T[]' so that all the parameters (Matrix and Vectors)
+     +  should have their weights in it. In practice, what we want is to change the neural networks
+     +  weights by changing only the array.
+     +  This way of changing the weights of the neural networks should ease the work of the optimization
+     +  algorithms.
+     +/
+    @property
+    void serialize()
     {
-        return addLayer(_dim_out,
-                        new FunctionalLayer!T(_function),
-                        false, 0.0,
-                        _name, _state,
-                        _in, _to);
+        /++ This method allocate memory for the all neural network.
+         +/
+
+        // First we want to know the size of the total array.
+        // We sum the size of each layer.
+        size_t total_size = 0;
+        foreach(i; 0 .. this.layers.length)
+            if (!(this.layers[i] is null)) {
+                total_size += this.layers[i].size;
+                if (this.has_state[i])
+                    total_size += this.arr_dim_out[i];
+            }
+
+        serialized_data = new T[total_size];
+
+        // We copy the values in the new array and replace the old
+        // ones by a reference to the new array. 
+        size_t _index = 0;
+        foreach(i; 0 .. layers.length)
+            if (!(layers[i] is null)){
+                layers[i].takeOwnership(serialized_data, _index);
+                if (this.has_state[i])
+                    takeOwnership_util!T(serialized_data, results[i].v, _index);
+            }
+    }
+
+    @nogc pure
+    void set_parameters(in Vector!T _v) {
+        this.set_parameters(_v.v);
+    }
+
+    @nogc pure
+    void set_parameters(in T[] _v) {
+        this.serialized_data[] = _v[];
     }
 
     /// Apply the NeuralNetwork to the vector and change the NN state if needed.
     Vector!T compute(in Vector!T _v)
     {
-        results[0] = _v.dup;
-        Vector!T tmp_vec;
+        buffers[0].v[] = _v.v[];
+        results[0].v[] = _v.v[];
 
         foreach(cur_id; 1 .. id)
         {
             // If there is only one input,
             // we just pass it to the layer for computation. 
             if (input_layers[cur_id].length == 1)
-                results[cur_id] = layers[cur_id].compute(results[input_layers[cur_id][0]]);
+                layers[cur_id].apply(results[input_layers[cur_id][0]], results[cur_id]);
             else {
                 // Else we need to create a temporary vector to sum all the inputs.
-                tmp_vec = new Vector!T(arr_dim_in[cur_id], 0);
+                buffers[cur_id].v[] = to!T(0);
                 foreach(tmp_id; input_layers[cur_id])
-                    tmp_vec += results[tmp_id];
+                    buffers[cur_id] += results[tmp_id];
 
                 // Finally, we compute the tmp vector using the layer.
-                results[cur_id] = layers[cur_id].compute(tmp_vec);
+                layers[cur_id].apply(buffers[cur_id], results[cur_id]);
             }
         }
+        return new Vector!T(results[$-1].dup);
+    }
 
-        return results[$-1];
+    /// Apply the NeuralNetwork to the vector and change the NN state if needed.
+    void apply(in Vector!T _v, ref Vector!T _b)
+    {
+        buffers[0].v[] = _v.v[];
+        results[0].v[] = _v.v[];
+
+        foreach(cur_id; 1 .. id)
+        {
+            // If there is only one input,
+            // we just pass it to the layer for computation. 
+            if (input_layers[cur_id].length == 1)
+                layers[cur_id].apply(results[input_layers[cur_id][0]], results[cur_id]);
+            else {
+                // Else we need to create a temporary vector to sum all the inputs.
+                buffers[cur_id].v[] = to!T(0);
+                foreach(tmp_id; input_layers[cur_id])
+                    buffers[cur_id] += results[tmp_id];
+
+                // Finally, we compute the tmp vector using the layer.
+                layers[cur_id].apply(buffers[cur_id], results[cur_id]);
+            }
+        }
+        _b.v[] = results[$-1].v[];
     }
 }
 unittest {
@@ -336,11 +604,11 @@ unittest {
 
     // Neural Network 1: Simple linear layer neural network.
     // Neural Network 2: Two linear layer with a recurrence.
-    
     {
         // Initialize the neural network.
-        // At this point, we have the identity function.
+        // At this point, we have the identity func.
         auto nn = new NeuralNetwork!float(4);
+        nn.identity;
 
         // Vector of L2 norm = 1.
         auto v = new Vector!float([0.5, 0.0, -0.5, 0.7071068]);
@@ -351,8 +619,8 @@ unittest {
 
         assert(w.norm!"L2" <= 0.0001);
 
-        // We add a Linear Layer of shape (6, 4).
-        nn.Linear!(Matrix!float)(6, false, 1.0, "L1");
+        // We add a linear Layer of shape (6, 4).
+        nn.linear!(Matrix!float)(6, false, 1.0, "L1");
         w = nn.compute(v);
 
         // Hence, the resulting vector should have length 6.
@@ -361,16 +629,19 @@ unittest {
         // We add some complexity: the layer take the user's input and the ouput of "L1"
         // and return its output to "L1" (And so create a rnn-like structure) and to
         // the output (by default, the result of the last layer).
-        nn.Linear!(Matrix!float)(4, false, 1.0, "L2", null, null, ["L1"]);
+        nn.linear!(Matrix!float)(4, false, 1.0, "L2", null, null, ["L1"]);
+        auto blue_state_tmp = nn.results[3].dup; // Copy the state.
         w = nn.compute(v);
         auto z = nn.compute(v);
 
         // Now we reconstruct what we think the neural network should compute.
         // w
-        auto w_bis = (cast(Matrix!float) nn.layers[1].params[0]) * v;
-        w_bis *= (cast(Matrix!float) nn.layers[2].params[0]);
+        blue_state_tmp += v;
+        auto w_bis = (cast(Matrix!float) nn.layers[nn.name_to_id["L1"]].params[0]) * blue_state_tmp;
+        w_bis *= (cast(Matrix!float) nn.layers[nn.name_to_id["L2"]].params[0]);
 
         auto hidden = w_bis.dup;
+
         w_bis -= w;
 
         assert(w_bis.norm!"L2" <= 0.0001);
@@ -378,23 +649,23 @@ unittest {
         // z
         auto z_bis = hidden;
         z_bis += v;
-        z_bis = (cast(Matrix!float) nn.layers[1].params[0]) * z_bis;
-        z_bis = (cast(Matrix!float) nn.layers[2].params[0]) * z_bis;
+        z_bis = (cast(Matrix!float) nn.layers[nn.name_to_id["L1"]].params[0]) * z_bis;
+        z_bis = (cast(Matrix!float) nn.layers[nn.name_to_id["L2"]].params[0]) * z_bis;
         
         z_bis -= z;
         assert(z_bis.norm!"L2" <= 0.0001);
     }
-    
+
     // Neural Network 1: Simple linear layer + softmax.
-    // Neural Network 2: RNN: Linear + relu + Linear (+backlink) + Linear + softmax.
+    // Neural Network 2: RNN: linear + relu + linear (+backlink) + linear + softmax.
     {
 
         auto vec = new Vector!real(5, 1.0);
 
         // NN1
         auto nn1 = new NeuralNetwork!real(5);
-        nn1.Linear(5)
-           .Function("softmax", 5);
+        nn1.linear(5)
+           .softmax(5);
 
 
         auto w = nn1.compute(vec);
@@ -404,20 +675,20 @@ unittest {
 
         // NN2
         auto nn2 = new NeuralNetwork!real(5);
-        nn2.Linear(5, true)
-           .Recurrent()
-           .Linear(5, true)
-           .Function("softmax");
+        nn2.linear(5, true)
+           .recurrent()
+           .linear(5, true)
+           .softmax();
 
 
         auto s = nn2.results[3].dup; 
 
         auto nn3 = new NeuralNetwork!real(5);
-        nn3.Linear(5, true, 1.0)
-           .Function("relu", 5, "Rec_in")
-           .Linear(5, false, 1.0, null, s, null, ["Rec_in"])
-           .Linear(5, true)
-           .Function("softmax");
+        nn3.linear(5, true, 1.0)
+           .relu(5, "Rec_in")
+           .linear(5, false, 1.0, null, s, null, ["Rec_in"])
+           .linear(5, true)
+           .softmax();
 
 
         // put same parameters in the second nn.
@@ -459,6 +730,159 @@ unittest {
         assert(b_3.norm!"L2" <= 0.0001);
         assert(b_4.norm!"L2" <= 0.0001);
     }
+
+    // Neural Network 1: linear + softmax
+    // Neural Network 2: linear + softmax + linear + recurrent + linear + norm!"L2"^-1
+    {
+        auto nn1 = new NeuralNetwork!real(4);
+        nn1.linear(4, true)
+           .softmax()
+           .serialize;
+
+        auto v = new Vector!real([1.0, -1.0, 0.0, 1.0]);
+
+        assert(nn1.serialized_data.length == 4*4+4);
+
+        foreach(i; 0 .. nn1.serialized_data.length)
+            nn1.serialized_data[i] = 1.0;
+
+        v = nn1.compute(v);
+
+        auto res = new Vector!real([0.25, 0.25, 0.25, 0.25]);
+        res -= v;
+
+        assert(res.norm!"L2" <= 0.0001);
+
+        auto nn2 = new NeuralNetwork!real(4);
+        nn2.linear(5)
+           .softmax()
+           .linear(5)
+           .recurrent()
+           .linear(4)
+           .func!"b.v[] = _v.v[]; b.v[] += 1.0;"()
+           .func!"
+                b.v[] = _v.v[];
+                b /= b.norm!\"L2\";"()
+           .serialize;
+
+        auto w = nn2.compute(v);
+
+        // Test if the delegate works as needed.
+        enforce(abs(1 - w.norm!"L2") <= 0.0001, "Norm of "~to!string(w.v)~" is not 1.0");
+
+        // We set each weights to one.
+        foreach(i; 0 .. nn2.serialized_data.length)
+            nn2.serialized_data[i] = 1.0;
+
+        w = nn2.compute(v);
+        
+        // We then apply each step separately with weights 1 using the fact that v = [1, -1, 0, 1].
+
+        //Apply linear(5): [1, 1, 1, 1, 1]
+
+        //Apply softmax: [0.2, 0.2, 0.2, 0.2, 0.2]
+
+        //Apply recurrent (relu(1 + previous vector)): [1.2, 1.2, 1.2, 1.2, 1.2]
+
+        //linear(4): [4.8, 4.8, 4.8, 4.8]
+
+        //bias: [5.8, 5.8, 5.8, 5.8]
+
+        //Divide by norm!"L2": [0.5, 0.5, 0.5, 0.5]
+
+        auto true_res = new Vector!real([0.5, 0.5, 0.5, 0.5]);
+        true_res -= w;
+
+        assert(true_res.norm!"L2" <= 0.0001);
+    }
+
+    // Neural Networks: relu / logistic / gaussian / identity
+    //                / tanh / arctan / softsign  / softplus / sin / binary 
+    {
+        auto vec = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        
+        auto nn_relu = new NeuralNetwork!real(4);
+        nn_relu.relu();
+        auto res_relu = new Vector!real([0.0, 0.0, 0.5, 1.0]);
+        res_relu -= nn_relu.compute(vec);
+        assert(res_relu.norm!"L2" <= 0.000001);
+
+        auto nn_logistic = new NeuralNetwork!real(4);
+        nn_logistic.logistic();
+        auto res_logistic = new Vector!real([1.0/(1.0 + exp( 1.0)), 1.0/(1.0 + exp( 0.5)),
+                                             1.0/(1.0 + exp(-0.5)), 1.0/(1.0 + exp(-1.0))]);
+        res_logistic -= nn_logistic.compute(vec);
+        assert(res_logistic.norm!"L2" <= 0.000001);
+
+        auto nn_gaussian = new NeuralNetwork!real(4);
+        nn_gaussian.gaussian();
+        auto res_gaussian = new Vector!real([exp(-1.0), exp(-0.25), exp(-0.25), exp(-1.0)]);
+        res_gaussian -= nn_gaussian.compute(vec);
+        assert(res_gaussian.norm!"L2" <= 0.000001);
+
+        auto nn_identity = new NeuralNetwork!real(4);
+        nn_identity.identity();
+        auto res_identity = new Vector!real([-1.0, -0.5, 0.5, 1.0]);
+        res_identity -= nn_identity.compute(vec);
+        assert(res_identity.norm!"L2" <= 0.000001);
+
+        auto nn_tanh = new NeuralNetwork!real(4);
+        nn_tanh.tanh();
+        auto res_tanh = new Vector!real([tanh(-1.0), tanh(-0.5), tanh(0.5), tanh(1.0)]);
+        res_tanh -= nn_tanh.compute(vec);
+        assert(res_tanh.norm!"L2" <= 0.000001);
+
+        auto nn_arctan = new NeuralNetwork!real(4);
+        nn_arctan.arctan();
+        auto res_arctan = new Vector!real([atan(-1.0), atan(-0.5), atan(0.5), atan(1.0)]);
+        res_arctan -= nn_arctan.compute(vec);
+        assert(res_arctan.norm!"L2" <= 0.000001);
+
+        auto nn_softsign = new NeuralNetwork!real(4);
+        nn_softsign.softsign();
+        auto res_softsign = new Vector!real([-0.5, -1.0/3.0, 1.0/3.0, 0.5]);
+        res_softsign -= nn_softsign.compute(vec);
+        assert(res_softsign.norm!"L2" <= 0.000001);
+
+        auto nn_softplus = new NeuralNetwork!real(4);
+        nn_softplus.softplus();
+        auto res_softplus = new Vector!real([log(1+exp(-1.0)), log(1+exp(-0.5)), log(1 + exp(0.5)), log(1 + exp(1.0))]);
+        res_softplus -= nn_softplus.compute(vec);
+        assert(res_softplus.norm!"L2" <= 0.000001);
+
+        auto nn_sin = new NeuralNetwork!real(4);
+        nn_sin.sin();
+        auto res_sin = new Vector!real([sin(-1.0), sin(-0.5), sin(0.5), sin(1.0)]);
+        res_sin -= nn_sin.compute(vec);
+        assert(res_sin.norm!"L2" <= 0.000001);
+
+        auto nn_binary = new NeuralNetwork!real(4);
+        nn_binary.binary();
+        auto res_binary = new Vector!real([0.0, 0.0, 1.0, 1.0]);
+        res_binary -= nn_binary.compute(vec);
+        assert(res_binary.norm!"L2" <= 0.000001);
+    }
+
+    // Neural Network: Diamond structure with identity function only => implement f(x) = 2*x !
+    {
+        auto nn = new NeuralNetwork!real(6);
+        nn.identity(0, "top")
+          .identity(0, "bottom", null, ["input"])
+          .identity(0, "output", null, ["bottom", "top"]);
+
+        auto vec = new Vector!real(6, 1.0);
+        auto res = nn.compute(vec);
+        auto buf = new Vector!real(6);
+        nn.apply(vec, buf);
+        vec += vec;
+        buf -= vec;
+        res -= vec;
+        assert(res.norm!"L2" <= 0.000001);
+        assert(buf.norm!"L2" <= 0.000001);
+    }
+
+    // Bad naming of layers
+    assertThrown((new NeuralNetwork!real(5).linear(0, false, 1.0, "blue").linear(7, true, 2.0, "blue")));
 
     writeln("Done.");
 }

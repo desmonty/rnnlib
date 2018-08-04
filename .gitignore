@@ -3,3 +3,6 @@
 *.lst
 *.a
 .dub
+Layer
+*.bin
+*.exe
