@@ -48,8 +48,11 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
      +  - shrink_coef (T): Meta-Parameter.
      +/
 
-     immutable size_T length = _v.length;
-     immutable size_T num_points = _v.length + 1;
+    assert(_contraction_coef <= 0.5, "Contraction coef must be <= 0.5");
+    assert(_contraction_coef > 0, "Contraction coef must be > 0");
+
+    immutable size_T length = _v.length;
+    immutable size_T num_points = _v.length + 1;
 
     /// Create Simplex
     auto simplex = new (Vector!T)[num_points];
@@ -61,15 +64,27 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         simplex_values[i] = _func(simplex[i]);
 
     /// Order simplex
-    auto sorted_indices = simplex_values.enumerate // Get indices
-                                        .array     // Prepare for sorting
-                                        .sort!((a,b) => a.value < b.value) // Take the value only to sort
-                                        .map!(a => a.index) // Return the indices 
-                                        .array     // Make it an array.
-    
+    auto tmp_min = simplex_values.enumerate.minElement!"a.value";
+    auto min_value = tmp_min.value;
+    auto min_index = tmp_min.index;
+
+    auto tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
+    auto max1_value = tmp_max[0].value;
+    auto max1_index = tmp_max[0].index;
+    auto max2_value = tmp_max[1].value;
+    auto max2_index = tmp_max[1].index;
+
     /// Init util vector
     auto temporary_vector = new Vector!T(length, _random_bound);
+    auto reflection_vector = new Vector!T(length, _random_bound);
+    auto expension_vector = new Vector!T(length, _random_bound);
+    auto contraction_vector = new Vector!T(length, _random_bound);
+    auto shrink_vector = new Vector!T(length, _random_bound);
     T temporary_value;
+    T reflection_value;
+    T expension_value;
+    T contraction_value;
+    T shrink_value;
 
     // Centroid
     auto temporary_centroid_vector = new Vector!T(length, 0);
@@ -80,25 +95,142 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 
     /// Core Loop
     bool stop_criterion = false;
+    bool free_pass = false;
     while(!stop_criterion) {
         /// Compute centroid
-            centroid_vector.v[] = temporary_centroid_vector.v[];
-            centroid_vector /= length;
-
+        centroid_vector.v[] = temporary_centroid_vector.v[];
+        centroid_vector /= length;
+        
+        free_pass = false;
+        
         /// Reflection
-            temporary_vector.v[] = centroid_vector.v[];
-            temporary_vector -= simplex[length];
-            temporary_vector *= _reflection_coef;
-            temporary_vector += centroid_vector;
+        reflection_vector.v[] = centroid_vector.v[];
+        reflection_vector -= simplex[max1_index];
+        reflection_vector *= _reflection_coef;
+        reflection_vector += centroid_vector;
 
-            temporary_value = _func(temporary_vector);
-            if 
+        reflection_value = _func(reflection_vector);
+
+        // if f(x_1) <= f(x_r) < f(x_n)
+        if ((reflection_value < max2_value)
+         && (reflection_value >= min_value)) {
+            // Readjust centroid vector.
+            temporary_centroid_vector -= simplex[max1_index];
+            temporary_centroid_vector += reflection_vector;
+
+            // Replace last point in simplex.
+            simplex[max1_index].v[] = reflection_vector.v[];
+            simplex_values[max1_index] = reflection_value;
+
+            tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
+            max1_value = tmp_max[0].value;
+            max1_index = tmp_max[0].index;
+            max2_value = tmp_max[1].value;
+            max2_index = tmp_max[1].index;
+
+            free_pass = true;
+        }
 
         /// Expension
+        if (!free_pass) {
+            if (reflection_value < min_value) {
+                expension_vector.v[] = reflection_vector.v[];
+                expension_vector -= centroid_vector;
+                expension_vector *= _expension_coef;
+                expension_vector += centroid_vector;
+
+                expension_value = _func(expension_vector);
+
+                // We replace the worst point by the expension vector
+                if (expension_value < reflection_value) {
+                    // Readjust centroid vector.
+                    temporary_centroid_vector -= simplex[main_index];
+                    temporary_centroid_vector += expension_vector;
+
+                    simplex[max1_index].v[] = expension_vector.v[];
+                    simplex_values[max1_index] = expension_value;
+
+                    tmp_min = simplex_values.enumerate.minElement!"a.value";
+                    min_value = tmp_min.value;
+                    min_index = tmp_min.index;
+                    tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
+                    max1_value = tmp_max[0].value;
+                    max1_index = tmp_max[0].index;
+                    max2_value = tmp_max[1].value;
+                    max2_index = tmp_max[1].index;
+                }
+                // We replace the worst point by the reflection vector
+                else {
+                    // Readjust centroid vector.
+                    temporary_centroid_vector -= simplex[main_index];
+                    temporary_centroid_vector += reflection_vector;
+
+                    simplex[max1_index].v[] = reflection_vector.v[];
+                    simplex_values[max1_index] = reflection_value;
+
+                    tmp_min = simplex_values.enumerate.minElement!"a.value";
+                    min_value = tmp_min.value;
+                    min_index = tmp_min.index;
+                    tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
+                    max1_value = tmp_max[0].value;
+                    max1_index = tmp_max[0].index;
+                    max2_value = tmp_max[1].value;
+                    max2_index = tmp_max[1].index;
+                }
+                free_pass = true;
+            }
+        }
 
         /// Contraction
+        if (!free_pass) {
+            contraction_vector.v[] = simplex[max1_index].v[];
+            contraction_vector -= centroid_vector;
+            contraction_vector *= _contraction_coef;
+            contraction_vector += centroid_vector;
+
+            contraction_value = _func(contraction_vector);
+            if (contraction_value < max1_value) {
+                // Readjust centroid vector.
+                temporary_centroid_vector -= simplex[max1_index];
+                temporary_centroid_vector += contraction_vector;
+
+                // Replace last point in simplex.
+                simplex[max1_index].v[] = contraction_vector.v[];
+                simplex_values[max1_index] = contraction_value;
+
+                tmp_min = simplex_values.enumerate.minElement!"a.value";
+                min_value = tmp_min.value;
+                min_index = tmp_min.index;
+                tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
+                max1_value = tmp_max[0].value;
+                max1_index = tmp_max[0].index;
+                max2_value = tmp_max[1].value;
+                max2_index = tmp_max[1].index;
+
+                free_pass = true;
+            }
+        }
 
         /// Shrink
+        if (!free_pass) {
+            foreach(i; 0 .. num_points) {
+                if (i != min_index) {
+                    simplex[i] -= simplex[min_index];
+                    simplex[i] *= _shrink_coef;
+                    simplex[i] += simplex[min_index];
+                    simplex_values[i] = _func(simplex[i]);
+                }
+            }
+            
+            tmp_min = simplex_values.enumerate.minElement!"a.value";
+            min_value = tmp_min.value;
+            min_index = tmp_min.index;
+            tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
+            max1_value = tmp_max[0].value;
+            max1_index = tmp_max[0].index;
+            max2_value = tmp_max[1].value;
+            max2_index = tmp_max[1].index;
+        }
     }
     /// Return
     return ;
