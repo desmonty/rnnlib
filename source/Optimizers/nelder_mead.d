@@ -1,12 +1,10 @@
 module source.optimizers.nelder_mead;
 
-//import core.stdc.math: isnan;
-//import std.algorithm: max;
-//import std.conv: to;
+import std.algorithm: minElement, topN, minIndex, topNIndex;
+import std.conv: to;
 import std.functional: toDelegate;
-//import std.math: abs, pow, sqrt;
-//import std.mathspecial: normalDistributionInverse;
-//import std.random: uniform;
+import std.math: abs, pow, sqrt;
+import std.range: enumerate;
 
 import source.Matrix;
 import source.NeuralNetwork;
@@ -51,11 +49,11 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     assert(_contraction_coef <= 0.5, "Contraction coef must be <= 0.5");
     assert(_contraction_coef > 0, "Contraction coef must be > 0");
 
-    immutable size_T length = _v.length;
-    immutable size_T num_points = _v.length + 1;
+    immutable size_t length = _v.length;
+    immutable size_t num_points = _v.length + 1;
 
     /// Create Simplex
-    auto simplex = new (Vector!T)[num_points];
+    auto simplex = new Vector!T[num_points];
     foreach(i; 0 .. (num_points))
         simplex[i] = new Vector!T(length, _random_bound);
 
@@ -64,15 +62,16 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         simplex_values[i] = _func(simplex[i]);
 
     /// Order simplex
-    auto tmp_min = simplex_values.enumerate.minElement!"a.value";
-    auto min_value = tmp_min.value;
-    auto min_index = tmp_min.index;
+    auto min_value = simplex_values.minElement;
+    auto min_index = simplex_values.minIndex;
 
-    auto tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
-    auto max1_value = tmp_max[0].value;
-    auto max1_index = tmp_max[0].index;
-    auto max2_value = tmp_max[1].value;
-    auto max2_index = tmp_max[1].index;
+    auto tmp_max_value = simplex_values.topN(2);
+    size_t[] index_max = new size_t[2];
+    simplex_values.topNIndex(index_max);
+    auto max1_value = tmp_max_value[0];
+    auto max1_index = index_max[0];
+    auto max2_value = tmp_max_value[1];
+    auto max2_index = index_max[1];
 
     /// Init util vector
     auto temporary_vector = new Vector!T(length, _random_bound);
@@ -122,11 +121,12 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
             simplex[max1_index].v[] = reflection_vector.v[];
             simplex_values[max1_index] = reflection_value;
 
-            tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
-            max1_value = tmp_max[0].value;
-            max1_index = tmp_max[0].index;
-            max2_value = tmp_max[1].value;
-            max2_index = tmp_max[1].index;
+            tmp_max_value = simplex_values.topN(2);
+            simplex_values.topNIndex(index_max);
+            max1_value = tmp_max_value[0];
+            max1_index = index_max[0];
+            max2_value = tmp_max_value[1];
+            max2_index = index_max[1];
 
             free_pass = true;
         }
@@ -144,38 +144,38 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 // We replace the worst point by the expension vector
                 if (expension_value < reflection_value) {
                     // Readjust centroid vector.
-                    temporary_centroid_vector -= simplex[main_index];
+                    temporary_centroid_vector -= simplex[min_index];
                     temporary_centroid_vector += expension_vector;
 
                     simplex[max1_index].v[] = expension_vector.v[];
                     simplex_values[max1_index] = expension_value;
 
-                    tmp_min = simplex_values.enumerate.minElement!"a.value";
-                    min_value = tmp_min.value;
-                    min_index = tmp_min.index;
-                    tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
-                    max1_value = tmp_max[0].value;
-                    max1_index = tmp_max[0].index;
-                    max2_value = tmp_max[1].value;
-                    max2_index = tmp_max[1].index;
+                    min_value = simplex_values.minElement;
+                    min_index = simplex_values.minIndex;
+                    tmp_max_value = simplex_values.topN(2);
+                    simplex_values.topNIndex(index_max);
+                    max1_value = tmp_max_value[0];
+                    max1_index = index_max[0];
+                    max2_value = tmp_max_value[1];
+                    max2_index = index_max[1];
                 }
                 // We replace the worst point by the reflection vector
                 else {
                     // Readjust centroid vector.
-                    temporary_centroid_vector -= simplex[main_index];
+                    temporary_centroid_vector -= simplex[min_index];
                     temporary_centroid_vector += reflection_vector;
 
                     simplex[max1_index].v[] = reflection_vector.v[];
                     simplex_values[max1_index] = reflection_value;
 
-                    tmp_min = simplex_values.enumerate.minElement!"a.value";
-                    min_value = tmp_min.value;
-                    min_index = tmp_min.index;
-                    tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
-                    max1_value = tmp_max[0].value;
-                    max1_index = tmp_max[0].index;
-                    max2_value = tmp_max[1].value;
-                    max2_index = tmp_max[1].index;
+                    min_value = simplex_values.minElement;
+                    min_index = simplex_values.minIndex;
+                    tmp_max_value = simplex_values.topN(2);
+                    simplex_values.topNIndex(index_max);
+                    max1_value = tmp_max_value[0];
+                    max1_index = index_max[0];
+                    max2_value = tmp_max_value[1];
+                    max2_index = index_max[1];
                 }
                 free_pass = true;
             }
@@ -198,14 +198,14 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 simplex[max1_index].v[] = contraction_vector.v[];
                 simplex_values[max1_index] = contraction_value;
 
-                tmp_min = simplex_values.enumerate.minElement!"a.value";
-                min_value = tmp_min.value;
-                min_index = tmp_min.index;
-                tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
-                max1_value = tmp_max[0].value;
-                max1_index = tmp_max[0].index;
-                max2_value = tmp_max[1].value;
-                max2_index = tmp_max[1].index;
+                min_value = simplex_values.minElement;
+                min_index = simplex_values.minIndex;
+                tmp_max_value = simplex_values.topN(2);
+                simplex_values.topNIndex(index_max);
+                max1_value = tmp_max_value[0];
+                max1_index = index_max[0];
+                max2_value = tmp_max_value[1];
+                max2_index = index_max[1];
 
                 free_pass = true;
             }
@@ -222,21 +222,29 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 }
             }
             
-            tmp_min = simplex_values.enumerate.minElement!"a.value";
-            min_value = tmp_min.value;
-            min_index = tmp_min.index;
-            tmp_max = simplex_values.enumerate.topN!"a.value < b.value"(2);
-            max1_value = tmp_max[0].value;
-            max1_index = tmp_max[0].index;
-            max2_value = tmp_max[1].value;
-            max2_index = tmp_max[1].index;
+            min_value = simplex_values.minElement;
+            min_index = simplex_values.minIndex;
+            tmp_max_value = simplex_values.topN(2);
+            simplex_values.topNIndex(index_max);
+            max1_value = tmp_max_value[0];
+            max1_index = index_max[0];
+            max2_value = tmp_max_value[1];
+            max2_index = index_max[1];
         }
+
+        // Stopping criterion 1:
+        // Stop when the centroid and the first vector are close
+        temporary_vector.v[] = temporary_centroid_vector.v[];
+        temporary_vector -= simplex[min_index];
+        stop_criterion = (temporary_vector.norm!"L2" <= 0.001);
     }
+
     /// Return
-    return ;
+    _v.v[] = simplex[min_index].v[];
+    return min_value;
 }
 unittest {
-    write("Unittest: random_search ... ");
+    write("Unittest: nelder_mead ... ");
 
     {// Three-hump camel function -  dimensions
         auto v = new Vector!real(2);
@@ -255,7 +263,7 @@ unittest {
         foreach(i; 0 .. num)
         {
             // TODO: Replace with neilder-mead
-            auto res = random_search!real(v, &f3hc, 100_000_000, 100000);
+            auto res = nelder_mead!real(v, &f3hc);
 
             if ((abs(res) <= 0.01) && (v.norm!"L2" <= 0.01))
                 succes++;
@@ -282,7 +290,7 @@ unittest {
         foreach(i; 0 .. num)
         {
             // TODO: Replace with neilder-mead
-            auto res = random_search!real(v, &sphere, 5000, 30);
+            auto res = nelder_mead!real(v, &sphere);
 
             if ((abs(res) <= 0.01) && (v.norm!"max" <= 0.01))
                 succes++;
@@ -306,8 +314,7 @@ unittest {
         assert(racine!(1.0, -1.0)(new Vector!real([1.0])) == 0.0);
 
             // TODO: Replace with neilder-mead
-        auto res = random_search!real(v, &(racine!(1.0, -1.0, -1.0)),
-                                      200UL, 5UL);
+        auto res = nelder_mead!real(v, &(racine!(1.0, -1.0, -1.0)));
 
         assert(abs(res) <= 0.001);
         assert((abs(v[0] - (1.0 + sqrt(5.0))/2.0) <= 0.001) ||
@@ -317,7 +324,7 @@ unittest {
     writeln("Done");
 }
 
-void random_search_tests() {
+void nelder_mead_tests() {
 
     { // train a very small neural network on linear + relu function
         size_t len = 10;
@@ -364,7 +371,7 @@ void random_search_tests() {
 
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
             // TODO: Replace with neilder-mead
-        auto res = random_search!float(sol, &loss_function_linRel, 100_000_000, 500);
+        auto res = nelder_mead!float(sol, &loss_function_linRel);
 
         write("Optimizers: Random_search: Linear.Relu: ");
         if (res < 1e-3)
@@ -412,7 +419,7 @@ void random_search_tests() {
 
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
             // TODO: Replace with neilder-mead
-        auto res = random_search!float(sol, &loss_function_dot, 1_000_000_000, 200);
+        auto res = nelder_mead!float(sol, &loss_function_dot);
 
         write("            Random_search: Dot Product: ");
         if (res < 1e-3)
