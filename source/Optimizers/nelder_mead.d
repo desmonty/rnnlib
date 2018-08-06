@@ -21,7 +21,9 @@ T nelder_mead(T)(ref Vector!T _v, T function(in Vector!T) _func,
                  T expension_coef=2.0,
                  T contraction_coef=0.5,
                  T shrink_coef=0.5) {
-    return nelder_mead!T(_v, toDelegate(_func));
+    return nelder_mead!T(_v, toDelegate(_func),
+                         reflection_coef, expension_coef,
+                         contraction_coef, shrink_coef);
 }
 
 T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
@@ -57,15 +59,6 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     foreach(i; 0 .. (num_points))
         simplex[i] = new Vector!T(length, _random_bound);
 
-    simplex[0].v[0] = 1;
-    simplex[0].v[1] = 0;
-
-    simplex[1].v[0] = -0.5;
-    simplex[1].v[1] = sqrt(3.0)/2;
-
-    simplex[2].v[0] = -0.5;
-    simplex[2].v[1] = -sqrt(3.0)/2;
-
     T[] simplex_values = new T[num_points];
     foreach(i; 0 .. num_points)
         simplex_values[i] = _func(simplex[i]);
@@ -98,8 +91,10 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     auto temporary_centroid_vector = new Vector!T(length, 0);
     auto centroid_vector = new Vector!T(length, 0);
 
-    foreach(i; 0 .. length) // Centroid doesn't take last point into account
-        temporary_centroid_vector += simplex[i];
+    foreach(i; 0 .. num_points){ // Centroid doesn't take worst point into account
+        if (i != max1_index)
+            temporary_centroid_vector += simplex[i];
+    }
 
     /// Core Loop
     bool stop_criterion = false;
@@ -107,8 +102,9 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     size_t ind = 0;
     while(!stop_criterion && ind < 100) {
         /// Compute centroid
+        ind++;
         centroid_vector.v[] = temporary_centroid_vector.v[];
-        centroid_vector /= num_points;
+        centroid_vector /= length;
         
         free_pass = false;
         
@@ -124,7 +120,6 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         if ((reflection_value < max2_value)
          && (reflection_value >= min_value)) {
             // Readjust centroid vector.
-            temporary_centroid_vector -= simplex[max1_index];
             temporary_centroid_vector += reflection_vector;
 
             // Replace last point in simplex.
@@ -153,7 +148,6 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 // We replace the worst point by the expension vector
                 if (expension_value < reflection_value) {
                     // Readjust centroid vector.
-                    temporary_centroid_vector -= simplex[min_index];
                     temporary_centroid_vector += expension_vector;
 
                     simplex[max1_index].v[] = expension_vector.v[];
@@ -171,7 +165,6 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 // We replace the worst point by the reflection vector
                 else {
                     // Readjust centroid vector.
-                    temporary_centroid_vector -= simplex[min_index];
                     temporary_centroid_vector += reflection_vector;
 
                     simplex[max1_index].v[] = reflection_vector.v[];
@@ -200,7 +193,6 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
             contraction_value = _func(contraction_vector);
             if (contraction_value < max1_value) {
                 // Readjust centroid vector.
-                temporary_centroid_vector -= simplex[max1_index];
                 temporary_centroid_vector += contraction_vector;
 
                 // Replace last point in simplex.
@@ -229,7 +221,6 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                     simplex[i] *= _shrink_coef;
                     simplex[i] += simplex[min_index];
                     simplex_values[i] = _func(simplex[i]);
-                    temporary_centroid_vector += simplex[i];
                 }
             }
 
@@ -245,6 +236,9 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 
         // Stopping criterion 1:
         // Stop when the centroid and the first vector are close
+
+        // Remove worst point from centroid
+        temporary_centroid_vector -= simplex[max1_index];
 
         temporary_vector.v[] = temporary_centroid_vector.v[];
         temporary_vector.v[] /= num_points;
@@ -297,7 +291,7 @@ unittest {
         assert(sphere(new Vector!real([0.0])) == 0.0);
         assert(sphere(new Vector!real([1.0, -1.0])) == 2.0);
 
-        size_t num = 1;
+        size_t num = 100;
         real succes = 0;
 
         foreach(i; 0 .. num)
@@ -308,7 +302,7 @@ unittest {
             if ((abs(res) <= 0.01) && (v.norm!"max" <= 0.01))
                 succes++;
         }
-        assert((succes/num) > 0.94);
+        assert((succes/num) >= 0.95, "Only " ~ to!string(100*(succes/num)) ~ "% success.");
     }
 /*
     { // Really simple exemple: find the racine of a polynomial (phi !)
