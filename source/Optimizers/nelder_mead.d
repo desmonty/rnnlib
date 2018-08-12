@@ -27,17 +27,24 @@ T nelder_mead(T)(ref Vector!T _v, T function(in Vector!T) _func,
 }
 
 T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
+                 in T _random_bound=5.0,
+                 in size_t _max_iterations=1000,
                  in T _reflection_coef=1.0,
                  in T _expension_coef=2.0,
                  in T _contraction_coef=0.5,
-                 in T _shrink_coef=0.5,
-                 in T _random_bound=5.0,) {
+                 in T _shrink_coef=0.5)
+{
     /+
      + Arguments:
      +
      +  - _v (Vector!T): will contains a local minimum of the _func.
      +
      +  - _func (T delegate(Vector!T)): the function to minimize.
+     +
+     +  - _random_bound (T): Absolute upper/lower bound for the creation
+     +                       of the vectors.
+     +
+     +  - _max_iterations (size_t): Maximum number of iterations.
      +
      +  - reflection_coef (T): Meta-Parameter.
      +
@@ -56,8 +63,18 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 
     /// Create Simplex
     auto simplex = new Vector!T[num_points];
+    
     foreach(i; 0 .. (num_points))
         simplex[i] = new Vector!T(length, _random_bound);
+    /+
+    foreach(i; 0 .. (num_points-1)) {
+        simplex[i] = new Vector!T(length, 0);
+        simplex[i].v[i] = _random_bound;
+    }
+    simplex[num_points-1] = new Vector!T(length, 0);
+    foreach(i; 0 .. length)
+        simplex[num_points-1].v[i] = - _random_bound / sqrt(to!real(length));
+    +/
 
     T[] simplex_values = new T[num_points];
     foreach(i; 0 .. num_points)
@@ -100,7 +117,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     bool stop_criterion = false;
     bool free_pass = false;
     size_t ind = 0;
-    while(!stop_criterion && ind < 100) {
+    while(!stop_criterion && ind < _max_iterations) {
         /// Compute centroid
         ind++;
         centroid_vector.v[] = temporary_centroid_vector.v[];
@@ -133,6 +150,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
             max2_value = tmp_max_value[1];
             max2_index = index_max[1];
             free_pass = true;
+            write("Reflection: ");
         }
 
         /// Expension
@@ -179,6 +197,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                     max2_value = tmp_max_value[1];
                     max2_index = index_max[1];
                 }
+                write("Expension: ");
                 free_pass = true;
             }
         }
@@ -208,6 +227,8 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 max2_value = tmp_max_value[1];
                 max2_index = index_max[1];
                 free_pass = true;
+
+                write("Contraction: ");
             }
         }
 
@@ -232,6 +253,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
             max1_index = index_max[0];
             max2_value = tmp_max_value[1];
             max2_index = index_max[1];
+            write("Shrink: ");
         }
 
         // Stopping criterion 1:
@@ -244,16 +266,35 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         temporary_vector.v[] /= num_points;
         temporary_vector -= simplex[min_index];
         stop_criterion = (temporary_vector.norm!"L2" <= 0.00001);
+
+
+        version(unittest) {
+            writeln(min_value, " - ", max1_value);
+            write("\t");
+            foreach(i; 0 .. num_points) {
+                write(simplex[i].v, " ");
+            }
+            write("\n");
+            write("\t");
+            foreach(i; 0 .. num_points) {
+                write(simplex_values[i], " ");
+            }
+            write("\n");
+        }
+
     }
 
     /// Return
+    version(unittest) {
+        writeln("Number of iterations: ", ind);
+    }
     _v.v[] = simplex[min_index].v[];
     return min_value;
-}
+}/+
 unittest {
     write("Unittest: nelder_mead ... ");
-/*
-    {// Three-hump camel function -  dimensions
+
+    {// coscosexp function -  dimensions
         auto v = new Vector!real(2);
         
         import std.math: cos, exp;
@@ -264,20 +305,19 @@ unittest {
             return 1 - cos(x) * cos(y) * exp(- (x*x + y*y));
         }
 
-        size_t num = 25;
+        size_t num = 100;
         real succes = 0;
 
         foreach(i; 0 .. num)
         {
-            // TODO: Replace with neilder-mead
-            auto res = nelder_mead!real(v, &f3hc);
+            auto res = nelder_mead!real(v, &f3hc, 1.0);
 
             if ((abs(res) <= 0.01) && (v.norm!"L2" <= 0.01))
                 succes++;
         }
         assert((succes/num) >= 0.95, "Only " ~ to!string(100*(succes/num)) ~ "% success.");
     }
-*/
+
     {// Sphere function - 100 dimensions
         auto v = new Vector!real(2);
 
@@ -296,7 +336,6 @@ unittest {
 
         foreach(i; 0 .. num)
         {
-            // TODO: Replace with neilder-mead
             auto res = nelder_mead!real(v, &sphere);
 
             if ((abs(res) <= 0.01) && (v.norm!"max" <= 0.01))
@@ -304,7 +343,7 @@ unittest {
         }
         assert((succes/num) >= 0.95, "Only " ~ to!string(100*(succes/num)) ~ "% success.");
     }
-/*
+
     { // Really simple exemple: find the racine of a polynomial (phi !)
         auto v = new Vector!real(1);
 
@@ -320,20 +359,19 @@ unittest {
         assert(racine(new Vector!real([0.0])) == 0.0);
         assert(racine!(1.0, -1.0)(new Vector!real([1.0])) == 0.0);
 
-            // TODO: Replace with neilder-mead
-        auto res = nelder_mead!real(v, &(racine!(1.0, -1.0, -1.0)));
+        auto res = nelder_mead!real(v, &(racine!(1.0, -1.0, -1.0)), 3.0);
 
         assert(abs(res) <= 0.001);
         assert((abs(v[0] - (1.0 + sqrt(5.0))/2.0) <= 0.001) ||
-               (abs(v[0] - (1.0 - sqrt(5.0))/2.0) <= 0.001));
+               (abs(v[0] - (1.0 - sqrt(5.0))/2.0) <= 0.001), to!string(v[0]) ~ " is not a solution.");
     }
-*/
+
 
     writeln("Done");
-}
+}+/
 
 void nelder_mead_tests() {
-
+/+
     { // train a very small neural network on linear + relu function
         size_t len = 10;
         size_t num_points = 500;
@@ -378,19 +416,18 @@ void nelder_mead_tests() {
         }
 
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
-            // TODO: Replace with neilder-mead
-        auto res = nelder_mead!float(sol, &loss_function_linRel);
+        auto res = nelder_mead!float(sol, &loss_function_linRel, 10.0);
 
-        write("Optimizers: Random_search: Linear.Relu: ");
+        write("Optimizers: Nelder_Mead: Linear.Relu: ");
         if (res < 1e-3)
             writeln("OK");
         else
             writeln("FAIL: ", res);
     }
-
++/
     { // train a very small neural network on dot product function
-        size_t len = 100;
-        size_t num_points = 1000;
+        size_t len = 2;
+        size_t num_points = 100;
         
         // Create Data points.
         auto m = new Matrix!float(1, len, 1.0);
@@ -426,13 +463,12 @@ void nelder_mead_tests() {
         }
 
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
-            // TODO: Replace with neilder-mead
-        auto res = nelder_mead!float(sol, &loss_function_dot);
+        auto res = nelder_mead!float(sol, &loss_function_dot, 2.0, 10);
 
-        write("            Random_search: Dot Product: ");
+        write("            Nelder_Mead: Dot Product: ");
         if (res < 1e-3)
             writeln("OK");
         else
-            writeln("FAIL");
+            writeln("FAIL: ", res);
     }
 }
