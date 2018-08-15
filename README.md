@@ -82,8 +82,14 @@ This library will be used to try to answer the following questions:
     * Music Generation ?
   * _Deep Reinforcement Learning Final Tests_
     * [Gym](https://gym.openai.com/)
-    * [Universe](https://github.com/openai/universe)
+    * ~~[Universe](https://github.com/openai/universe)~~ (too large a dependency)
     * Zbaghul
+    
+* GPU
+ * OpenCL computing of graph
+  - translate entire graph to openCL kernel?
+  - optimization pass with similar system to https://github.com/CNugteren/cltune
+
 * DOCUMENTATION
   * Vector
   * Matrix
@@ -95,6 +101,7 @@ This library will be used to try to answer the following questions:
 * FORMAT
   * CodeCov
   * Travis CI ?
+    - Would be useful to guarantee all builds on all compilers/platforms
   * [Command Line git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) (+ .gitignore)
   * dub
   * [For most of these](https://github.com/libmir/mir-algorithm)
