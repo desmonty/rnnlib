@@ -4,18 +4,14 @@ import core.stdc.math: isnan;
 import std.algorithm: max;
 import std.conv: to;
 import std.functional: toDelegate;
-import std.math: abs, pow, sqrt;
+import std.math: abs, cos, exp, pow, sqrt;
 import std.mathspecial: normalDistributionInverse;
 import std.random: uniform;
+import std.stdio: writeln, write;
 
 import source.Matrix;
 import source.NeuralNetwork;
 import source.Parameter;
-
-
-version(unittest) {
-    import std.stdio: writeln, write;
-}
 
 
 T random_search(T)(ref Vector!T _v, T function(in Vector!T) _func,
@@ -96,86 +92,102 @@ T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 
     return current_value;
 }
+
+// Unit tests only check valid contract types (input, output)
 unittest {
-    write("Unittest: random_search ... ");
-
-    {// coscosexp function -  dimensions
-        auto v = new Vector!real(2);
-        
-        import std.math: cos, exp;
-        
-        real f3hc(in Vector!real _v) {
-            real x = _v[0];
-            real y = _v[1];
-            return 1 - cos(x) * cos(y) * exp(- (x*x + y*y));
-        }
-
-        size_t num = 25;
-        real succes = 0;
-
-        foreach(i; 0 .. num)
-        {
-            auto res = random_search!real(v, &f3hc, 100_000_000, 100000);
-
-            if ((abs(res) <= 0.01) && (v.norm!"L2" <= 0.01))
-                succes++;
-        }
-        assert((succes/num) >= 0.95, "Only " ~ to!string(100*(succes/num)) ~ "% success.");
+    real f3hc(in Vector!real _v) {
+        real x = _v[0];
+        real y = _v[1];
+        return 1 - cos(x) * cos(y) * exp(- (x*x + y*y));
     }
-
-    {// Sphere function - 100 dimensions
-        auto v = new Vector!real(100);
-
-        real sphere(in Vector!real _v) {
-            real tmp = 0.0;
-            foreach(val; _v.v)
-                tmp += val*val;
-            return tmp;
-        }
-
-        assert(sphere(new Vector!real([0.0])) == 0.0);
-        assert(sphere(new Vector!real([1.0, -1.0])) == 2.0);
-
-        size_t num = 25;
-        real succes = 0;
-
-        foreach(i; 0 .. num)
-        {
-            auto res = random_search!real(v, &sphere, 5000, 30);
-
-            if ((abs(res) <= 0.01) && (v.norm!"max" <= 0.01))
-                succes++;
-        }
-        assert((succes/num) > 0.94);
-    }
-
-    { // Really simple exemple: find the racine of a polynomial (phi !)
-        auto v = new Vector!real(1);
-
-        // racine!(a, b, c)(v) is zero iif v[i] is a racine of ax^2 + bx + c
-        // for every "i" and > zero everywhere else.
-        real racine(real a=1.0, real b=0.0, real c=0.0)(in Vector!real _v) {
-            real tmp = 0.0;
-            foreach(val; _v.v)
-                tmp += pow(a*val*val + b*val + c, 2.0);
-            return tmp;
-        } 
-
-        assert(racine(new Vector!real([0.0])) == 0.0);
-        assert(racine!(1.0, -1.0)(new Vector!real([1.0])) == 0.0);
-
-        auto res = random_search!real(v, &(racine!(1.0, -1.0, -1.0)),
-                                      200UL, 5UL);
-
-        assert(abs(res) <= 0.001);
-        assert((abs(v[0] - (1.0 + sqrt(5.0))/2.0) <= 0.001) ||
-               (abs(v[0] - (1.0 - sqrt(5.0))/2.0) <= 0.001));
-    }
-
-    writeln("Done");
+    auto v = new Vector!real(2);
+    auto res = random_search!real(v, &f3hc, 3, 3);
+    assert(res < 100_000_000_000);
 }
 
+/*
+End-to-end test function
+*/
 void random_search_tests() {
+
+    { //unit tests testing corrrect output took too long so moved here 
+        write("Unittest: random_search ... ");
+
+        {// coscosexp function -  dimensions
+            auto v = new Vector!real(2);
+            
+            import std.math: cos, exp;
+            
+            real f3hc(in Vector!real _v) {
+                real x = _v[0];
+                real y = _v[1];
+                return 1 - cos(x) * cos(y) * exp(- (x*x + y*y));
+            }
+
+            size_t num = 25;
+            real succes = 0;
+
+            foreach(i; 0 .. num)
+            {
+                auto res = random_search!real(v, &f3hc, 100_000_000, 100_000);
+
+                if ((abs(res) <= 0.01) && (v.norm!"L2" <= 0.01))
+                    succes++;
+            }
+            assert((succes/num) >= 0.95, "Only " ~ to!string(100*(succes/num)) ~ "% success.");
+        }
+
+        {// Sphere function - 100 dimensions
+            auto v = new Vector!real(100);
+
+            real sphere(in Vector!real _v) {
+                real tmp = 0.0;
+                foreach(val; _v.v)
+                    tmp += val*val;
+                return tmp;
+            }
+
+            assert(sphere(new Vector!real([0.0])) == 0.0);
+            assert(sphere(new Vector!real([1.0, -1.0])) == 2.0);
+
+            size_t num = 25;
+            real succes = 0;
+
+            foreach(i; 0 .. num)
+            {
+                auto res = random_search!real(v, &sphere, 5000, 30);
+
+                if ((abs(res) <= 0.01) && (v.norm!"max" <= 0.01))
+                    succes++;
+            }
+            assert((succes/num) > 0.94);
+        }
+
+        { // Really simple exemple: find the racine of a polynomial (phi !)
+            auto v = new Vector!real(1);
+
+            // racine!(a, b, c)(v) is zero iif v[i] is a racine of ax^2 + bx + c
+            // for every "i" and > zero everywhere else.
+            real racine(real a=1.0, real b=0.0, real c=0.0)(in Vector!real _v) {
+                real tmp = 0.0;
+                foreach(val; _v.v)
+                    tmp += pow(a*val*val + b*val + c, 2.0);
+                return tmp;
+            } 
+
+            assert(racine(new Vector!real([0.0])) == 0.0);
+            assert(racine!(1.0, -1.0)(new Vector!real([1.0])) == 0.0);
+
+            auto res = random_search!real(v, &(racine!(1.0, -1.0, -1.0)),
+                                        200UL, 5UL);
+
+            assert(abs(res) <= 0.001);
+            assert((abs(v[0] - (1.0 + sqrt(5.0))/2.0) <= 0.001) ||
+                (abs(v[0] - (1.0 - sqrt(5.0))/2.0) <= 0.001));
+        }
+
+        writeln("Done");
+    }
 
     { // train a very small neural network on linear + relu function
         size_t len = 10;
