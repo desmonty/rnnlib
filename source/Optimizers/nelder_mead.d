@@ -1,11 +1,10 @@
 module source.optimizers.nelder_mead;
 
-import std.algorithm;
+import std.algorithm: minElement, topN, minIndex, topNIndex;
 import std.conv: to;
 import std.functional: toDelegate;
 import std.math: abs, pow, sqrt;
 import std.range: enumerate;
-import std.typecons: Yes;
 
 import source.Matrix;
 import source.NeuralNetwork;
@@ -63,12 +62,11 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     immutable size_t num_points = _v.length + 1;
 
     /// Create Simplex
-
     auto simplex = new Vector!T[num_points];
-    /+
+    
     foreach(i; 0 .. (num_points))
         simplex[i] = new Vector!T(length, _random_bound);
-    +/
+    /+
     foreach(i; 0 .. (num_points-1)) {
         simplex[i] = new Vector!T(length, 0);
         simplex[i].v[i] = _random_bound;
@@ -76,7 +74,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     simplex[num_points-1] = new Vector!T(length, 0);
     foreach(i; 0 .. length)
         simplex[num_points-1].v[i] = - _random_bound / sqrt(to!real(length));
-    
+    +/
 
     T[] simplex_values = new T[num_points];
     foreach(i; 0 .. num_points)
@@ -86,15 +84,14 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     auto min_value = simplex_values.minElement;
     auto min_index = simplex_values.minIndex;
 
-    auto tmp_max_value = new T[2];
-    simplex_values.topNCopy!"a > b"(tmp_max_value, Yes.sortOutput);
+    auto tmp_max_value = simplex_values.topN(2);
     size_t[] index_max = new size_t[2];
-    simplex_values.topNIndex!"a > b"(index_max, Yes.sortOutput);
+    simplex_values.topNIndex(index_max);
     auto max1_value = tmp_max_value[0];
     auto max1_index = index_max[0];
     auto max2_value = tmp_max_value[1];
     auto max2_index = index_max[1];
-            
+
     /// Init util vector
     auto temporary_vector = new Vector!T(length, _random_bound);
     auto reflection_vector = new Vector!T(length, _random_bound);
@@ -120,9 +117,9 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     bool stop_criterion = false;
     bool free_pass = false;
     size_t ind = 0;
-    T[] a = new T[_max_iterations];
     while(!stop_criterion && ind < _max_iterations) {
         /// Compute centroid
+        ind++;
         centroid_vector.v[] = temporary_centroid_vector.v[];
         centroid_vector /= length;
         
@@ -135,7 +132,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         reflection_vector += centroid_vector;
 
         reflection_value = _func(reflection_vector);
-        
+
         // if f(x_1) <= f(x_r) < f(x_n)
         if ((reflection_value < max2_value)
          && (reflection_value >= min_value)) {
@@ -146,15 +143,14 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
             simplex[max1_index].v[] = reflection_vector.v[];
             simplex_values[max1_index] = reflection_value;
 
-            min_value = simplex_values.minElement;
-            min_index = simplex_values.minIndex;
-            simplex_values.topNCopy!"a > b"(tmp_max_value, Yes.sortOutput);
-            simplex_values.topNIndex!"a > b"(index_max, Yes.sortOutput);
+            tmp_max_value = simplex_values.topN(2);
+            simplex_values.topNIndex(index_max);
             max1_value = tmp_max_value[0];
             max1_index = index_max[0];
             max2_value = tmp_max_value[1];
             max2_index = index_max[1];
             free_pass = true;
+            write("Reflection: ");
         }
 
         /// Expension
@@ -177,8 +173,8 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 
                     min_value = simplex_values.minElement;
                     min_index = simplex_values.minIndex;
-                    simplex_values.topNCopy!"a > b"(tmp_max_value, Yes.sortOutput);
-                    simplex_values.topNIndex!"a > b"(index_max, Yes.sortOutput);
+                    tmp_max_value = simplex_values.topN(2);
+                    simplex_values.topNIndex(index_max);
                     max1_value = tmp_max_value[0];
                     max1_index = index_max[0];
                     max2_value = tmp_max_value[1];
@@ -194,33 +190,24 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 
                     min_value = simplex_values.minElement;
                     min_index = simplex_values.minIndex;
-                    simplex_values.topNCopy!"a > b"(tmp_max_value, Yes.sortOutput);
-                    simplex_values.topNIndex!"a > b"(index_max, Yes.sortOutput);
+                    tmp_max_value = simplex_values.topN(2);
+                    simplex_values.topNIndex(index_max);
                     max1_value = tmp_max_value[0];
                     max1_index = index_max[0];
                     max2_value = tmp_max_value[1];
                     max2_index = index_max[1];
                 }
+                write("Expension: ");
                 free_pass = true;
             }
         }
 
         /// Contraction
         if (!free_pass) {
-            // Internal contraction
-            if (max1_value <= reflection_value) {
-                contraction_vector.v[] = simplex[max1_index].v[];
-                contraction_vector -= centroid_vector;
-                contraction_vector *= _contraction_coef;
-                contraction_vector += centroid_vector;
-            }
-            // External contraction
-            else {
-                contraction_vector.v[] = reflection_vector.v[];
-                contraction_vector -= centroid_vector;
-                contraction_vector *= _contraction_coef;
-                contraction_vector += centroid_vector;
-            }
+            contraction_vector.v[] = simplex[max1_index].v[];
+            contraction_vector -= centroid_vector;
+            contraction_vector *= _contraction_coef;
+            contraction_vector += centroid_vector;
 
             contraction_value = _func(contraction_vector);
             if (contraction_value < max1_value) {
@@ -233,13 +220,15 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 
                 min_value = simplex_values.minElement;
                 min_index = simplex_values.minIndex;
-                simplex_values.topNCopy!"a > b"(tmp_max_value, Yes.sortOutput);
-                simplex_values.topNIndex!"a > b"(index_max, Yes.sortOutput);
+                tmp_max_value = simplex_values.topN(2);
+                simplex_values.topNIndex(index_max);
                 max1_value = tmp_max_value[0];
                 max1_index = index_max[0];
                 max2_value = tmp_max_value[1];
                 max2_index = index_max[1];
                 free_pass = true;
+
+                write("Contraction: ");
             }
         }
 
@@ -253,18 +242,18 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                     simplex[i] *= _shrink_coef;
                     simplex[i] += simplex[min_index];
                     simplex_values[i] = _func(simplex[i]);
-                    temporary_centroid_vector += simplex[i];
                 }
             }
 
             min_value = simplex_values.minElement;
             min_index = simplex_values.minIndex;
-            simplex_values.topNCopy!"a > b"(tmp_max_value, Yes.sortOutput);
-            simplex_values.topNIndex!"a > b"(index_max, Yes.sortOutput);
+            tmp_max_value = simplex_values.topN(2);
+            simplex_values.topNIndex(index_max);
             max1_value = tmp_max_value[0];
             max1_index = index_max[0];
             max2_value = tmp_max_value[1];
             max2_index = index_max[1];
+            write("Shrink: ");
         }
 
         // Stopping criterion 1:
@@ -274,16 +263,26 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         temporary_centroid_vector -= simplex[max1_index];
 
         temporary_vector.v[] = temporary_centroid_vector.v[];
-        temporary_vector.v[] /= length;
+        temporary_vector.v[] /= num_points;
         temporary_vector -= simplex[min_index];
-        stop_criterion = (temporary_vector.norm!"L2" <= 0.0001);
+        stop_criterion = (temporary_vector.norm!"L2" <= 0.00001);
 
-        a[ind] = min_value;
-        ind++;
+
+        version(unittest) {
+            writeln(min_value, " - ", max1_value);
+            write("\t");
+            foreach(i; 0 .. num_points) {
+                write(simplex[i].v, " ");
+            }
+            write("\n");
+            write("\t");
+            foreach(i; 0 .. num_points) {
+                write(simplex_values[i], " ");
+            }
+            write("\n");
+        }
+
     }
-
-    import std.file: write;
-    write("list", to!string(a));
 
     /// Return
     version(unittest) {
@@ -427,8 +426,8 @@ void nelder_mead_tests() {
     }
 +/
     { // train a very small neural network on dot product function
-        size_t len = 100;
-        size_t num_points = 2000;
+        size_t len = 2;
+        size_t num_points = 100;
         
         // Create Data points.
         auto m = new Matrix!float(1, len, 1.0);
@@ -464,7 +463,7 @@ void nelder_mead_tests() {
         }
 
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
-        auto res = nelder_mead!float(sol, &loss_function_dot, 2.0, 50000);
+        auto res = nelder_mead!float(sol, &loss_function_dot, 2.0, 10);
 
         write("            Nelder_Mead: Dot Product: ");
         if (res < 1e-3)
