@@ -1,0 +1,10 @@
+{
+    "name": "rnnlib",
+    "authors": [
+        "Charles Desmonty",
+        "Matthieu Ranger"
+    ],
+    "description": "A library for (recurrent) neural networks in Dlang.",
+    "copyright": "Copyright © 2018, Charles Desmonty, Matthieu Ranger",
+    "license": "MIT"
+}
