@@ -72,8 +72,8 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     simplex[num_points-1] = new Vector!T(length, 0);
     foreach(i; 0 .. length)
         simplex[num_points-1].v[i] = - _random_bound / sqrt(to!real(length));
-    
 
+    /// Compute values at simplex points.
     T[] simplex_values = new T[num_points];
     foreach(i; 0 .. num_points)
         simplex_values[i] = _func(simplex[i]);
@@ -283,6 +283,64 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 unittest {
     write("Unittest: nelder_mead ... ");
 
+    void test_action_NM(Vector!float expected_solution,
+                        string str_action)
+    {
+        size_t len = 2;
+        size_t num_points = 1;
+        
+        // Create Data points.
+        Vector!float[] x_train = new Vector!float[num_points];
+        Vector!float[] y_train = new Vector!float[num_points];
+        Vector!float[] y_tilde = new Vector!float[num_points];
+
+        foreach(i; 0 .. num_points) {
+            x_train[i] = expected_solution;
+            y_train[i] = new Vector!float(len);
+            y_tilde[i] = new Vector!float(len);
+            y_train[i].v[] = x_train[i].v[];
+        }
+
+        // Create Neural Network.
+        auto nn = new NeuralNetwork!float(len);
+        nn.func!("b.v[] = p0.v[];", Vector!float)
+                (0, null, null, null, null, [2], [0.0])
+          .serialize;
+
+        float loss_function_linRel(in Vector!float _v) {
+            float loss_value = 0.0;
+
+            // We equipe the neural network with the weigth given in parameters.
+            nn.set_parameters(_v);
+
+            // We loop over all data points and compute the sum of squared errors.
+            foreach(i; 0 .. num_points) {
+                nn.apply(x_train[i], y_tilde[i]);
+                y_tilde[i] -= y_train[i];
+                loss_value += y_tilde[i].norm!"L2";
+            }
+
+            return loss_value/num_points;
+        }
+
+        auto sol = new Vector!float(nn.serialized_data.length, 0.0);
+        auto res = nelder_mead!float(sol, &loss_function_linRel, 2.0, 1);
+
+        sol -= expected_solution;
+
+        assert (sol.norm!"L2" < 1e-3, "Optimizers: Nelder_Mead: " ~ str_action);
+    }
+
+    test_action_NM(new Vector!float([1.0+sqrt(2.0), 1.0+sqrt(2.0)]), "Reflection");
+    test_action_NM(new Vector!float([2.0+sqrt(2.0), 2.0+sqrt(2.0)]), "Expension");
+    test_action_NM(new Vector!float([0.0, 0.0]), "Contraction (Internal)");
+    test_action_NM(new Vector!float([(3.0-sqrt(2.0))/4.0, (3.0-sqrt(2.0))/4.0]), "Contraction (External)");
+    test_action_NM(new Vector!float([0,5, 0,5]), "Shrink");
+
+    writeln("Done");
+}
+
+void nelder_mead_tests() { 
     {// coscosexp function -  dimensions
         auto v = new Vector!real(2);
         
@@ -304,7 +362,7 @@ unittest {
             if ((abs(res) <= 0.01) && (v.norm!"L2" <= 0.01))
                 succes++;
         }
-        assert((succes/num) >= 0.95, "Only " ~ to!string(100*(succes/num)) ~ "% success.");
+        assert((succes/num) >= 0.95, "Optimizers: Nelder_Mead: coscosexp: " ~ to!string(100*(succes/num))~"%");
     }
 
     {// Sphere function
@@ -330,14 +388,10 @@ unittest {
             if ((abs(res) <= 0.01) && (v.norm!"max" <= 0.01))
                 succes++;
         }
-        assert((succes/num) >= 0.95, "Only " ~ to!string(100*(succes/num)) ~ "% success.");
+        assert((succes/num) >= 0.95, "Optimizers: Nelder_Mead: Sphere: " ~ to!string(100*(succes/num))~"%");
     }
 
-    writeln("Done");
-}
-
-void nelder_mead_tests() {
-    { // train a very small neural network on linear + relu function
+    {// train a very small neural network on linear + relu function
         size_t len = 10;
         size_t num_points = 500;
         
@@ -383,14 +437,10 @@ void nelder_mead_tests() {
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
         auto res = nelder_mead!float(sol, &loss_function_linRel, 2.0);
 
-        write("Optimizers: Nelder_Mead: Linear.Relu: ");
-        if (res < 1e-3)
-            writeln("OK");
-        else
-            writeln("FAIL: ", res);
+        assert(res < 1e-3, "Optimizers: Nelder_Mead: Linear.Relu");
     }
 
-    { // train a very small neural network on dot product function
+    {// train a very small neural network on dot product function
         size_t len = 100;
         size_t num_points = 5000;
         
@@ -430,10 +480,7 @@ void nelder_mead_tests() {
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
         auto res = nelder_mead!float(sol, &loss_function_dot, 2.0, 50000);
 
-        write("            Nelder_Mead: Dot Product: ");
-        if (res < 1e-3)
-            writeln("OK");
-        else
-            writeln("FAIL: ", res);
+        
+        assert (res < 1e-3, "Optimizers: Nelder_Mead: Dot Product");
     }
 }
