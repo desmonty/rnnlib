@@ -131,6 +131,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 
         reflection_value = _func(reflection_vector);
         
+
         // if f(x_1) <= f(x_r) < f(x_n)
         if ((reflection_value < max2_value)
          && (reflection_value >= min_value)) {
@@ -150,6 +151,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
             max2_value = tmp_max_value[1];
             max2_index = index_max[1];
             free_pass = true;
+            writeln("Reflection");
         }
 
         /// Expension
@@ -161,6 +163,8 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 expension_vector += centroid_vector;
 
                 expension_value = _func(expension_vector);
+                writeln("blue: ", reflection_value, " ", expension_value);
+                writeln("cyan: ", reflection_vector.v, " ", expension_vector.v);
 
                 // We replace the worst point by the expension vector
                 if (expension_value < reflection_value) {
@@ -178,6 +182,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                     max1_index = index_max[0];
                     max2_value = tmp_max_value[1];
                     max2_index = index_max[1];
+                    writeln("Expension");
                 }
                 // We replace the worst point by the reflection vector
                 else {
@@ -195,6 +200,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                     max1_index = index_max[0];
                     max2_value = tmp_max_value[1];
                     max2_index = index_max[1];
+                    writeln("Reflection");
                 }
                 free_pass = true;
             }
@@ -203,11 +209,17 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         /// Contraction
         if (!free_pass) {
             // Internal contraction
+            auto blie = "";
             if (max1_value <= reflection_value) {
                 contraction_vector.v[] = simplex[max1_index].v[];
+                writeln("c: ", contraction_vector.v);
                 contraction_vector -= centroid_vector;
+                writeln("c: ", contraction_vector.v);
                 contraction_vector *= _contraction_coef;
+                writeln("c: ", contraction_vector.v);
                 contraction_vector += centroid_vector;
+                writeln("c: ", contraction_vector.v);
+                blie = "internal";
             }
             // External contraction
             else {
@@ -215,6 +227,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 contraction_vector -= centroid_vector;
                 contraction_vector *= _contraction_coef;
                 contraction_vector += centroid_vector;
+                blie = "external";
             }
 
             contraction_value = _func(contraction_vector);
@@ -235,6 +248,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 max2_value = tmp_max_value[1];
                 max2_index = index_max[1];
                 free_pass = true;
+                writeln("Contraction " ~ blie);
             }
         }
 
@@ -260,6 +274,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
             max1_index = index_max[0];
             max2_value = tmp_max_value[1];
             max2_index = index_max[1];
+            writeln("Shrink");
         }
 
         // Stopping criterion 1:
@@ -284,18 +299,23 @@ unittest {
     write("Unittest: nelder_mead ... ");
 
     void test_action_NM(Vector!float expected_solution,
-                        string str_action)
+                        string str_action,
+                        Vector!float point_training=null)
     {
+        if (!point_training)
+            point_training = expected_solution;
         size_t len = 2;
         size_t num_points = 1;
         
+        writeln(str_action);
+
         // Create Data points.
         Vector!float[] x_train = new Vector!float[num_points];
         Vector!float[] y_train = new Vector!float[num_points];
         Vector!float[] y_tilde = new Vector!float[num_points];
 
         foreach(i; 0 .. num_points) {
-            x_train[i] = expected_solution;
+            x_train[i] = point_training;
             y_train[i] = new Vector!float(len);
             y_tilde[i] = new Vector!float(len);
             y_train[i].v[] = x_train[i].v[];
@@ -304,7 +324,7 @@ unittest {
         // Create Neural Network.
         auto nn = new NeuralNetwork!float(len);
         nn.func!("b.v[] = p0.v[];", Vector!float)
-                (0, null, null, null, null, [2], [0.0])
+                (2, null, null, null, null, [2], [0.0])
           .serialize;
 
         float loss_function_linRel(in Vector!float _v) {
@@ -324,18 +344,36 @@ unittest {
         }
 
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
-        auto res = nelder_mead!float(sol, &loss_function_linRel, 2.0, 1);
+        auto res = nelder_mead!float(sol, &loss_function_linRel, 1.0, 1);
+
+        writeln(res);
+        writeln(expected_solution.v);
+        writeln(sol.v);
 
         sol -= expected_solution;
 
         assert (sol.norm!"L2" < 1e-3, "Optimizers: Nelder_Mead: " ~ str_action);
     }
 
-    test_action_NM(new Vector!float([1.0+sqrt(2.0), 1.0+sqrt(2.0)]), "Reflection");
-    test_action_NM(new Vector!float([2.0+sqrt(2.0), 2.0+sqrt(2.0)]), "Expension");
-    test_action_NM(new Vector!float([0.0, 0.0]), "Contraction (Internal)");
-    test_action_NM(new Vector!float([(3.0-sqrt(2.0))/4.0, (3.0-sqrt(2.0))/4.0]), "Contraction (External)");
-    test_action_NM(new Vector!float([0,5, 0,5]), "Shrink");
+
+    auto vec_r = new Vector!float([1.0+1.0/sqrt(2.0), 1.0+1.0/sqrt(2.0)]);
+    auto vec_e = new Vector!float([1.5+sqrt(2.0), 1.5+sqrt(2.0)]);
+    auto vec_c_i = new Vector!float([0.25-1.0/(2.0*sqrt(2.0)),
+                                     0.25-1.0/(2.0*sqrt(2.0))]);
+    auto vec_c_e = new Vector!float([1.5 + 1.0/(2.0*sqrt(2.0)),
+                                     1.5 + 1.0/(2.0*sqrt(2.0))]);
+    auto vec_s = new Vector!float([0,5, 0,5]);
+
+    write("Reflection::: ");
+    test_action_NM(vec_r, "Reflection");
+    write("Expension::: ");
+    test_action_NM(vec_e, "Expension");
+    write("Contraction (Internal)::: ");
+    test_action_NM(vec_c_i, "Contraction (Internal)", new Vector!float([0.1, 0.1]));
+    write("Contraction (External)::: ");
+    test_action_NM(vec_c_e, "Contraction (External)");
+    write("Shrink::: ");
+    test_action_NM(vec_s, "Shrink");
 
     writeln("Done");
 }
@@ -362,7 +400,8 @@ void nelder_mead_tests() {
             if ((abs(res) <= 0.01) && (v.norm!"L2" <= 0.01))
                 succes++;
         }
-        assert((succes/num) >= 0.95, "Optimizers: Nelder_Mead: coscosexp: " ~ to!string(100*(succes/num))~"%");
+        assert((succes/num) >= 0.95,
+               "Optimizers: Nelder_Mead: coscosexp: " ~ to!string(100*(succes/num))~"%");
     }
 
     {// Sphere function
@@ -388,7 +427,8 @@ void nelder_mead_tests() {
             if ((abs(res) <= 0.01) && (v.norm!"max" <= 0.01))
                 succes++;
         }
-        assert((succes/num) >= 0.95, "Optimizers: Nelder_Mead: Sphere: " ~ to!string(100*(succes/num))~"%");
+        assert((succes/num) >= 0.95,
+              "Optimizers: Nelder_Mead: Sphere: " ~ to!string(100*(succes/num))~"%");
     }
 
     {// train a very small neural network on linear + relu function
