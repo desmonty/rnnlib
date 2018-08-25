@@ -614,6 +614,8 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
             static foreach(i; 0 .. TypeParameter.length)
                 mixin("params["~to!string(i)~"] = new "~TypeParameter[i].stringof~
                       "(size_parameters[i], randomBound_parameters[i]);");
+            foreach(tmp_size; size_parameters)
+                this.size += tmp_size;
         }
     }
 
