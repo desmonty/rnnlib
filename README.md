@@ -100,9 +100,6 @@ This library will be used to try to answer the following questions:
     * OGFO
 * FORMAT
   * CodeCov
-  * Travis CI ?
-    - Would be useful to guarantee all builds on all compilers/platforms
   * [Command Line git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) (+ .gitignore)
-  * dub
   * [For most of these](https://github.com/libmir/mir-algorithm)
 
