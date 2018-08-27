@@ -123,7 +123,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         
         free_pass = false;
         
-        /// Reflection
+        /// Reflection - 1st case
         reflection_vector.v[] = centroid_vector.v[];
         reflection_vector -= simplex[max1_index];
         reflection_vector *= _reflection_coef;
@@ -180,6 +180,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                     max2_value = tmp_max_value[1];
                     max2_index = index_max[1];
                 }
+                // Reflection - 2nd case
                 // We replace the worst point by the reflection vector
                 else {
                     // Readjust centroid vector.
@@ -352,7 +353,8 @@ unittest {
         assert (sol.norm!"L2" < 1e-3, "Optimizers: Nelder_Mead: " ~ str_action);
     }
 
-    auto vec_r = new Vector!float([1.0+1.0/sqrt(2.0), 1.0+1.0/sqrt(2.0)]);
+    auto vec_r1 = new Vector!float([0, 1]);
+    auto vec_r2 = new Vector!float([1.0+1.0/sqrt(2.0), 1.0+1.0/sqrt(2.0)]);
     auto vec_e = new Vector!float([1.5+sqrt(2.0), 1.5+sqrt(2.0)]);
     auto vec_c_i = new Vector!float([0.25-1.0/(2.0*sqrt(2.0)),
                                      0.25-1.0/(2.0*sqrt(2.0))]);
@@ -360,14 +362,15 @@ unittest {
                                      0.75 + 1.0/(2.0*sqrt(2.0))]);
     auto vec_s = new Vector!float([0.5, 0.5]);
 
-    test_action_NM(vec_r, "Reflection");
+    test_action_NM(vec_r1, "Reflection - 1st case", new Vector!float([0.5, 1 + 1/sqrt(2.0)]));
+    test_action_NM(vec_r2, "Reflection - 2nd case");
     test_action_NM(vec_e, "Expension");
     test_action_NM(vec_c_i, "Contraction (Internal)", new Vector!float([0.1, 0.1]));
     test_action_NM(vec_c_e, "Contraction (External)", new Vector!float([0.9, 0.9]));
     test_action_NM_shrink(vec_s, "Shrink");
     writeln("Done");
 }
-/+
+
 void nelder_mead_tests() {
     {// coscosexp function -  dimensions
         auto v = new Vector!real(2);
@@ -513,4 +516,4 @@ void nelder_mead_tests() {
         
         assert (res < 1e-3, "Optimizers: Nelder_Mead: Dot Product");
     }
-}+/
+}
