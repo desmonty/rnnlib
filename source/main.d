@@ -16,6 +16,7 @@ import source.Parameter;
 import source.Utils;
 
 import source.optimizers.random_search;
+import source.optimizers.nelder_mead;
 
 /// GLOBALS
 
@@ -35,4 +36,5 @@ void main(string[] args) {
 
 void run_optimizers_tests() {
     random_search_tests();
+    nelder_mead_tests();
 }

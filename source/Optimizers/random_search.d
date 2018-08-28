@@ -99,7 +99,7 @@ T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
 unittest {
     write("Unittest: random_search ... ");
 
-    {// Three-hump camel function -  dimensions
+    {// coscosexp function -  dimensions
         auto v = new Vector!real(2);
         
         import std.math: cos, exp;
@@ -110,7 +110,7 @@ unittest {
             return 1 - cos(x) * cos(y) * exp(- (x*x + y*y));
         }
 
-        size_t num = 100;
+        size_t num = 25;
         real succes = 0;
 
         foreach(i; 0 .. num)
