@@ -13,17 +13,17 @@ import source.NeuralNetwork;
 import source.Parameter;
 
 
-T nelder_mead(T)(ref Vector!T _v, T function(in Vector!T) _func,
+T nelder_mead(T)(ref Vector!T _v, T function(in Vector!T) _obj,
                  T reflection_coef=1.0,
                  T expension_coef=2.0,
                  T contraction_coef=0.5,
                  T shrink_coef=0.5) {
-    return nelder_mead!T(_v, toDelegate(_func),
+    return nelder_mead!T(_v, toDelegate(_obj),
                          reflection_coef, expension_coef,
                          contraction_coef, shrink_coef);
 }
 
-T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
+T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _obj,
                  in T _random_bound=5.0,
                  in size_t _max_iterations=10000,
                  in T _reflection_coef=1.0,
@@ -34,9 +34,9 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     /+
      + Arguments:
      +
-     +  - _v (Vector!T): will contains a local minimum of the _func.
+     +  - _v (Vector!T): will contains a local minimum of the _obj.
      +
-     +  - _func (T delegate(Vector!T)): the function to minimize.
+     +  - _obj (T delegate(Vector!T)): the function to minimize.
      +
      +  - _random_bound (T): Absolute upper/lower bound for the creation
      +                       of the vectors.
@@ -76,7 +76,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     /// Compute values at simplex points.
     T[] simplex_values = new T[num_points];
     foreach(i; 0 .. num_points)
-        simplex_values[i] = _func(simplex[i]);
+        simplex_values[i] = _obj(simplex[i]);
 
     /// Order simplex
     auto min_value = simplex_values.minElement;
@@ -97,11 +97,11 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     auto expension_vector = new Vector!T(length, _random_bound);
     auto contraction_vector = new Vector!T(length, _random_bound);
     auto shrink_vector = new Vector!T(length, _random_bound);
-    T temporary_value;
-    T reflection_value;
-    T expension_value;
-    T contraction_value;
-    T shrink_value;
+    T temporary_value = to!T(0);
+    T reflection_value = to!T(0);
+    T expension_value = to!T(0);
+    T contraction_value = to!T(0);
+    T shrink_value = to!T(0);
 
     // Centroid
     auto temporary_centroid_vector = new Vector!T(length, 0);
@@ -129,7 +129,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         reflection_vector *= _reflection_coef;
         reflection_vector += centroid_vector;
 
-        reflection_value = _func(reflection_vector);
+        reflection_value = _obj(reflection_vector);
         
 
         // if f(x_1) <= f(x_r) < f(x_n)
@@ -161,7 +161,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 expension_vector *= _expension_coef;
                 expension_vector += centroid_vector;
 
-                expension_value = _func(expension_vector);
+                expension_value = _obj(expension_vector);
 
                 // We replace the worst point by the expension vector
                 if (expension_value < reflection_value) {
@@ -220,7 +220,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                 contraction_vector += centroid_vector;
             }
 
-            contraction_value = _func(contraction_vector);
+            contraction_value = _obj(contraction_vector);
             if (contraction_value < max1_value) {
                 // Readjust centroid vector.
                 temporary_centroid_vector += contraction_vector;
@@ -250,7 +250,7 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
                     simplex[i] -= simplex[min_index];
                     simplex[i] *= _shrink_coef;
                     simplex[i] += simplex[min_index];
-                    simplex_values[i] = _func(simplex[i]);
+                    simplex_values[i] = _obj(simplex[i]);
                     temporary_centroid_vector += simplex[i];
                 }
             }
@@ -292,23 +292,19 @@ unittest {
     {
         if (!point_training)
             point_training = expected_solution;
-        size_t len = 2;
-        size_t num_points = 1;
 
         // Create Data points.
-        Vector!float[] x_train = new Vector!float[num_points];
-        Vector!float[] y_train = new Vector!float[num_points];
-        Vector!float[] y_tilde = new Vector!float[num_points];
+        Vector!float[] x_train = new Vector!float[1];
+        Vector!float[] y_train = new Vector!float[1];
+        Vector!float[] y_tilde = new Vector!float[1];
 
-        foreach(i; 0 .. num_points) {
-            x_train[i] = point_training;
-            y_train[i] = new Vector!float(len);
-            y_tilde[i] = new Vector!float(len);
-            y_train[i].v[] = x_train[i].v[];
-        }
+        x_train[0] = point_training;
+        y_train[0] = new Vector!float(2);
+        y_tilde[0] = new Vector!float(2);
+        y_train[0].v[] = x_train[0].v[];
 
         // Create Neural Network.
-        auto nn = new NeuralNetwork!float(len);
+        auto nn = new NeuralNetwork!float(2);
         nn.func!("b.v[] = p0.v[];", Vector!float)
                 (2, null, null, null, null, [2], [0.0])
           .serialize;
@@ -319,14 +315,12 @@ unittest {
             // We equipe the neural network with the weigth given in parameters.
             nn.set_parameters(_v);
 
-            // We loop over all data points and compute the sum of squared errors.
-            foreach(i; 0 .. num_points) {
-                nn.apply(x_train[i], y_tilde[i]);
-                y_tilde[i] -= y_train[i];
-                loss_value += y_tilde[i].norm!"L2";
-            }
+            // Compute the squared errors.
+            nn.apply(x_train[0], y_tilde[0]);
+            y_tilde[0] -= y_train[0];
+            loss_value += y_tilde[0].norm!"L2";
 
-            return loss_value/num_points;
+            return loss_value;
         }
 
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
