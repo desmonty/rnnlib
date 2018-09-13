@@ -4,53 +4,68 @@ import core.stdc.math: isnan;
 import std.algorithm: max;
 import std.conv: to;
 import std.functional: toDelegate;
-import std.math: abs, pow, sqrt;
+import std.math: abs, pow, cos, exp, sqrt;
 import std.mathspecial: normalDistributionInverse;
 import std.random: uniform;
+import std.stdio: writeln, write;
 
 import source.Matrix;
 import source.NeuralNetwork;
 import source.Parameter;
 
 
-version(unittest) {
-    import std.stdio: writeln, write;
-}
-
-
-T random_search(T)(ref Vector!T _v, T function(in Vector!T) _func,
-                   in size_t _num_iterations=50UL,
-                   in size_t _patience=5UL) {
-    return random_search!T(_v, toDelegate(_func), _num_iterations,
-                            _patience, _lower_bound, _upper_bound);
-}
-
-T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
+T random_search(T)(ref Vector!T _v, T function(in Vector!T) _obj,
                    in size_t _num_iterations=50UL,
                    in size_t _patience=5UL,
                    in T _exponential_factor_radius=0.5,
-                   in T _lower_bound_radius=1e-6) {
+                   in T _lower_bound_radius=1e-6
+                   in bool _random_start=true)
+{
+    return random_search!T(_v, toDelegate(_obj), _num_iterations,
+                            _patience, _exponential_factor_radius,
+                            _lower_bound_radius, _random_start);
+}
+
+T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _obj,
+                   in size_t _num_iterations=50UL,
+                   in size_t _patience=5UL,
+                   in T _exponential_factor_radius=0.5,
+                   in T _lower_bound_radius=1e-6
+                   in bool _random_start=true)
+{
     /+
      + Arguments:
      +
-     +  - _v (Vector!T): will contains a local minimum of the _func.
+     +  - _v (Vector!T): will contains a local minimum of the _obj.
      +
-     +  - _func (T delegate(Vector!T)): the function to minimize.
+     +  - _obj (T delegate(Vector!T)): the function to minimize.
      +
      +  - _num_iterations (size_t): Maximum number of iterations of the algorithm.
      +
      +  - _patience (size_t): Reduce hypersphere radius if _patience itertations
      +                        has been executed without improvement.
+     +
+     +  - _exponential_factor_radius (T): value we use to rescale the size of step
+     +                                    when '_patence' tries didn't provide us 
+     +                                    with a better value.
+     +
+     +  - _lower_bound_radius (T): Stop criterion on the minimal acceptable scaling
+     +                             one can use.
+     +
+     +  - _random_start (bool): Whether we should start the algorithm at the provided
+     +                          vector or create a random one.
+     +
      +/
 
     /// Initialization
     immutable T default_upper_bound = to!T( 1); 
     immutable T default_lower_bound = to!T(-1); 
 
-    foreach(i; 0 .. _v.length)
-        _v[i] = uniform(default_lower_bound, default_upper_bound);
+    if (_random_start)
+        foreach(i; 0 .. _v.length)
+            _v[i] = uniform(default_lower_bound, default_upper_bound);
 
-    auto current_value = _func(_v);
+    auto current_value = _obj(_v);
     auto current_iteration = 0UL;
     auto current_radius = to!T(1.0);
     size_t current_patience = _patience;
@@ -79,7 +94,7 @@ T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
         neighbour += _v;
 
         /// Compute new value.
-        neighbour_value = _func(neighbour);
+        neighbour_value = _obj(neighbour);
 
         /// If new value is better than the old, we move _v to the neighbour.
         // And become patient again.
@@ -97,12 +112,41 @@ T random_search(T)(ref Vector!T _v, T delegate(in Vector!T) _func,
     return current_value;
 }
 unittest {
-    write("Unittest: random_search ... ");
+    Vector!real origin = new Vector!real(5, 0.0);
 
+    real func_obj(Vector!real _v) {
+        // We are sure that any point will do better than the origin here.
+        return -_v.norm!"L2";
+    }
+
+    auto origin_tmp = origin.dup;
+
+    
+
+    /+ We make only one iteration and stop to see if the next
+     + point is at the right distance from the previous one.
+     + Furthermore, we take the mean of all the generated points
+     + to see if it is close to the origin
+     + (check ifuniform on the hypersphere)
+     +/
+    auto mean_vector = new Vector!real(5, 0.0);
+    foreach(i; 0 . 300) {
+        random_search(origin_tmp, &func_obj, 1, 10, 0.5, 1e-6, false);
+        assert(abs(origin_tmp.norm!"L2" - 1.0) <= 1e-3,
+               "Error: Random_search: Wrong distance between consecutives point");
+        mean_vector += origin_tmp;
+        origin_tmp[] = origin[];
+    }
+
+    mean_vector /= 300.0;
+    assert(mean_vector.norm!"L2" <= 1e-5,
+           "Error: Random_search: Generation isn't uniform on the hypersphere.");
+
+}
+
+void random_search_tests() {
     {// Three-hump camel function -  dimensions
         auto v = new Vector!real(2);
-        
-        import std.math: cos, exp;
         
         real f3hc(in Vector!real _v) {
             real x = _v[0];
@@ -171,11 +215,6 @@ unittest {
         assert((abs(v[0] - (1.0 + sqrt(5.0))/2.0) <= 0.001) ||
                (abs(v[0] - (1.0 - sqrt(5.0))/2.0) <= 0.001));
     }
-
-    writeln("Done");
-}
-
-void random_search_tests() {
 
     { // train a very small neural network on linear + relu function
         size_t len = 10;
