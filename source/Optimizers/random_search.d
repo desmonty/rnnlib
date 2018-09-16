@@ -120,31 +120,107 @@ unittest {
         return -_v.norm!"L2";
     }
 
-    auto origin_tmp = origin.dup;
-
-    
-    /+ We make only one iteration and stop to see if the next
-     + point is at the right distance from the previous one.
-     + Furthermore, we take the mean of all the generated points
-     + to see if it is close to the origin
-     + (check ifuniform on the hypersphere)
-     +/
-    auto mean_vector = new Vector!real(dimension, 0.0);
-    size_t num_vector = 1000;
-    foreach(i; 0 .. num_vector) {
-        random_search(origin_tmp, &func_obj, 1, 10, 0.5, 1e-3, false);
-        assert(abs(origin_tmp.norm!"L2" - 1.0) <= 1e-3,
-               "Error: Random_search: Wrong distance between consecutives point");
-        mean_vector += origin_tmp;
-        origin_tmp.v[] = origin.v[];
+    real func_obj_op(in Vector!real _v) {
+        // We are sure that any point will do better than the origin here.
+        return _v.norm!"L2";
     }
 
-    mean_vector /= num_vector;
-    assert(mean_vector.norm!"L2" <= 1e-1,
-           "Error: Random_search: Generation isn't uniform on the hypersphere.");
+    { // Patience = 10, Iter = 1
+        auto origin_tmp = origin.dup;
+
+        
+        /+ We make only one iteration and stop to see if the next
+         + point is at the right distance from the previous one.
+         + Furthermore, we take the mean of all the generated points
+         + to see if it is close to the origin
+         + (check ifuniform on the hypersphere)
+         +/
+        auto mean_vector = new Vector!real(dimension, 0.0);
+        size_t num_vector = 1000;
+        foreach(i; 0 .. num_vector) {
+            random_search(origin_tmp, &func_obj, 1, 10, 0.5, 1e-3, false);
+            assert(abs(origin_tmp.norm!"L2" - 1.0) <= 1e-3,
+                   "Error: Random_search: Wrong distance between consecutives point");
+            mean_vector += origin_tmp;
+            origin_tmp.v[] = origin.v[];
+        }
+
+        mean_vector /= num_vector;
+        assert(mean_vector.norm!"L2" <= 1e-1,
+               "Error: Random_search: Generation isn't uniform on the hypersphere.");
+    }
+
+    {// Patience = 0, Iter = 1
+        auto origin_tmp = origin.dup;
+
+        /+ Same as above, but the distance should be 0.5 because of our lack of patience.
+         +/
+        auto mean_vector = new Vector!real(dimension, 0.0);
+        size_t num_vector = 1000;
+        foreach(i; 0 .. num_vector) {
+            random_search(origin_tmp, &func_obj, 1, 0, 0.5, 1e-3, false);
+            assert(abs(origin_tmp.norm!"L2" - 0.5) <= 1e-3,
+                   "Error: Random_search: Wrong distance between consecutives point");
+            mean_vector += origin_tmp;
+            origin_tmp.v[] = origin.v[];
+        }
+
+        mean_vector /= num_vector;
+        assert(mean_vector.norm!"L2" <= 1e-1,
+               "Error: Random_search: Generation isn't uniform on the hypersphere.");
+    }
+
+    {// Patience = 0, Iter = 2, lower_bound = 2.0
+        auto origin_tmp = origin.dup;
+
+        auto mean_vector = new Vector!real(dimension, 0.0);
+        random_search(origin_tmp, &func_obj, 1, 0, 0.5, 2.0, false);
+        assert(origin_tmp.norm!"L2" <= 1e-6,
+               "Error: Random_search: Didn't stop at radius too small condition.");
+    }
+
+    {// Patience = 0, Iter = 0, random start
+        auto origin_tmp = origin.dup;
+
+        auto mean_vector = new Vector!real(dimension, 0.0);
+        size_t num_vector = 1000;
+        foreach(i; 0 .. num_vector) {
+            random_search(origin_tmp, &func_obj, 0, 0, 0.5, 1e-3, true);
+            assert(abs(origin_tmp.norm!"L2") <= sqrt(2.0),
+                   "Error: Random_search: Wrong distance between origin and random start");
+            mean_vector += origin_tmp;
+            origin_tmp.v[] = origin.v[];
+        }
+
+        mean_vector /= num_vector;
+        assert(mean_vector.norm!"L2" <= 1e-1,
+               "Error: Random_search: Generation of random start"~
+               "isn't uniform in the hypercube.");
+    }
+
+    {// Patience = 1, Iter = 2
+        auto origin_tmp = origin.dup;
+
+        // Here we use func_obj_op to only get point with a higher
+        // obj value than the origin in order for the algorithm to lose patience.
+
+        auto mean_vector = new Vector!real(dimension, 0.0);
+        size_t num_vector = 1000;
+        foreach(i; 0 .. num_vector) {
+            random_search(origin_tmp, &func_obj_op, 2, 1, 0.5, 1e-3, false);
+            assert(abs(origin_tmp.norm!"L2") <= 1.5,
+                   "Error: Random_search: Wrong distance between consecutives point");
+            mean_vector += origin_tmp;
+            origin_tmp.v[] = origin.v[];
+        }
+
+        mean_vector /= num_vector;
+        assert(mean_vector.norm!"L2" <= 1e-1,
+               "Error: Random_search: Generation isn't uniform on the hypersphere.");
+    }
 
 }
-/*
+
 void random_search_tests() {
     {// Three-hump camel function -  dimensions
         auto v = new Vector!real(2);
@@ -316,4 +392,4 @@ void random_search_tests() {
         else
             writeln("FAIL");
     }
-}*/
+}
