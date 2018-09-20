@@ -218,7 +218,6 @@ unittest {
         assert(mean_vector.norm!"L2" <= 1e-1,
                "Error: Random_search: Generation isn't uniform on the hypersphere.");
     }
-
 }
 
 void random_search_tests() {
@@ -231,7 +230,7 @@ void random_search_tests() {
             return 1 - cos(x) * cos(y) * exp(- (x*x + y*y));
         }
 
-        size_t num = 100;
+        size_t num = 25;
         real succes = 0;
 
         foreach(i; 0 .. num)
