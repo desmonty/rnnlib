@@ -909,7 +909,7 @@ unittest {
 
         auto a = new double[4];
         auto s = new Vector!double([5.0, 5.0, 5.0, 5.0]);
-        auto i = 0UL;
+        size_t i = 0;
 
         f.takeOwnership(a, i);
         a[0] = 4.0;
