@@ -600,8 +600,6 @@ class NeuralNetwork(T) {
     }
 }
 unittest {
-    write("Unittest: NeuralNetwork ... ");
-
     // Neural Network 1: Simple linear layer neural network.
     // Neural Network 2: Two linear layer with a recurrence.
     {
@@ -883,6 +881,4 @@ unittest {
 
     // Bad naming of layers
     assertThrown((new NeuralNetwork!real(5).linear(0, false, 1.0, "blue").linear(7, true, 2.0, "blue")));
-
-    writeln("Done.");
 }

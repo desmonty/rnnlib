@@ -338,11 +338,7 @@ void random_search_tests() {
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
         auto res = random_search!float(sol, &loss_function_linRel, 100_000_000, 500);
 
-        write("Optimizers: Random_search: Linear.Relu: ");
-        if (res < 1e-3)
-            writeln("OK");
-        else
-            writeln("FAIL: ", res);
+        assert(res < 1e-3, "Random_search: Linear.Relu: FAIL");
     }
 
     { // train a very small neural network on dot product function
@@ -385,10 +381,6 @@ void random_search_tests() {
         auto sol = new Vector!float(nn.serialized_data.length, 0.0);
         auto res = random_search!float(sol, &loss_function_dot, 1_000_000_000, 200);
 
-        write("Random_search: Dot Product: ");
-        if (res < 1e-3)
-            writeln("OK");
-        else
-            writeln("FAIL");
+        assert(res < 1e-3, "Random_search: Dot Product: FAIL");
     }
 }
