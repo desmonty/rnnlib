@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/desmonty/rnnlib.svg?branch=master)](https://travis-ci.org/desmonty/rnnlib)
+[![Build Status](https://ci.appveyor.com/api/projects/status/github/desmonty/rnnlib?svg=true)](https://ci.appveyor.com/api/projects/status/github/desmonty/rnnlib)
+
 # rnnlib
 A library for recurrent neural networks in [Dlang](https://dlang.org/)
 
@@ -100,6 +103,5 @@ This library will be used to try to answer the following questions:
     * OGFO
 * FORMAT
   * CodeCov
-  * [Command Line git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) (+ .gitignore)
   * [For most of these](https://github.com/libmir/mir-algorithm)
 
