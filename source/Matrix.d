@@ -36,7 +36,6 @@ auto dot(R1, R2)(in R1[] lhs, in R2[] rhs)
 }
 unittest
 {
-    write("Unittest: Matrix: Dot Product ...");
     assert(dot([1.0, 2.0, 3.0], [-6.0, -5.0, -1.0]) ==
            dot([-6.0, -5.0, -1.0], [1.0, 2.0, 3.0]));
 
@@ -45,7 +44,6 @@ unittest
            -
                dot([complex(6.4, 3.58), complex(10.8, 7.65), complex(1.0, 8.5)],
                [-5.0, -1.0, -6.0])) < 0.001);
-    write("Done.\n");
 }
 
 
@@ -254,8 +252,6 @@ class BlockMatrix(Mtype : M!T, alias M, T) : Parameter {
 }
 unittest
 {
-    write("                  Block ... ");
-
     // create an empt BlockMatrix for the seek of coverage.
     auto mtmp_blue_unused = new BlockMatrix!(UnitaryMatrix!real)();
     auto len = 1024;
@@ -347,7 +343,6 @@ unittest
 
     assertThrown(new BlockMatrix!(DiagonalMatrix!real)(4u, 4u, 3u));
     assertThrown(new BlockMatrix!(DiagonalMatrix!real)(4u, 3u, 3u));
-    write("Done.\n");
 }
 
 
@@ -717,7 +712,6 @@ class UnitaryMatrix(T) : Parameter
 }
 unittest
 {
-    write("                  Unitary ... ");
     // Complex valued Matrix
     {
         auto m0 = new UnitaryMatrix!(Complex!float)();
@@ -786,8 +780,6 @@ unittest
             assert(res_c_r.norm!"L2" <= 0.00001);
         }
     }
-
-    write("Done.\n");
 }
 
 /++ Fourier Matrix class.
@@ -952,8 +944,6 @@ class FourierMatrix(T) : Parameter
 }
 unittest
 {
-    write("                  Fourrier ... ");
-
     size_t len = 4;
     // Complex
     {
@@ -1038,8 +1028,6 @@ unittest
         b -= v;
         assert(b.norm!"L2" <= 0.000001);
     }
-
-    write("Done.\n");
 }
 
 /++ Diagonal matrix class.
@@ -1261,7 +1249,6 @@ class DiagonalMatrix(T) : Parameter {
 }
 unittest
 {
-    write("                  Diagonal ... ");
     {
         alias Diag = DiagonalMatrix!double;
         auto m1 = new Diag(4);
@@ -1336,8 +1323,6 @@ unittest
     v *= d;
 
     assert(v.norm!"L1" <= 0.001);
-
-    write("Done.\n");
 }
 
 /++ Reflection matrix class.
@@ -1529,7 +1514,6 @@ class ReflectionMatrix(T) : Parameter {
 }
 unittest
 {
-    write("                  Reflection ... ");
     {
         // Verification of the multiplication algorithm.
         alias Reflection = ReflectionMatrix!(Complex!real);
@@ -1588,8 +1572,6 @@ unittest
     }
 
     assertThrown(new ReflectionMatrix!(Complex!real)(10, 0.0));
-
-    writeln("Done.");
 }
 
 /++ Permutation matrix class.
@@ -1725,7 +1707,6 @@ class PermutationMatrix(T) : Parameter {
 }
 unittest
 {
-    write("                  Permutation ... ");
     {
         alias Perm = PermutationMatrix!float;
         
@@ -1753,7 +1734,6 @@ unittest
         buffer -= vec;
         assert(buffer.norm!"L2" <= 0.000001);
     }
-    write("Done.\n");
 }
 
 /++ General matrix class.
@@ -1934,7 +1914,6 @@ class Matrix(T) : Parameter {
 }
 unittest
 {
-    write("                  Matrix ... ");
     {
         auto m1 = new Matrix!(Complex!float)(10, 30, 5.0f);
         auto m2 = m1.dup;
@@ -1985,6 +1964,4 @@ unittest
         r -= b;
         assert(r.norm!"L2" <= 0.00001);
     }
-
-    writeln("Done.");
 }

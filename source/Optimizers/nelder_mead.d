@@ -284,8 +284,6 @@ T nelder_mead(T)(ref Vector!T _v, T delegate(in Vector!T) _obj,
     return min_value;
 }
 unittest {
-    write("Unittest: nelder_mead ... ");
-
     void test_action_NM(Vector!float expected_solution,
                         string str_action,
                         Vector!float point_training=null)
@@ -362,7 +360,6 @@ unittest {
     test_action_NM(vec_c_i, "Contraction (Internal)", new Vector!float([0.1, 0.1]));
     test_action_NM(vec_c_e, "Contraction (External)", new Vector!float([0.9, 0.9]));
     test_action_NM_shrink(vec_s, "Shrink");
-    writeln("Done");
 }
 
 void nelder_mead_tests() {

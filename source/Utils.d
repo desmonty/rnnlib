@@ -220,8 +220,6 @@ auto createPoolingFunction(T, alias reducer, size_t height, size_t width,
     ";
 }
 unittest {
-    write("Unittest: Utils: createPoolingFunction ...");
-
     enum size_t[] av = [1, 3];
     enum size_t[] lenav = [1, 2, 2];
     enum size_t[] valav = [0, 1, 3];
@@ -341,10 +339,6 @@ unittest {
 
     s5[] -= re5.v[];
     assert(abs(s5.sum) <= 0.001);
-
-
-
-    writeln(" Done.");
 }
 
 
@@ -380,8 +374,6 @@ void takeOwnership_util_matrix(Mtype, T)(ref T[] _owner, ref Mtype _ownee, ref s
     }
 }
 unittest {
-    write("                 takeOwnership_util_matrix... ");
-
     auto v = new Vector!real(4, 1.0);
     auto v2 = new Vector!real(2, 1.0);
 
@@ -430,8 +422,6 @@ unittest {
     auto res_5 = b * v;
     res_5 -= b1 * v;
     assert(res_5.norm!"L2" <= 0.00001);
-
-    writeln("Done.");
 }
 
 @safe @nogc pure
@@ -442,7 +432,6 @@ void takeOwnership_util(T)(ref T[] _owner, ref T[] _ownee, ref size_t _index)
     _index += _ownee.length;
 }
 unittest {
-    write("                 takeOwnership_util... ");
     size_t[] a = new size_t[4];
 
     size_t[] v1 = [1, 3];
@@ -460,6 +449,4 @@ unittest {
     assert(ind == 4);
     assert(v1 == [1000, 3]);
     assert(v2 == [5, 2000]);
-
-    writeln("Done.");
 }

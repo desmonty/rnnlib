@@ -376,9 +376,6 @@ class Vector(T) : Parameter {
 }
 unittest
 {
-  write("Unittest: Vector ... ");
-
-
   assertThrown(new Vector!float(5, -1.0));
 
   foreach(____;0 .. 10){
@@ -629,6 +626,5 @@ unittest
     }
 
   }
-  write("Done.\n");
 }
 

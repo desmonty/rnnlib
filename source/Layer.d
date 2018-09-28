@@ -199,8 +199,6 @@ if (!__traits(compiles, BlockMatrix!T))
     }
 }
 unittest {
-    write("Unittest: Layer: Matrix ... ");
-
     { // Matrices
         auto v = new Vector!(Complex!real)(4, 1.0);
 
@@ -370,7 +368,6 @@ unittest {
         assert(res_4.norm!"L2" <= 0.00001);
 
     }
-    write("Done.\n");
 }
 
 class MatrixLayer(Mtype : BlockMatrix!(M!T), alias M, T) : Layer!T
@@ -438,7 +435,6 @@ class MatrixLayer(Mtype : BlockMatrix!(M!T), alias M, T) : Layer!T
     }
 }
 unittest {
-    write("Unittest: Layer: BlockMatrix ... ");
 
     { // Matrice
         auto v = new Vector!(Complex!real)(4, 1.0);
@@ -492,7 +488,6 @@ unittest {
         res1 -= res2;
         assert(res1.norm!"L2" <= 0.00001);
     }
-    write("Done.\n");
 }
 
 
@@ -535,8 +530,6 @@ class BiasLayer(T) : Layer!T
     }
 }
 unittest {
-    write("                 Bias ... ");
-
     {
         auto v = new Vector!(Complex!real)(4, 0.5);
 
@@ -584,8 +577,6 @@ unittest {
 
         assert(buf.norm!"L2" <= 0.0001);
     }
-
-    write("Done.\n");
 }
 
 /++ This layer can implement any function that take as input a
@@ -842,8 +833,6 @@ class FunctionalLayer(T, string strfunc="", TypeParameter...) : Layer!T
     }
 }
 unittest {
-    write("                 Functional ... ");
-
     {
         alias Vec = Vector!(Complex!double);
 
@@ -1039,6 +1028,4 @@ unittest {
 
         assert(buf.norm!"L2" <= 0.000001);
     }
-
-    write(" Done.\n");
 }
