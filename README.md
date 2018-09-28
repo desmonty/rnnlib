@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/desmonty/rnnlib.svg?branch=master)](https://travis-ci.org/desmonty/rnnlib)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/desmonty/rnnlib?svg=true)](https://ci.appveyor.com/api/projects/status/github/desmonty/rnnlib)
+[![codecov](https://codecov.io/gh/desmonty/rnnlib/branch/master/graph/badge.svg)](https://codecov.io/gh/desmonty/rnnlib)
 
 # rnnlib
 A library for recurrent neural networks in [Dlang](https://dlang.org/)
