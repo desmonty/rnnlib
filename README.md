@@ -3,20 +3,19 @@
 [![codecov](https://codecov.io/gh/desmonty/rnnlib/branch/master/graph/badge.svg)](https://codecov.io/gh/desmonty/rnnlib)
 
 # rnnlib
-A library for recurrent neural networks in [Dlang](https://dlang.org/)
+A library for (recurrent) neural networks in [Dlang](https://dlang.org/)
 
 The aim of this project is to build a RNN factory such that one can construct
-RNN architecture using simple layers and any function.
+RNN architecture using simple layers and possibly any functions.
 
-The neural networks will primarily be trained using [Evolutionnary Algorithms](https://en.wikipedia.org/wiki/Evolutionary_algorithm).
-The reason why we do not use any optimization based on gradient descent is to avoid many issues it gives us when optimizing
-a rnn like vanishing/exploding gradients (e.g. see _[On the difficulty of training recurrent neural networks](http://www.jmlr.org/proceedings/papers/v28/pascanu13.pdf)_).
+Firstly, a focus will be put on gradient-based algorithm (e.g. SGD) to train the nns.
+SGD will then be used as a baseline against which we will test gradient-free algorithms (e.g. [Evolutionnary Algorithms](https://en.wikipedia.org/wiki/Evolutionary_algorithm)).
 
-One of the auxiliary goal of this project is to cut any dependencies between the evolutionary algorithms
-and the recurrent neural netwroks to enable anyone to use it independently.
+## Bonus
+- [ ] static nn
+- [ ] staticly trained nn
 
-
-# Research Goals
+## Research Goals
 This library will be used to try to answer the following questions:
 
 * _Optimizations_
