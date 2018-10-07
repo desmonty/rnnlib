@@ -11,6 +11,8 @@ RNN architecture using simple layers and possibly any functions.
 Firstly, a focus will be put on gradient-based algorithm (e.g. SGD) to train the nns.
 SGD will then be used as a baseline against which we will test gradient-free algorithms (e.g. [Evolutionnary Algorithms](https://en.wikipedia.org/wiki/Evolutionary_algorithm)).
 
+https://docs.google.com/document/d/1YrIUGw8XOrTrF7r6YTlCyMAbhDv9xIM5qTRsI9WwcdI/edit
+
 ## Bonus
 - [ ] static nn
 - [ ] staticly trained nn
