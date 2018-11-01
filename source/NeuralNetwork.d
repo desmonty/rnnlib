@@ -19,6 +19,25 @@ version(unittest)
     import std.math;
 }
 
+/++ Neural Networks constructed at compile time ! Yeah let's do this !
+ +
+ +  The idea is to first give the type that's gonna be manipulated by
+ +  the neural networks, and then a list of "Layers" that are compile-time
+ +  defined struct that holds all the information we need about it.
+ +
+ +  Once the template created, it should holds everything needed to run
+ +  and train a neural network (the original network).
+ +  Therefore, creating several networks using the same template will give
+ +  you access to the _same_ network !
+ +  However, we provide a function "create_clone" that give you a copy of
+ +  the original, making the template class both the network and a network
+ +  factory.
+ +
+ +/
+class NeuralNetwork(T, Layers...) {
+
+}
+
 /++ The Neural Network class hold all the logic of the func approximator.
  +  
  +  Args:
