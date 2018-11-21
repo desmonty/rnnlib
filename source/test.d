@@ -1,24 +1,38 @@
 import std.conv: to;
 
+/+ Used to create mutable version of an immutable type.
+ +
+ +/
+mixin template makeMutable(string name_type, U: immutable(T), T)
+{
+    mixin("alias "~name_type~" = T;");
+}
+
+mixin template makeMutable(string name_type, U)
+{
+    mixin("alias "~name_type~" = U;");
+}
 
 /+ Function used to extract any given property of the layers
  + and return them in the form of a to!string(string[])
  +/
 auto extract_property(string property, args...)()
 {
-    string unfolded_args= "[";
-
-    static foreach(i; 0 .. args.length)
+    static if (args.length)
     {
-        mixin("static if (is(typeof(args[i]."~property~") :  string)) unfolded_args ~= \"\\\"\";");
-        mixin("unfolded_args ~= to!string(args[i]."~property~");");
-        mixin("static if (is(typeof(args[i]."~property~") :  string)) unfolded_args ~= \"\\\"\";");
-        static if (i < args.length-1)
-            unfolded_args ~= ",";
-    }
+        mixin makeMutable!("mutable_property_type", typeof(__traits(getMember, args[0], property)));
+        mutable_property_type[args.length] unfolded_args;
 
-    unfolded_args ~= "]";
-    return unfolded_args;
+        static foreach(i; 0 .. args.length)
+        {
+            unfolded_args[i] = __traits(getMember, args[i], property);
+        }
+        return unfolded_args;
+    }
+    else
+    {
+        return;
+    }
 }
 
 
@@ -50,18 +64,10 @@ struct Linear(size_t _dim_out=0,
 class NeuralNetwork(typeInput, size_t dimInput, Layers...)
 {
     // Array of layers' name.
-    mixin(
-        "static immutable string[Layers.length] layers_names = "
-        ~extract_property!("name",Layers)
-        ~";"
-    );
+    static immutable string[Layers.length] layers_names = extract_property!("name",Layers);
 
     // Array of layers' bias existance.
-    mixin(
-        "static immutable bool[Layers.length] layers_bias = "
-        ~extract_property!("bias",Layers)
-        ~";"
-    );
+    static immutable bool[Layers.length] layers_bias = extract_property!("bias",Layers);
 
     this()
     {
